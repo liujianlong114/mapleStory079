@@ -1,0 +1,60 @@
+# 冒险岛079 Kubernetes 部署配置
+# 使用: kubectl apply -f deploy/k8s/deployment.yaml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: maplestory
+  labels:
+    app: maplestory
+---
+# ==================== MySQL ====================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: maplestory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: maplestory
+data:
+  my.cnf: |
+    [mysqld]
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    max-connections=500
+    innodb-buffer-pool-size=512M
+    default-authentication-plugin=mysql_native_password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: maplestory
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value

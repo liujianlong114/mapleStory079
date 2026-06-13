@@ -1,0 +1,42 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: debug
+  readTimeout: 10
+  writeTimeout: 10
+  shutdownTimeout: 5
+
+database:
+  driver: mysql
+  host: localhost
+  port: 3306
+  username: root
+  password: ""
+  database: maplestory
+  charset: utf8mb4
+  parseTime: true
+  autoMigrate: true
+  maxIdleConns: 10
+  maxOpenConns: 100
+  connMaxLifetime: 3600
+  maxRetries: 3
+  retryInterval: 2
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+logging:
+  level: debug
+  format: text
+  output: stdout
+
+game:
+  name: "MapleStory 079"
+  version: "v0.2.0"
+  defaultMap: 1
+  maxLevel: 200
+  startLevel: 1
+  startGold: 10000
