@@ -34,6 +34,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	r.Use(middleware.RateLimitMiddleware())
 
 	authHandler := NewAuthHandler()
+	worldHandler := NewWorldHandler()
 	charHandler := NewCharacterHandler()
 	wsHandler := NewWebSocketHandler()
 	gameHandler := NewGameHandler()
@@ -49,6 +50,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 		v1 := api.Group("/v1")
 		{
 			registerAuthRoutes(v1, authHandler)
+			registerWorldRoutes(v1, worldHandler)
 			registerCharacterRoutes(v1, charHandler)
 			registerGameRoutes(v1, gameHandler)
 			registerNPCRoutes(v1, npcHandler)
@@ -69,13 +71,21 @@ func registerAuthRoutes(r *gin.RouterGroup, h *AuthHandler) {
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
+		auth.POST("/gender", h.SetGender)
+		auth.POST("/logout", h.Logout)
+		auth.GET("/me", h.Me)
 	}
+}
+
+func registerWorldRoutes(r *gin.RouterGroup, h *WorldHandler) {
+	r.GET("/worlds", h.List)
 }
 
 func registerCharacterRoutes(r *gin.RouterGroup, h *CharacterHandler) {
 	characters := r.Group("/characters")
 	{
 		characters.POST("/", h.Create)
+		characters.GET("/check-name", h.CheckName)
 		characters.GET("/", h.GetByAccount)
 		characters.GET("/:id", h.GetByID)
 		characters.PUT("/:id", h.Update)
@@ -211,19 +221,39 @@ func parseUintOrZero(s string) uint64 {
 
 func healthHandler(c *gin.Context) {
 	dbStatus := "ok"
+	var counts database.TableCounts
 	if err := database.HealthCheck(); err != nil {
 		dbStatus = "unreachable"
+	} else if c, err := database.QueryTableCounts(); err == nil {
+		counts = c
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
 		"message": "MapleStory 079 Server is running",
 		"database": gin.H{
-			"status": dbStatus,
+			"status":     dbStatus,
+			"dsn":        database.DSNInfo(),
+			"data_ready": database.IsGameDataReady(),
+			"counts": gin.H{
+				"maps":       counts.Maps,
+				"mobs":       counts.Mobs,
+				"items":      counts.Items,
+				"skills":     counts.Skills,
+				"npcs":       counts.Npcs,
+				"quests":     counts.Quests,
+				"mob_drops":  counts.MobDrops,
+				"accounts":   counts.Accounts,
+				"characters": counts.Characters,
+			},
 		},
 		"cache": gin.H{
 			"entries":  cache.Size(),
 			"hit_rate": cache.HitRate(),
+		},
+		"demo_account": gin.H{
+			"username": database.DemoUsername,
+			"password": database.DemoPassword,
 		},
 		"timestamp": time.Now().Format(time.RFC3339),
 	})

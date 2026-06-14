@@ -10,22 +10,15 @@ import (
 	"mapleStory079/internal/handler"
 	"mapleStory079/pkg/cache"
 	"mapleStory079/pkg/database"
+	"mapleStory079/pkg/utils"
 
 	"github.com/spf13/viper"
 )
 
 func initConfig() {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./config")
-	viper.AddConfigPath("../config")
-	viper.AddConfigPath("../../config")
-
-	if err := viper.ReadInConfig(); err != nil {
+	if err := database.LoadConfig(""); err != nil {
 		log.Fatalf("Error reading config file: %v", err)
 	}
-
-	log.Printf("Configuration loaded successfully")
 	log.Printf("Game: %s %s", viper.GetString("game.name"), viper.GetString("game.version"))
 }
 
@@ -34,6 +27,11 @@ func main() {
 
 	if err := database.Init(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	if err := utils.InitForbiddenNames(); err != nil {
+		log.Printf("Warning: forbidden names not loaded: %v", err)
+	} else {
+		log.Println("Forbidden names loaded from ms079-main")
 	}
 	if err := database.AutoMigrate(
 		&database.Account{},

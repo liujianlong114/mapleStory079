@@ -1,7 +1,13 @@
 import 'package:audioplayers/audioplayers.dart';
 
-/// ====== BGM 背景音乐资源 ======
+/// ms079 MapLogin2 — 全登录流程统一 BGM: BgmUI/Title
 class BgmAssets {
+  static const String login = 'audio/title.mp3';
+  static const String loginWav = 'audio/title.wav';
+  static const String title = login;
+  static const String titleWav = loginWav;
+  static const String charSelect = login;
+  static const String charSelectWav = loginWav;
   static const String mapleIsland  = 'audio/00001000.ogg';
   static const String lithHarbor   = 'audio/00002000.ogg';
   static const String nautilus     = 'audio/00002001.ogg';
@@ -17,8 +23,6 @@ class BgmAssets {
   static const String muLung       = 'audio/00900000.ogg';
   static const String herbTown     = 'audio/01000000.ogg';
 
-  /// 根据地图 ID 返回对应 BGM；找不到时返回 null（客户端可跳过播放）。
-  /// 服务端 pkg/utils/constants.go 中 MapXX 常量与此处分支保持对齐。
   static String? byMapId(int mapId) {
     if (mapId >= 990000000) return 'audio/boss_zakum.wav';
     if (mapId >= 220000000) return 'audio/00300000.wav';
@@ -33,7 +37,6 @@ class BgmAssets {
   }
 }
 
-/// ====== SFX 系统音效 ======
 class SfxAssets {
   static const String levelUp = 'audio/sfx_levelup.wav';
   static const String hit     = 'audio/sfx_hit.wav';
@@ -46,7 +49,6 @@ class SfxAssets {
   static const String revive  = 'audio/sfx_revive.wav';
 }
 
-/// ====== Sprite 精灵资源路径 ======
 class SpriteDirs {
   static const String player = 'sprites/player/';
   static const String mob    = 'sprites/mob/';
@@ -63,7 +65,6 @@ class SpriteDirs {
   static String tileDirt() => '${tiles}dirt.png';
 }
 
-/// ====== 单例音频播放器 ======
 class AudioManager {
   AudioManager._();
   static final AudioManager _instance = AudioManager._();
@@ -75,6 +76,7 @@ class AudioManager {
   double _bgmVolume = 0.6;
   double _sfxVolume = 0.8;
   bool _muted = false;
+  String? _currentBgm;
 
   double get bgmVolume => _bgmVolume;
   double get sfxVolume => _sfxVolume;
@@ -82,16 +84,38 @@ class AudioManager {
 
   Future<void> playBgm(String asset) async {
     if (_muted) return;
+    if (_currentBgm == asset) return;
     try {
       await _bgm.setVolume(_bgmVolume);
       await _bgm.play(AssetSource(asset));
-    } catch (_) {
-      // 资源不存在时静默失败（开发期可接受）
+      _currentBgm = asset;
+    } catch (_) {}
+  }
+
+  Future<void> playBgmAsset(String primary) async {
+    if (_muted) return;
+    if (_currentBgm == primary) return;
+    final fallbacks = <String>[primary];
+    if (primary.endsWith('.mp3')) {
+      fallbacks.add(primary.replaceAll('.mp3', '.wav'));
+    } else if (primary.endsWith('.wav')) {
+      fallbacks.add(primary.replaceAll('.wav', '.mp3'));
+    }
+    for (final path in fallbacks) {
+      try {
+        await _bgm.setVolume(_bgmVolume);
+        await _bgm.play(AssetSource(path));
+        _currentBgm = path;
+        return;
+      } catch (_) {}
     }
   }
 
   Future<void> stopBgm() async {
-    try { await _bgm.stop(); } catch (_) {}
+    try {
+      await _bgm.stop();
+      _currentBgm = null;
+    } catch (_) {}
   }
 
   Future<void> playSfx(String asset) async {
@@ -127,7 +151,6 @@ class AudioManager {
   }
 }
 
-/// ====== 游戏数值常量（与服务端 pkg/utils/constants.go 对齐） ======
 class GameConstants {
   static const int maxLevel = 200;
   static const int maxCharacterSlots = 6;
@@ -135,20 +158,19 @@ class GameConstants {
   static const int maxMesos = 999999999;
   static const int defaultStartHp = 50;
   static const int defaultStartMp = 50;
-  static const int defaultStartStr = 10;
-  static const int defaultStartDex = 4;
+  static const int defaultStartStr = 12;
+  static const int defaultStartDex = 5;
   static const int defaultStartInt = 4;
   static const int defaultStartLuk = 4;
   static const int defaultLevelUpAp = 5;
   static const int defaultLevelUpSp = 3;
+  static const int accountGenderUnset = 10;
 
-  /// 升级经验公式：10 + level^2 * 8
   static int expRequired(int level) {
     final lv = level < 1 ? 1 : level;
     return 10 + lv * lv * 8;
   }
 
-  /// 当前经验 → 到下一级还需多少
   static int expRemaining(int currentLevel, int currentExp) {
     final need = expRequired(currentLevel);
     final rest = need - currentExp;
@@ -156,12 +178,11 @@ class GameConstants {
   }
 }
 
-/// ====== 职业信息（客户端 UI 用） ======
 class JobInfo {
   final int id;
   final String name;
-  final String primaryStat;   // 主属性（STR/DEX/INT/LUK）
-  final String secondaryStat; // 副属性
+  final String primaryStat;
+  final String secondaryStat;
   final double critMultiplier;
 
   const JobInfo({

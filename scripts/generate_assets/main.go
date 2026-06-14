@@ -69,6 +69,7 @@ func main() {
 		"sfx_hit": 440, "sfx_levelup": 880, "sfx_pickup": 660,
 		"sfx_meso": 550, "sfx_portal": 330, "sfx_ui_click": 200,
 		"sfx_chat": 300, "sfx_dead": 110, "sfx_revive": 770,
+		"title": 196, "char_select": 262,
 	}
 	for name, freq := range sfx {
 		writeToneWAV(filepath.Join(root, "audio", name+".wav"), freq, 0.3, 0.25)

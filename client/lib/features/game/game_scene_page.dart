@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
+import '../../main.dart';
+import '../../providers/inventory_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
@@ -89,11 +91,11 @@ class _GameScenePageState extends State<GameScenePage> {
     _gameWorld.mp = widget.initialMp;
     _gameWorld.maxMp = widget.initialMaxMp;
     _gameWorld.level = widget.initialLevel;
+    _setupStatSync();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
       _connectWebSocket();
-      _spawnDefaultEntities();
-      _setupStatSync();
+      _spawnServerEntities();
     });
   }
 
@@ -115,6 +117,7 @@ class _GameScenePageState extends State<GameScenePage> {
   void _setupStatSync() {
     if (!mounted) return;
     final gp = context.read<GameProvider>();
+    final inv = context.read<InventoryProvider>();
     _gameWorld.onStatChange = ({
       int? hp,
       int? maxHp,
@@ -123,6 +126,8 @@ class _GameScenePageState extends State<GameScenePage> {
       int? level,
       int? exp,
       int? mesos,
+      double? posX,
+      double? posY,
     }) {
       gp.syncFromGameWorld(
         hp: hp,
@@ -132,17 +137,60 @@ class _GameScenePageState extends State<GameScenePage> {
         level: level,
         exp: exp,
         mesos: mesos,
+        posX: posX,
+        posY: posY,
       );
     };
     _gameWorld.onLevelUp = (newLevel) {
       gp.syncFromGameWorld(level: newLevel);
+      gp.doLevelUp();
     };
     _gameWorld.onPlayerDead = () {
       gp.syncFromGameWorld(hp: 0);
     };
+    _gameWorld.onInventoryChanged = () {
+      inv.loadInventory(widget.characterId);
+    };
   }
 
-  void _spawnDefaultEntities() {
+  Future<void> _spawnServerEntities() async {
+    final api = ApiService();
+    final instances = await api.getMapMobInstances(widget.mapId);
+    if (instances.isNotEmpty) {
+      for (final row in instances) {
+        final instanceId = (row['instance_id'] as num?)?.toInt() ?? 0;
+        final templateId = (row['template_id'] as num?)?.toInt() ?? 0;
+        if (instanceId == 0 || templateId == 0) continue;
+        final mob = Mob(
+          id: instanceId,
+          mobId: templateId,
+          name: row['name'] as String? ?? '怪物',
+          level: (row['level'] as num?)?.toInt() ?? 1,
+          hp: (row['hp'] as num?)?.toInt() ?? 50,
+          maxHp: (row['max_hp'] as num?)?.toInt() ?? 50,
+          attack: 10,
+          defense: 0,
+          expReward: 0,
+          mesoReward: 0,
+          posX: (row['x'] as num?)?.toDouble() ?? widget.mapWidth / 2,
+          posY: (row['y'] as num?)?.toDouble() ?? widget.mapHeight / 2,
+        );
+        _gameWorld.addMob(
+          mob,
+          position: Vector2(mob.posX, mob.posY),
+        );
+      }
+    } else {
+      _spawnFallbackMobs();
+    }
+    _gameWorld.addNPC(
+      id: 1,
+      name: '卡姆伊',
+      position: Vector2(widget.mapWidth / 2 - 200, widget.mapHeight / 2),
+    );
+  }
+
+  void _spawnFallbackMobs() {
     for (int i = 0; i < 5; i++) {
       final template = MobCatalog.templates[i % MobCatalog.templates.length];
       final mob = Mob(
@@ -161,11 +209,6 @@ class _GameScenePageState extends State<GameScenePage> {
       );
       _gameWorld.addMob(mob);
     }
-    _gameWorld.addNPC(
-      id: 1,
-      name: '卡姆伊',
-      position: Vector2(widget.mapWidth / 2 - 200, widget.mapHeight / 2),
-    );
   }
 
   void _onAttack() {
@@ -209,6 +252,21 @@ class _GameScenePageState extends State<GameScenePage> {
             left: 10,
             right: 10,
             child: PlayerStatsBar(),
+          ),
+          Positioned(
+            top: 44,
+            right: 10,
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.menu, color: Colors.white),
+              onSelected: (route) => Navigator.pushNamed(context, route),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: Routes.inventory, child: Text('背包')),
+                PopupMenuItem(value: Routes.skills, child: Text('技能')),
+                PopupMenuItem(value: Routes.chat, child: Text('聊天')),
+                PopupMenuItem(value: Routes.combat, child: Text('战斗测试')),
+                PopupMenuItem(value: Routes.social, child: Text('社交')),
+              ],
+            ),
           ),
           Positioned(
             top: 80,

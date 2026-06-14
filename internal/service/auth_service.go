@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"time"
 
 	"mapleStory079/internal/repository"
 	"mapleStory079/pkg/database"
@@ -50,10 +51,12 @@ func (s *AuthService) Register(username, password, email string) error {
 		return errors.New("username already exists")
 	}
 	account := &database.Account{
-		Username: username,
-		Password: utils.HashPassword(password),
-		Email:    email,
-		Status:   1,
+		Username:  username,
+		Password:  utils.HashPassword(password),
+		Email:     email,
+		Gender:    utils.AccountGenderUnset,
+		Status:    1,
+		LastLogin: time.Now(),
 	}
 	return s.accountRepo.Create(account)
 }
@@ -74,6 +77,22 @@ func (s *AuthService) Login(username, password string) (*database.Account, error
 
 func (s *AuthService) GetAccountByID(id uint) (*database.Account, error) {
 	return s.accountRepo.FindByID(id)
+}
+
+// SetGender ms079 SetGenderRequest — 账号级性别，创建角色时使用
+func (s *AuthService) SetGender(accountID uint, gender int) (*database.Account, error) {
+	if gender != 0 && gender != 1 {
+		return nil, errors.New("invalid gender")
+	}
+	acc, err := s.accountRepo.FindByID(accountID)
+	if err != nil {
+		return nil, errors.New("account not found")
+	}
+	acc.Gender = gender
+	if err := s.accountRepo.Update(acc); err != nil {
+		return nil, err
+	}
+	return acc, nil
 }
 
 // RegisterLegacy 提供与旧实现兼容的便捷函数接口。

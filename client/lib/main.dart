@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'config/app_config.dart';
 import 'features/login/login_page.dart';
+import 'features/login/gender_page.dart';
+import 'features/login/world_select_page.dart';
+import 'features/login/race_select_page.dart';
 import 'features/character/character_select_page.dart';
+import 'features/character/new_char_page.dart';
 import 'features/game/game_page.dart';
 import 'features/game/game_scene_loader.dart';
 import 'features/chat/chat_page.dart';
@@ -44,7 +48,11 @@ class MapleStoryApp extends StatelessWidget {
         initialRoute: Routes.login,
         routes: {
           Routes.login: (context) => const LoginPage(),
+          Routes.gender: (context) => const GenderPage(),
+          Routes.worldSelect: (context) => const WorldSelectPage(),
+          Routes.raceSelect: (context) => const RaceSelectPage(),
           Routes.characterSelect: (context) => const CharacterSelectPage(),
+          Routes.newChar: (context) => const NewCharPage(),
           Routes.game: (context) => const GamePage(),
           Routes.gameScene: (context) => const GameSceneLoader(),
           Routes.chat: (context) => const ChatPage(),
@@ -60,7 +68,11 @@ class MapleStoryApp extends StatelessWidget {
 
 class Routes {
   static const String login = '/login';
+  static const String gender = '/gender';
+  static const String worldSelect = '/world-select';
+  static const String raceSelect = '/race-select';
   static const String characterSelect = '/character-select';
+  static const String newChar = '/new-char';
   static const String game = '/game';
   static const String gameScene = '/game-scene';
   static const String chat = '/chat';

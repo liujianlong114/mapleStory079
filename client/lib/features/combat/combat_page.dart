@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -57,18 +58,19 @@ class _CombatPageState extends State<CombatPage> {
           key: key,
           left: isPlayer ? 60.0 : 220.0,
           top: 150.0,
-          child: DamageNumberWidget(
+          child: DamageNumber(
             damage: damage,
-            onComplete: () {
-              if (mounted) {
-                setState(() {
-                  _damageWidgets.removeWhere((w) => (w.key == key));
-                });
-              }
-            },
+            startPosition: Offset.zero,
           ),
         ),
       );
+    });
+    Timer(const Duration(milliseconds: 1000), () {
+      if (mounted) {
+        setState(() {
+          _damageWidgets.removeWhere((w) => w.key == key);
+        });
+      }
     });
   }
 

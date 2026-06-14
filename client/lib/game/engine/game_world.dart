@@ -85,9 +85,9 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   // ===== 外部回调（需在创建后、运行前设置）=====
   WebSocketService? ws;
   ApiService? api;
-  late final void Function(int newLevel)? onLevelUp;
-  late final void Function()? onPlayerDead;
-  late final void Function({
+  void Function(int newLevel)? onLevelUp;
+  void Function()? onPlayerDead;
+  void Function({
     int? hp,
     int? maxHp,
     int? mp,
@@ -95,6 +95,8 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     int? level,
     int? exp,
     int? mesos,
+    double? posX,
+    double? posY,
   })? onStatChange;
 
   // ===== 实体集合 =====
@@ -106,7 +108,9 @@ class GameWorld extends FlameGame with HasCollisionDetection {
 
   // ===== 节流器 =====
   double _positionThrottle = 0;
+  double _moveApiThrottle = 0;
   static const double _positionThrottleMs = 50 / 1000;
+  static const double _moveApiThrottleMs = 500 / 1000;
 
   // 输入状态
   final Set<LogicalKeyboardKey> _keysDown = {};
@@ -245,6 +249,15 @@ class GameWorld extends FlameGame with HasCollisionDetection {
           y: player.position.y,
         );
       }
+      _moveApiThrottle -= dt;
+      if (_moveApiThrottle <= 0 && api != null) {
+        _moveApiThrottle = _moveApiThrottleMs;
+        api!.moveCharacter(characterId, player.position.x, player.position.y);
+        onStatChange?.call(
+          posX: player.position.x,
+          posY: player.position.y,
+        );
+      }
     }
 
     // --- 攻击键 (J / Space) ---
@@ -338,6 +351,7 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     final result = await api!.playerAttackMob(
       characterId: characterId,
       mobId: nearest.mob.mobId,
+      instanceId: nearest.mob.id,
       mapId: mapId,
       x: nearest.position.x,
       y: nearest.position.y,
@@ -458,7 +472,7 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     }
   }
 
-  Future<void> _pickupLoot(String dropId) async {
+  void _pickupLoot(String dropId) async {
     removeGroundLoot(dropId);
     try {
       AudioManager().playSfx(SfxAssets.pickup);
@@ -470,6 +484,7 @@ class GameWorld extends FlameGame with HasCollisionDetection {
         x: player.position.x,
         y: player.position.y,
       );
+      onInventoryChanged?.call();
     } else {
       ws?.sendLootPickup(
         characterId: characterId,
@@ -479,6 +494,9 @@ class GameWorld extends FlameGame with HasCollisionDetection {
       );
     }
   }
+
+  /// 拾取后刷新背包（由 GameScenePage 绑定 InventoryProvider）
+  void Function()? onInventoryChanged;
 
   void _onServerLoot(WsMessage msg) {
     final p = msg.payload;

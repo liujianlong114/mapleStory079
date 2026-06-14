@@ -1,0 +1,10 @@
+# IntelliJ IDEA 的目录和文件
+.idea
+*.iml
+
+# 编译目录
+out
+target
+build
+
+/logs

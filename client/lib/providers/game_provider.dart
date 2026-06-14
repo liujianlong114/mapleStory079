@@ -34,42 +34,22 @@ class GameProvider with ChangeNotifier {
 
   /// 通过角色 ID 加载游戏状态：设置当前角色 + 拉取游戏状态
   Future<bool> loadCharacterState(int characterId) async {
-    _currentCharacter = Character(
-      id: characterId,
-      accountId: 0,
-      name: '加载中...',
-      characterClass: 0,
-      gender: 0,
-      level: 1,
-      experience: 0,
-      mapId: 1,
-      positionX: 0,
-      positionY: 0,
-      hp: 100,
-      maxHp: 100,
-      mp: 50,
-      maxMp: 50,
-      str: 4,
-      dex: 4,
-      intl: 4,
-      luk: 4,
-      mesos: 0,
-    );
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
     try {
+      _currentCharacter = await _api.getCharacter(characterId);
       final data = await _api.getGameState(characterId);
-      final charData = data['character'] as Map<String, dynamic>?;
-      if (charData != null) {
-        _currentCharacter = Character.fromMap(charData);
-      }
       _state = GameState.fromJson(data);
       if (data['map'] != null) {
         _currentMap = GameMap.fromJson(data['map'] as Map<String, dynamic>);
+      } else if (_currentCharacter != null) {
+        try {
+          _currentMap = await _api.getMap(_currentCharacter!.mapId);
+        } catch (_) {}
       }
       _isLoading = false;
       notifyListeners();
-      await connectWebSocket();
       return true;
     } catch (e) {
       _errorMessage = '加载游戏状态失败: $e';
@@ -322,6 +302,8 @@ class GameProvider with ChangeNotifier {
     int? level,
     int? exp,
     int? mesos,
+    double? posX,
+    double? posY,
   }) {
     bool changed = false;
     if (hp != null && _state.hp != hp) {
@@ -350,6 +332,14 @@ class GameProvider with ChangeNotifier {
     }
     if (mesos != null && _state.mesos != mesos) {
       _state.mesos = mesos;
+      changed = true;
+    }
+    if (posX != null && _state.posX != posX) {
+      _state.posX = posX;
+      changed = true;
+    }
+    if (posY != null && _state.posY != posY) {
+      _state.posY = posY;
       changed = true;
     }
     if (changed) {

@@ -9,19 +9,32 @@ import (
 	"mapleStory079/pkg/utils"
 )
 
+// CharacterView 角色列表视图（含装备外观，供选角预览）
+type CharacterView struct {
+	database.Character
+	Top    int `json:"top"`
+	Bottom int `json:"bottom"`
+	Shoes  int `json:"shoes"`
+	Weapon int `json:"weapon"`
+}
+
 type CharacterService struct {
+	invRepo *repository.InventoryRepository
 }
 
 func NewCharacterService() *CharacterService {
-	return &CharacterService{}
+	return &CharacterService{invRepo: repository.NewInventoryRepository()}
 }
 
-func (s *CharacterService) CreateCharacter(accountID uint, name string, class int, gender int) (*database.Character, error) {
+func (s *CharacterService) CreateCharacter(accountID uint, name string, jobType int, gender int, look utils.BeginnerLook) (*database.Character, error) {
 	if accountID == 0 {
 		return nil, errors.New("account id required")
 	}
 	if name == "" {
 		return nil, errors.New("character name required")
+	}
+	if !utils.CanCreateCharacterName(name) {
+		return nil, errors.New("角色名不可用")
 	}
 
 	_, err := repository.GetCharacterByName(name)
@@ -37,20 +50,40 @@ func (s *CharacterService) CreateCharacter(accountID uint, name string, class in
 		return nil, errors.New("max character limit reached")
 	}
 
-	// 优先从 utils 中取标准初始属性；若未定义则回退到新手默认值
-	baseStats, ok := utils.JobInitialStatsMap[class]
+	classID, mapID, ok := jobTypeToSpawn(jobType)
 	if !ok {
-		baseStats = utils.JobInitialStatsMap[utils.JobBeginner]
+		return nil, errors.New("职业类型未开放")
 	}
+	if err := validateJobTypeEnabled(jobType); err != nil {
+		return nil, err
+	}
+
+	if gender != 0 && gender != 1 {
+		return nil, errors.New("invalid gender")
+	}
+
+	if look.Face == 0 && look.Hair == 0 && look.Top == 0 {
+		look = utils.DefaultBeginnerLook(gender)
+	}
+	look.HairColor = 0
+	look.Skin = 0
+	if err := utils.ValidateBeginnerLook(gender, look); err != nil {
+		return nil, errors.New("非法的新手外观: " + err.Error())
+	}
+
+	baseStats := utils.JobInitialStatsMap[utils.JobBeginner]
 
 	character := &database.Character{
 		AccountID: accountID,
 		Name:      name,
-		Class:     class,
+		Class:     classID,
 		Gender:    gender,
+		Face:      look.Face,
+		Hair:      look.Hair,
+		Skin:      0,
 		Level:     1,
 		Exp:       0,
-		MapID:     utils.MapMapleIsland, // 新手村
+		MapID:     mapID,
 		PositionX: 0,
 		PositionY: 0,
 		HP:        baseStats.HP,
@@ -61,13 +94,142 @@ func (s *CharacterService) CreateCharacter(accountID uint, name string, class in
 		DEX:       baseStats.DEX,
 		INT:       baseStats.INT,
 		LUK:       baseStats.LUK,
-		Mesos:     500,
+		Mesos:     0,
 	}
 
 	if err := repository.CreateCharacter(character); err != nil {
 		return nil, err
 	}
+	if err := seedBeginnerEquipment(character.ID, look); err != nil {
+		return nil, fmt.Errorf("equip starter items: %w", err)
+	}
+	if err := seedBeginnerInventory(character.ID, jobType); err != nil {
+		return nil, fmt.Errorf("seed starter inventory: %w", err)
+	}
 	return character, nil
+}
+
+func jobTypeToSpawn(jobType int) (classID int, mapID uint, ok bool) {
+	switch jobType {
+	case utils.JobTypeAdventurer:
+		return utils.JobBeginner, utils.MapTutorialStart, true
+	case utils.JobTypeKnight:
+		return utils.JobKnightBeginner, utils.MapKnightStart, true
+	case utils.JobTypeAran:
+		return utils.JobAranBeginner, utils.MapAranStart, true
+	default:
+		return 0, 0, false
+	}
+}
+
+// ms079 ServerProperties: adventurer=true, knights=false, warGod=false
+func validateJobTypeEnabled(jobType int) error {
+	switch jobType {
+	case utils.JobTypeAdventurer:
+		return nil
+	case utils.JobTypeKnight:
+		return errors.New("骑士团职业未开放")
+	case utils.JobTypeAran:
+		return errors.New("战神职业未开放")
+	default:
+		return errors.New("invalid job type")
+	}
+}
+
+func seedBeginnerEquipment(characterID uint, look utils.BeginnerLook) error {
+	equips := []struct {
+		itemID int
+		slot   string
+	}{
+		{look.Top, "coat"},
+		{look.Bottom, "pants"},
+		{look.Shoes, "shoes"},
+		{look.Weapon, "weapon"},
+	}
+	for i, e := range equips {
+		inv := &database.CharacterInventory{
+			CharacterID: characterID,
+			ItemID:      e.itemID,
+			SlotIndex:   i + 1,
+			Quantity:    1,
+			IsEquipped:  true,
+			EquipSlot:   e.slot,
+		}
+		if err := repository.AddCharacterItem(inv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// seedBeginnerInventory ms079 CharLoginHandler.CreateChar L348-368
+func seedBeginnerInventory(characterID uint, jobType int) error {
+	var guideItem int
+	switch jobType {
+	case utils.JobTypeKnight:
+		guideItem = 4161047
+	case utils.JobTypeAdventurer:
+		guideItem = 4161001
+	case utils.JobTypeAran:
+		guideItem = 4161048
+	default:
+		guideItem = 4161001
+	}
+	if err := repository.AddCharacterItem(&database.CharacterInventory{
+		CharacterID: characterID,
+		ItemID:      guideItem,
+		SlotIndex:   100,
+		Quantity:    1,
+	}); err != nil {
+		return err
+	}
+	return repository.AddCharacterItem(&database.CharacterInventory{
+		CharacterID: characterID,
+		ItemID:      2022336,
+		SlotIndex:   1,
+		Quantity:    1,
+	})
+}
+
+func (s *CharacterService) CheckCharacterName(name string) (bool, string) {
+	if !utils.CanCreateCharacterName(name) {
+		if utils.IsForbiddenName(name) {
+			return false, "角色名含有禁用词"
+		}
+		return false, "角色名格式不正确（2~12 字符，中文/字母/数字）"
+	}
+	if _, err := repository.GetCharacterByName(name); err == nil {
+		return false, "角色名已被使用"
+	}
+	return true, ""
+}
+
+func (s *CharacterService) GetCharactersByAccountID(accountID uint) ([]CharacterView, error) {
+	chars, err := repository.GetCharactersByAccount(accountID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CharacterView, 0, len(chars))
+	for _, ch := range chars {
+		v := CharacterView{Character: ch}
+		equips, err := s.invRepo.FindEquipped(ch.ID)
+		if err == nil {
+			for _, e := range equips {
+				switch e.EquipSlot {
+				case "coat":
+					v.Top = e.ItemID
+				case "pants":
+					v.Bottom = e.ItemID
+				case "shoes":
+					v.Shoes = e.ItemID
+				case "weapon":
+					v.Weapon = e.ItemID
+				}
+			}
+		}
+		out = append(out, v)
+	}
+	return out, nil
 }
 
 // GetClassName 根据职业编号返回中文名称；未知编号返回 "未知"。
@@ -75,8 +237,11 @@ func GetClassName(class int) string {
 	if name, ok := utils.JobNames[class]; ok {
 		return name
 	}
-	// 兼容 UI/测试使用的简化编号 1-5
 	switch class {
+	case utils.JobKnightBeginner:
+		return "初心者"
+	case utils.JobAranBeginner:
+		return "战童"
 	case 1:
 		return "战士"
 	case 2:
@@ -89,10 +254,6 @@ func GetClassName(class int) string {
 		return "海盗"
 	}
 	return "未知"
-}
-
-func (s *CharacterService) GetCharactersByAccountID(accountID uint) ([]database.Character, error) {
-	return repository.GetCharactersByAccount(accountID)
 }
 
 func (s *CharacterService) GetCharacterByID(id uint) (*database.Character, error) {
@@ -108,7 +269,6 @@ func (s *CharacterService) DeleteCharacter(id uint) error {
 }
 
 // AssignAbilityPoints 分配属性点：每一项不可超过剩余可用属性点，且总数不可超过剩余点。
-// 任何一项若为负值则被视为 0。
 func (s *CharacterService) AssignAbilityPoints(characterID uint, str, dex, intVal, luk int) error {
 	ch, err := repository.GetCharacterByID(characterID)
 	if err != nil {
@@ -141,7 +301,6 @@ func (s *CharacterService) AssignAbilityPoints(characterID uint, str, dex, intVa
 	return repository.UpdateCharacter(ch)
 }
 
-// RestoreCharacter HP/MP 恢复（当角色使用药水或休息时调用）。
 func (s *CharacterService) RestoreCharacter(characterID uint, hp, mp int) error {
 	ch, err := repository.GetCharacterByID(characterID)
 	if err != nil {
@@ -162,7 +321,6 @@ func (s *CharacterService) RestoreCharacter(characterID uint, hp, mp int) error 
 	return repository.UpdateCharacter(ch)
 }
 
-// MoveCharacterInMap 验证边界并更新角色在地图内的坐标。
 func (s *CharacterService) MoveCharacterInMap(characterID uint, newX, newY, width, height int) error {
 	ch, err := repository.GetCharacterByID(characterID)
 	if err != nil {

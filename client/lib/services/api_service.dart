@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../features/character/beginner_creation_catalog.dart';
 import '../models/account.dart';
 import '../models/character.dart';
 import '../models/game_map.dart';
@@ -48,8 +49,20 @@ class ApiService {
   }
 
   Map<String, dynamic> _unwrapMap(Map<String, dynamic> data) {
-    if (data['success'] == true && data['data'] is Map) {
-      return Map<String, dynamic>.from(data['data'] as Map);
+    final inner = _unwrapData(data);
+    if (inner is Map<String, dynamic>) {
+      return inner;
+    }
+    return data;
+  }
+
+  /// 解析服务端统一 envelope：{code, data} 或 {success, data}
+  dynamic _unwrapData(Map<String, dynamic> data) {
+    if (data['code'] == 0 && data['data'] != null) {
+      return data['data'];
+    }
+    if (data['success'] == true && data['data'] != null) {
+      return data['data'];
     }
     return data;
   }
@@ -97,45 +110,121 @@ class ApiService {
     );
 
     final data = await _handleResponse(response);
-    if (data['token'] != null) {
-      _token = data['token'] as String;
+    final payload = _unwrapData(data);
+    if (payload is Map<String, dynamic>) {
+      if (payload['account'] is Map) {
+        return Map<String, dynamic>.from(payload);
+      }
+      if (payload['username'] != null) {
+        return {
+          'account': payload,
+          if (payload['token'] != null) 'token': payload['token'],
+        };
+      }
     }
-    return data;
+    return Map<String, dynamic>.from(data);
   }
 
-  Future<Character> createCharacter(int accountId, String name, int characterClass,
-      {int hair = 0, int skin = 0, int eyes = 0}) async {
+  /// 从 login 响应解析 Account 并保存 token
+  Account parseLoginAccount(Map<String, dynamic> loginPayload) {
+    final accountRaw = loginPayload['account'];
+    if (accountRaw is Map<String, dynamic>) {
+      final acc = Account.fromJson(accountRaw);
+      final token = loginPayload['token'] as String?;
+      if (token != null) {
+        _token = token;
+        return Account(
+          id: acc.id,
+          username: acc.username,
+          email: acc.email,
+          gender: acc.gender,
+          status: acc.status,
+          createdAt: acc.createdAt,
+          token: token,
+        );
+      }
+      return acc;
+    }
+    throw Exception('登录响应缺少 account 字段');
+  }
+
+  Future<Account> setGender(int accountId, int gender) async {
     final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/characters'),
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/gender'),
       headers: _headers(),
-      body: jsonEncode({
-        'account_id': accountId,
-        'name': name,
-        'class': characterClass,
-        'hair': hair,
-        'skin': skin,
-        'eyes': eyes,
-      }),
+      body: jsonEncode({'accountId': accountId, 'gender': gender}),
+    );
+    final data = _unwrapMap(await _handleResponse(response));
+    final accRaw = data['account'];
+    if (accRaw is Map<String, dynamic>) {
+      return Account.fromJson(accRaw);
+    }
+    return Account(id: accountId, username: '', gender: gender, status: 1);
+  }
+
+  Future<Character> createCharacter(
+    int accountId,
+    String name,
+    int characterClass, {
+    BeginnerLook? look,
+    int jobType = 1,
+  }) async {
+    final body = <String, dynamic>{
+      'accountId': accountId,
+      'account_id': accountId,
+      'name': name,
+      'class': characterClass,
+      'jobType': look?.jobType ?? jobType,
+      'face': look?.face ?? 0,
+      'hair': look?.hair ?? 0,
+      'hairColor': 0,
+      'skin': 0,
+      'top': look?.top ?? 0,
+      'bottom': look?.bottom ?? 0,
+      'shoes': look?.shoes ?? 0,
+      'weapon': look?.weapon ?? 0,
+    };
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/characters/'),
+      headers: _headers(),
+      body: jsonEncode(body),
     );
 
-    final data = await _handleResponse(response);
+    final data = _unwrapMap(await _handleResponse(response));
     return Character.fromJson(data);
   }
 
-  Future<List<Character>> getCharacters(int accountId) async {
+  /// 079 checkCharName — ms079-main CharLoginHandler.CheckCharName
+  Future<bool> checkCharacterName(String name) async {
     final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/characters'),
+      Uri.parse('${AppConfig.apiBaseUrl}/characters/check-name?name=${Uri.encodeComponent(name)}'),
+      headers: _headers(),
+    );
+    final data = _unwrapMap(await _handleResponse(response));
+    return data['available'] == true;
+  }
+
+  Future<List<Character>> getCharacters(int accountId) async {
+    if (accountId <= 0) {
+      throw Exception('无效的 accountId: $accountId');
+    }
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/characters/?accountId=$accountId'),
       headers: _headers(),
     );
 
     final data = await _handleResponse(response);
     final list = _unwrapList(data, key: 'characters');
-    if (list.isEmpty && data['data'] is List) {
-      return (data['data'] as List)
-          .map((e) => Character.fromJson(e as Map<String, dynamic>))
+    if (list.isNotEmpty) {
+      return list.map((e) => Character.fromJson(e)).toList();
+    }
+    final inner = _unwrapData(data);
+    if (inner is List) {
+      return inner
+          .map((e) => Character.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
-    return list.map((e) => Character.fromJson(e)).toList();
+    return [];
   }
 
   Future<Character> getCharacter(int id) async {
@@ -317,6 +406,11 @@ class ApiService {
         headers: _headers(),
       );
       final data = await _handleResponse(response);
+      if (data['inventory'] is List) {
+        return (data['inventory'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
       return _unwrapList(data, key: 'items');
     } catch (_) {
       return [];

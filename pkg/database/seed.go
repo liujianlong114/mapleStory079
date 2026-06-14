@@ -14,14 +14,16 @@ import (
 // ====================== 种子数据统计 ======================
 
 type SeedReport struct {
-	MapCount    int
-	NpcCount    int
-	MobCount    int
-	ItemCount   int
-	SkillCount  int
-	QuestCount  int
-	DropCount   int
-	IsFirstTime bool // 是否为首次初始化
+	MapCount       int
+	NpcCount       int
+	MobCount       int
+	ItemCount      int
+	SkillCount     int
+	QuestCount     int
+	DropCount      int
+	AccountCount   int
+	CharacterCount int
+	IsFirstTime    bool // 是否为首次初始化
 }
 
 // ====================== 总入口 ======================
@@ -57,9 +59,11 @@ func SeedDefaultData() (*SeedReport, error) {
 	report.SkillCount = seedSkills()
 	report.QuestCount = seedQuests()
 	report.DropCount = seedDrops()
+	report.AccountCount, report.CharacterCount = seedDemoAccounts()
 
-	log.Printf("[Seed] 完成！地图:%d 个, NPC:%d 个, 怪物:%d 种, 物品:%d 个, 技能:%d 个, 任务:%d 个, 掉落:%d 条",
-		report.MapCount, report.NpcCount, report.MobCount, report.ItemCount, report.SkillCount, report.QuestCount, report.DropCount)
+	log.Printf("[Seed] 完成！地图:%d 个, NPC:%d 个, 怪物:%d 种, 物品:%d 个, 技能:%d 个, 任务:%d 个, 掉落:%d 条, 演示账号:%d, 演示角色:%d",
+		report.MapCount, report.NpcCount, report.MobCount, report.ItemCount, report.SkillCount, report.QuestCount, report.DropCount,
+		report.AccountCount, report.CharacterCount)
 	log.Println("==============================================")
 	return report, nil
 }

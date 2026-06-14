@@ -39,24 +39,29 @@ class InventoryProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final items = await _api.getAllItems();
+      final rows = await _api.getCharacterInventory(characterId);
       _equipSlots.fillRange(0, _equipSlots.length, null);
       _consumables.clear();
       _etcItems.clear();
 
-      var slotIndex = 0;
-      for (final item in items) {
-        if (item.equippable && slotIndex < _equipSlots.length) {
-          _equipSlots[slotIndex] = item;
-          slotIndex++;
-        } else if (item.usable || item.consumable) {
-          _consumables.add(item);
-        } else {
-          _etcItems.add(item);
-        }
+      for (final row in rows) {
+        final itemId = (row['item_id'] as num?)?.toInt() ?? 0;
+        final qty = (row['quantity'] as num?)?.toInt() ?? 1;
+        if (itemId <= 0) continue;
+        final item = Item(
+          id: itemId,
+          name: '物品 #$itemId',
+          description: '',
+          type: 'etc',
+          quantity: qty,
+          equippable: itemId >= 1000000 && itemId < 2000000,
+          usable: itemId >= 2000000 && itemId < 3000000,
+          consumable: itemId >= 2000000 && itemId < 3000000,
+        );
+        addItem(item);
       }
 
-      if (_consumables.isEmpty && _etcItems.isEmpty) {
+      if (_consumables.isEmpty && _etcItems.isEmpty && rows.isEmpty) {
         _consumables.addAll(ItemCatalog.defaultItems.where((i) => i.usable || i.consumable));
         _etcItems.addAll(ItemCatalog.defaultItems.where((i) => !i.equippable && !i.usable && !i.consumable));
       }

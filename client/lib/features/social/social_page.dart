@@ -180,7 +180,7 @@ class _SocialPageState extends State<SocialPage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('当前队伍: ${_party.length} 人',
+              Text('当前队伍: ${_partyMembers.length} 人',
                   style: const TextStyle(color: Colors.white)),
               Row(
                 children: [

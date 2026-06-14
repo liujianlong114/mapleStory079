@@ -136,9 +136,10 @@ func (s *MobInstanceService) seedMapLocked(mapID uint) {
 			continue
 		}
 		s.nextID++
+		id := uint(s.nextID)
 		list = append(list, &mobInstanceInternal{
 			MobInstance: MobInstance{
-				InstanceID: s.nextID,
+				InstanceID: id,
 				MapID:      mapID,
 				TemplateID: d.templateID,
 				Name:       tmpl.Name,

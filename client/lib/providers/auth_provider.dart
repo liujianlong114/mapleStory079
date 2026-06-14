@@ -80,18 +80,9 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final data = await _api.login(username, password);
-      if (data['account'] != null) {
-        _account = Account.fromJson(data['account'] as Map<String, dynamic>);
-      } else if (data['data'] != null) {
-        _account = Account.fromJson(data['data'] as Map<String, dynamic>);
-      } else {
-        _account = Account(
-          id: 1,
-          username: username,
-          email: '',
-          status: 1,
-          createdAt: DateTime.now(),
-        );
+      _account = _api.parseLoginAccount(data);
+      if (_account!.id <= 0) {
+        throw Exception('账号 ID 无效，请检查服务端登录响应');
       }
       _isLoggedIn = true;
       await loadCharacters();
@@ -111,70 +102,10 @@ class AuthProvider with ChangeNotifier {
     if (_account == null) return;
 
     try {
-      _characters.clear();
-      _characters.add(Character(
-        id: 1,
-        accountId: _account!.id,
-        name: '新手角色',
-        characterClass: 0,
-        gender: 0,
-        level: 1,
-        experience: 0,
-        mapId: 1,
-        positionX: 100,
-        positionY: 100,
-        hp: 50,
-        maxHp: 50,
-        mp: 5,
-        maxMp: 5,
-        str: 12,
-        dex: 5,
-        intl: 4,
-        luk: 4,
-        mesos: 1000,
-      ));
-      _characters.add(Character(
-        id: 2,
-        accountId: _account!.id,
-        name: '战士号',
-        characterClass: 1,
-        gender: 0,
-        level: 10,
-        experience: 500,
-        mapId: 2,
-        positionX: 50,
-        positionY: 50,
-        hp: 200,
-        maxHp: 200,
-        mp: 20,
-        maxMp: 20,
-        str: 50,
-        dex: 20,
-        intl: 4,
-        luk: 4,
-        mesos: 5000,
-      ));
-      _characters.add(Character(
-        id: 3,
-        accountId: _account!.id,
-        name: '法师号',
-        characterClass: 2,
-        gender: 1,
-        level: 15,
-        experience: 1200,
-        mapId: 3,
-        positionX: 0,
-        positionY: 0,
-        hp: 80,
-        maxHp: 80,
-        mp: 300,
-        maxMp: 300,
-        str: 10,
-        dex: 15,
-        intl: 80,
-        luk: 30,
-        mesos: 2000,
-      ));
+      final list = await _api.getCharacters(_account!.id);
+      _characters
+        ..clear()
+        ..addAll(list);
       notifyListeners();
     } catch (e) {
       debugPrint('加载角色失败: $e');
@@ -188,6 +119,23 @@ class AuthProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  Future<bool> setGender(int gender) async {
+    if (_account == null) return false;
+    try {
+      final acc = await _api.setGender(_account!.id, gender);
+      _account = _account!.copyWith(gender: acc.gender);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  int get accountGender => _account?.gender ?? Account.genderUnset;
+  bool get needsGender => _account?.needsGender ?? true;
 
   void clearError() {
     _errorMessage = null;

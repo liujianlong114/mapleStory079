@@ -4,6 +4,9 @@ class Character {
   final String name;
   final int characterClass;
   final int gender;
+  final int face;
+  final int hair;
+  final int skin;
   final int level;
   final int experience;
   final int mapId;
@@ -18,6 +21,10 @@ class Character {
   final int intl;
   final int luk;
   final int mesos;
+  final int top;
+  final int bottom;
+  final int shoes;
+  final int weapon;
 
   Character({
     required this.id,
@@ -25,6 +32,9 @@ class Character {
     required this.name,
     required this.characterClass,
     required this.gender,
+    this.face = 20100,
+    this.hair = 30000,
+    this.skin = 0,
     required this.level,
     required this.experience,
     required this.mapId,
@@ -39,32 +49,49 @@ class Character {
     required this.intl,
     required this.luk,
     required this.mesos,
+    this.top = 0,
+    this.bottom = 0,
+    this.shoes = 0,
+    this.weapon = 0,
   });
 
   factory Character.fromJson(Map<String, dynamic> json) =>
       Character.fromMap(json);
 
   factory Character.fromMap(Map<String, dynamic> json) {
+    int asInt(dynamic v, [int d = 0]) {
+      if (v == null) return d;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? d;
+    }
     return Character(
-      id: (json['id'] ?? 0) as int,
-      accountId: (json['account_id'] ?? 0) as int,
+      id: asInt(json['id']),
+      accountId: asInt(json['account_id']),
       name: (json['name'] ?? '') as String,
-      characterClass: (json['class'] ?? json['character_class'] ?? 0) as int,
-      gender: (json['gender'] ?? 0) as int,
-      level: (json['level'] ?? 1) as int,
-      experience: (json['experience'] ?? json['exp'] ?? 0) as int,
-      mapId: (json['map_id'] ?? 10000) as int,
-      positionX: (json['position_x'] ?? 0) as int,
-      positionY: (json['position_y'] ?? 0) as int,
-      hp: (json['hp'] ?? 100) as int,
-      maxHp: (json['max_hp'] ?? 100) as int,
-      mp: (json['mp'] ?? 50) as int,
-      maxMp: (json['max_mp'] ?? 50) as int,
-      str: (json['str'] ?? 4) as int,
-      dex: (json['dex'] ?? 4) as int,
-      intl: (json['int'] ?? 4) as int,
-      luk: (json['luk'] ?? 4) as int,
-      mesos: (json['mesos'] ?? 0) as int,
+      characterClass: asInt(json['class'] ?? json['character_class']),
+      gender: asInt(json['gender']),
+      face: asInt(json['face'], 20100),
+      hair: asInt(json['hair'], 30000),
+      skin: asInt(json['skin']),
+      level: asInt(json['level'], 1),
+      experience: asInt(json['experience'] ?? json['exp']),
+      mapId: asInt(json['map_id'], 10000),
+      positionX: asInt(json['position_x']),
+      positionY: asInt(json['position_y']),
+      hp: asInt(json['hp'], 50),
+      maxHp: asInt(json['max_hp'], 50),
+      mp: asInt(json['mp'], 50),
+      maxMp: asInt(json['max_mp'], 50),
+      str: asInt(json['str'], 12),
+      dex: asInt(json['dex'], 5),
+      intl: asInt(json['int'], 4),
+      luk: asInt(json['luk'], 4),
+      mesos: asInt(json['mesos']),
+      top: asInt(json['top']),
+      bottom: asInt(json['bottom']),
+      shoes: asInt(json['shoes']),
+      weapon: asInt(json['weapon']),
     );
   }
 
@@ -75,6 +102,9 @@ class Character {
       'name': name,
       'class': characterClass,
       'gender': gender,
+      'face': face,
+      'hair': hair,
+      'skin': skin,
       'level': level,
       'experience': experience,
       'map_id': mapId,
@@ -89,13 +119,26 @@ class Character {
       'int': intl,
       'luk': luk,
       'mesos': mesos,
+      'top': top,
+      'bottom': bottom,
+      'shoes': shoes,
+      'weapon': weapon,
     };
   }
 
   String get className {
+    if (characterClass == 0) return '新手';
     switch (characterClass) {
-      case 0:
-        return 'Beginner';
+      case 100:
+        return '战士';
+      case 200:
+        return '法师';
+      case 300:
+        return '弓箭手';
+      case 400:
+        return '飞侠';
+      case 500:
+        return '海盗';
       case 1:
         return 'Warrior';
       case 2:

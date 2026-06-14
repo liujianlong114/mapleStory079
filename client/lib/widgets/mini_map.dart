@@ -81,7 +81,7 @@ class MiniMapWidget extends StatelessWidget {
               children: [
                 const Icon(Icons.person, size: 14, color: Colors.green),
                 const Icon(Icons.location_city, size: 14, color: Colors.yellow),
-                const Icon(Icons.skull_next_outlined, size: 14, color: Colors.red),
+                Icon(Icons.pest_control, size: 14, color: Colors.red),
                 Text(
                   '(${playerX.round()}, ${playerY.round()})',
                   style: const TextStyle(color: Colors.white70, fontSize: 11),

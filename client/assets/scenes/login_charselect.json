@@ -1,0 +1,99 @@
+{
+  "width": 800,
+  "height": 600,
+  "bgm": "audio/title.mp3",
+  "background": "scenes/login_charselect.png",
+  "slots": [
+    {
+      "x": 155,
+      "y": 220,
+      "w": 120,
+      "h": 180
+    },
+    {
+      "x": 340,
+      "y": 220,
+      "w": 120,
+      "h": 180
+    },
+    {
+      "x": 525,
+      "y": 220,
+      "w": 120,
+      "h": 180
+    }
+  ],
+  "buttons": [
+    {
+      "id": "select",
+      "label": "选择",
+      "rect": {
+        "x": 220,
+        "y": 520,
+        "w": 101,
+        "h": 30
+      },
+      "normal": "images/ui/login/btn_select.png",
+      "hover": "images/ui/login/btn_select_over.png",
+      "pressed": "images/ui/login/btn_select_pressed.png"
+    },
+    {
+      "id": "new",
+      "label": "创建",
+      "rect": {
+        "x": 350,
+        "y": 518,
+        "w": 101,
+        "h": 35
+      },
+      "normal": "images/ui/login/btn_new.png",
+      "hover": "images/ui/login/btn_new_over.png",
+      "pressed": "images/ui/login/btn_new_pressed.png"
+    },
+    {
+      "id": "delete",
+      "label": "删除",
+      "rect": {
+        "x": 480,
+        "y": 515,
+        "w": 101,
+        "h": 43
+      },
+      "normal": "images/ui/login/btn_delete.png",
+      "hover": "images/ui/login/btn_delete_over.png",
+      "pressed": "images/ui/login/btn_delete_pressed.png"
+    },
+    {
+      "id": "page_prev",
+      "label": "上一页",
+      "rect": {
+        "x": 40,
+        "y": 300,
+        "w": 86,
+        "h": 74
+      },
+      "normal": "images/ui/login/btn_page_l.png",
+      "hover": "images/ui/login/btn_page_l_over.png",
+      "pressed": "images/ui/login/btn_page_l_pressed.png"
+    },
+    {
+      "id": "page_next",
+      "label": "下一页",
+      "rect": {
+        "x": 674,
+        "y": 300,
+        "w": 89,
+        "h": 74
+      },
+      "normal": "images/ui/login/btn_page_r.png",
+      "hover": "images/ui/login/btn_page_r_over.png",
+      "pressed": "images/ui/login/btn_page_r_pressed.png"
+    }
+  ],
+  "login_panel": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+  }
+}

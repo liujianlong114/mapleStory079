@@ -14,6 +14,7 @@ type Account struct {
 	Username  string    `gorm:"size:32;unique_index;not null" json:"username"`
 	Password  string    `gorm:"size:128;not null" json:"-"`
 	Email     string    `gorm:"size:64" json:"email"`
+	Gender    int       `gorm:"default:10" json:"gender"` // 10=未设置 0=男 1=女（ms079 accounts.gender）
 	Status    int       `gorm:"default:1" json:"status"` // 1=正常 0=禁用
 	LastLogin time.Time `json:"last_login"`
 	CreatedAt time.Time `json:"created_at"`
@@ -27,12 +28,15 @@ type Character struct {
 	Name         string    `gorm:"size:12;unique_index;not null" json:"name"`
 	Class        int       `gorm:"not null;default:0" json:"class"` // 0=新手 1=战士 2=法师 3=弓箭手 4=飞侠 5=海盗
 	Gender       int       `gorm:"not null;default:0" json:"gender"`
+	Face         int       `gorm:"not null;default:20100" json:"face"`
+	Hair         int       `gorm:"not null;default:30000" json:"hair"`
+	Skin         int       `gorm:"not null;default:0" json:"skin"`
 	Level        int       `gorm:"not null;default:1" json:"level"`
 	Exp          int       `gorm:"not null;default:0" json:"exp"`
 	HP           int       `gorm:"not null;default:50" json:"hp"`
 	MaxHP        int       `gorm:"not null;default:50" json:"max_hp"`
-	MP           int       `gorm:"not null;default:5" json:"mp"`
-	MaxMP        int       `gorm:"not null;default:5" json:"max_mp"`
+	MP           int       `gorm:"not null;default:50" json:"mp"`
+	MaxMP        int       `gorm:"not null;default:50" json:"max_mp"`
 	STR          int       `gorm:"not null;default:12" json:"str"`
 	DEX          int       `gorm:"not null;default:5" json:"dex"`
 	INT          int       `gorm:"not null;default:4" json:"int"`

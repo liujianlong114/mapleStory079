@@ -47,7 +47,7 @@ class _InventoryPageState extends State<InventoryPage> with SingleTickerProvider
           controller: _tabController,
           tabs: const [
             Tab(icon: Icon(Icons.inventory_2), text: '装备'),
-            Tab(icon: Icon(Icons.potion), text: '消耗'),
+            Tab(icon: Icon(Icons.local_drink), text: '消耗'),
             Tab(icon: Icon(Icons.diamond), text: '其他'),
             Tab(icon: Icon(Icons.monetization_on), text: '金币'),
           ],
@@ -123,7 +123,7 @@ class _InventoryPageState extends State<InventoryPage> with SingleTickerProvider
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.shield, color: Colors.amber[300], size: 28),
+                            Icon(Icons.shield, color: Colors.amber[300], size: 28),
                             const SizedBox(height: 4),
                             Text(
                               item.name,

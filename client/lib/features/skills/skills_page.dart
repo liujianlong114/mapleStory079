@@ -45,6 +45,7 @@ class _SkillsPageState extends State<SkillsPage> {
               color: Colors.purple[800],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.purple[400]!),
+            ),
             child: Column(
               children: [
                 Row(
