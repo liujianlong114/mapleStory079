@@ -166,8 +166,10 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
         },
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            MapleAvatarView(
+            Flexible(
+              child: MapleAvatarView(
               gender: c.gender,
               face: c.face,
               hair: c.hair,
@@ -175,7 +177,16 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
               bottom: c.bottom,
               shoes: c.shoes,
               weapon: c.weapon,
-              scale: 1.35,
+              cap: c.cap,
+              cape: c.cape,
+              glove: c.glove,
+              shield: c.shield,
+              faceAcc: c.faceAcc,
+              eyeAcc: c.eyeAcc,
+              earring: c.earring,
+              longcoat: c.longcoat,
+              height: 110,
+            ),
             ),
             const SizedBox(height: 4),
             Container(

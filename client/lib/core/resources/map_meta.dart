@@ -18,7 +18,8 @@ class MapMeta {
 
   static const double sideScrollerViewportH = 600;
 
-  /// 079 客户端视口高度
+  /// 079 客户端逻辑视口（HeavenClient Configuration 默认 800×600）
+  static const double officialViewportW = 800;
   static const double officialViewportH = 600;
 
   const MapMeta({
@@ -49,12 +50,15 @@ class MapMeta {
         vrBottom: (j['vrBottom'] as num?)?.toInt() ?? 600,
       );
 
+  /// 按 mapId 加载地图 JSON 元数据（批量导出城镇后统一走 assets/maps/{id}.json）
   static Future<MapMeta?> loadForMap(int mapId) async {
     final paths = <String>[
+      'assets/maps/$mapId.json',
+      // 旧 ID 别名（服务端/存档可能仍用短 ID）
       if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
       if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
+      if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
       if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
-      'assets/maps/$mapId.json',
     ];
     for (final p in paths) {
       try {

@@ -9,13 +9,21 @@ import (
 	"mapleStory079/pkg/utils"
 )
 
-// CharacterView 角色列表视图（含装备外观，供选角预览）
+// CharacterView 角色列表视图（含完整装备外观，供选角 CharLook 预览）
 type CharacterView struct {
 	database.Character
-	Top    int `json:"top"`
-	Bottom int `json:"bottom"`
-	Shoes  int `json:"shoes"`
-	Weapon int `json:"weapon"`
+	Top      int `json:"top"`
+	Bottom   int `json:"bottom"`
+	Longcoat int `json:"longcoat"`
+	Shoes    int `json:"shoes"`
+	Cap      int `json:"cap"`
+	Cape     int `json:"cape"`
+	Glove    int `json:"glove"`
+	Shield   int `json:"shield"`
+	Weapon   int `json:"weapon"`
+	FaceAcc  int `json:"face_acc"`
+	EyeAcc   int `json:"eye_acc"`
+	Earring  int `json:"earring"`
 }
 
 type CharacterService struct {
@@ -121,7 +129,10 @@ func spawnYForMap(mapID uint) int {
 		return 450
 	}
 	if mapID == 10000 || mapID == 1000000 {
-		return 470
+		return 605
+	}
+	if mapID == 104000000 || mapID == 10300 || mapID == 10400 {
+		return 707
 	}
 	return 450
 }
@@ -233,14 +244,30 @@ func (s *CharacterService) GetCharactersByAccountID(accountID uint) ([]Character
 		if err == nil {
 			for _, e := range equips {
 				switch e.EquipSlot {
-				case "coat":
+				case "coat", "top":
 					v.Top = e.ItemID
-				case "pants":
+				case "pants", "bottom":
 					v.Bottom = e.ItemID
+				case "longcoat":
+					v.Longcoat = e.ItemID
 				case "shoes":
 					v.Shoes = e.ItemID
+				case "hat", "cap":
+					v.Cap = e.ItemID
+				case "cape":
+					v.Cape = e.ItemID
+				case "glove", "gloves":
+					v.Glove = e.ItemID
+				case "shield":
+					v.Shield = e.ItemID
 				case "weapon":
 					v.Weapon = e.ItemID
+				case "faceacc", "face_acc":
+					v.FaceAcc = e.ItemID
+				case "eyeacc", "eye_acc", "glass":
+					v.EyeAcc = e.ItemID
+				case "earring", "earacc":
+					v.Earring = e.ItemID
 				}
 			}
 		}

@@ -9,9 +9,12 @@ import 'package:flutter/services.dart';
 import '../../core/resources/assets.dart';
 import '../../core/resources/map_meta.dart';
 import 'map_foothold.dart';
+import 'map_render_utils.dart';
 
-/// 079 横版地图视差层（官方 Map.wz back PNG）
-class WzMapLayer extends PositionComponent with HasGameReference<FlameGame> {
+/// 079 地图视差背景层（HeavenClient MapBackgrounds）
+///
+/// 挂在 [CameraComponent.backdrop]：视口屏幕坐标绘制，按 viewx/viewy 视差平铺。
+class WzMapLayer extends Component with HasGameReference<FlameGame> {
   final int mapId;
   final double mapW;
   final double mapH;
@@ -21,8 +24,7 @@ class WzMapLayer extends PositionComponent with HasGameReference<FlameGame> {
     required double width,
     required double height,
   })  : mapW = width,
-        mapH = height,
-        super(size: Vector2(width, height), priority: -10);
+        mapH = height;
 
   MapMeta? _meta;
   MapFootholds? _footholds;
@@ -69,39 +71,103 @@ class WzMapLayer extends PositionComponent with HasGameReference<FlameGame> {
 
   @override
   void render(Canvas canvas) {
-    if (_images.isEmpty) {
-      _renderSideScrollerFallback(canvas);
-      return;
-    }
-    final cam = game.camera.viewfinder.position;
-    final sorted = [..._layers]..sort((a, b) => a.ry.compareTo(b.ry));
-    for (final layer in sorted) {
-      final img = _images['${layer.bS}_${layer.no}'];
-      if (img == null) continue;
-      final alpha = (layer.alpha / 255).clamp(0.0, 1.0);
-      // Flame 画布已含相机变换；视差世界坐标 = layer + camera * (r/100)
-      final drawX = layer.x + cam.x * (layer.rx / 100.0);
-      final drawY = layer.y + cam.y * (layer.ry / 100.0);
-      canvas.drawImage(
-        img,
-        Offset(drawX, drawY),
-        Paint()..color = Color.fromRGBO(255, 255, 255, alpha),
-      );
-    }
-  }
+    final v = MapRenderUtils.msView(game);
+    if (v.viewW <= 0 || v.viewH <= 0) return;
 
-  void _renderSideScrollerFallback(Canvas canvas) {
-    final gy = groundY;
-    final sky = Rect.fromLTWH(0, 0, mapW, gy);
+    final wOffset = v.viewW / 2;
+    final hOffset = v.viewH / 2;
+
+    // 每帧先铺满天际底色，避免视差层缝隙露出 Game 背景色（蓝框）
     canvas.drawRect(
-      sky,
+      Rect.fromLTWH(0, 0, v.viewW, v.viewH),
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF87CEEB), Color(0xFFB3E5FC), Color(0xFFE1F5FE)],
-        ).createShader(sky),
+          colors: [Color(0xFF5BA3D9), Color(0xFF87CEEB), Color(0xFFB8D4E8)],
+        ).createShader(Rect.fromLTWH(0, 0, v.viewW, v.viewH)),
     );
+
+    if (_images.isEmpty) {
+      return;
+    }
+
+    final sorted = [..._layers]..sort((a, b) => a.ry.compareTo(b.ry));
+    for (final layer in sorted) {
+      final img = _images['${layer.bS}_${layer.no}'];
+      if (img == null) continue;
+
+      final cx = img.width.toDouble();
+      final cy = img.height.toDouble();
+      if (cx < 1 || cy < 1) continue;
+
+      final alpha = (layer.alpha / 255).clamp(0.0, 1.0);
+      final paint = Paint()..color = Color.fromRGBO(255, 255, 255, alpha);
+
+      var htile = 1;
+      var vtile = 1;
+      switch (layer.type) {
+        case 1:
+        case 4:
+        case 6:
+          htile = (v.viewW / cx).ceil() + 3;
+          break;
+        case 2:
+        case 5:
+        case 7:
+          vtile = (v.viewH / cy).ceil() + 3;
+          break;
+        case 3:
+          htile = (v.viewW / cx).ceil() + 3;
+          vtile = (v.viewH / cy).ceil() + 3;
+          break;
+      }
+
+      var screenX = MapRenderUtils.backScreenX(
+        type: layer.type,
+        layerX: layer.x,
+        rx: layer.rx,
+        viewx: v.viewx,
+        wOffset: wOffset,
+      );
+      var screenY = MapRenderUtils.backScreenY(
+        type: layer.type,
+        layerY: layer.y,
+        ry: layer.ry,
+        viewy: v.viewy,
+        hOffset: hOffset,
+      );
+
+      if (htile > 1) {
+        while (screenX > 0) {
+          screenX -= cx;
+        }
+        while (screenX < -cx) {
+          screenX += cx;
+        }
+      }
+      if (vtile > 1) {
+        while (screenY > 0) {
+          screenY -= cy;
+        }
+        while (screenY < -cy) {
+          screenY += cy;
+        }
+      }
+
+      final tw = cx * htile;
+      final th = cy * vtile;
+      for (var tx = 0.0; tx < tw; tx += cx) {
+        for (var ty = 0.0; ty < th; ty += cy) {
+          canvas.drawImage(
+            img,
+            Offset(screenX + tx, screenY + ty),
+            paint,
+          );
+        }
+      }
+    }
+
   }
 
   @override
@@ -262,10 +328,11 @@ class MapMetaFull {
 
   static Future<MapMetaFull?> load(int mapId) async {
     final paths = <String>{
+      'assets/maps/$mapId.json',
       if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
       if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
+      if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
       if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
-      'assets/maps/$mapId.json',
     };
     for (final p in paths) {
       try {

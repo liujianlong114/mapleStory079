@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import '../../core/resources/avatar_assets.dart';
 import 'sprite_loader.dart';
 
-/// 无预烘焙 avatar 时，用 characters/parts/*.png 叠层合成站立图
+/// **已弃用**：parts/*.png 是 WZ 单部件碎片，无 BodyDrawInfo 锚点不能叠层。
+/// 请用 extract_avatars.py / extract_beginner_avatars.py 导出的 characters/avatars/*.png。
+@Deprecated('Use CharacterRenderer.compose avatars, not raw parts stacking')
 class CharacterPartComposer {
   CharacterPartComposer._();
 

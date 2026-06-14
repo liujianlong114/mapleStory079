@@ -45,10 +45,12 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	})
 	service.StartMobSimulation(service.DefaultMobInstanceService)
 	npcHandler := NewNPCHandler()
+	shopHandler := NewShopHandler()
 	invHandler := NewInventoryHandler()
 	skillHandler := NewSkillHandler()
 	chatHandler := NewChatHandler()
 	socialHandler := NewSocialHandler()
+	avatarHandler := NewAvatarHandler()
 
 	api := r.Group("/api")
 	{
@@ -59,10 +61,12 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 			registerCharacterRoutes(v1, charHandler)
 			registerGameRoutes(v1, gameHandler)
 			registerNPCRoutes(v1, npcHandler)
+			registerShopRoutes(v1, shopHandler)
 			registerInventoryRoutes(v1, invHandler)
 			registerSkillRoutes(v1, skillHandler)
 			registerChatRoutes(v1, chatHandler)
 			registerSocialRoutes(v1, socialHandler)
+			registerLookRoutes(v1, avatarHandler)
 		}
 	}
 
@@ -161,6 +165,14 @@ func registerNPCRoutes(r *gin.RouterGroup, h *NPCHandler) {
 	}
 }
 
+func registerShopRoutes(r *gin.RouterGroup, h *ShopHandler) {
+	shop := r.Group("/shop")
+	{
+		shop.GET("/npc/:npcId", h.List)
+		shop.POST("/npc/:npcId/buy", h.Buy)
+	}
+}
+
 func registerInventoryRoutes(r *gin.RouterGroup, h *InventoryHandler) {
 	inventory := r.Group("/inventory")
 	{
@@ -187,6 +199,13 @@ func registerChatRoutes(r *gin.RouterGroup, h *ChatHandler) {
 }
 
 // registerSocialRoutes 注册公会/组队/好友相关 API。
+func registerLookRoutes(r *gin.RouterGroup, h *AvatarHandler) {
+	lookGroup := r.Group("/look")
+	{
+		lookGroup.GET("/compose.png", h.Compose)
+	}
+}
+
 func registerSocialRoutes(r *gin.RouterGroup, h *SocialHandler) {
 	guild := r.Group("/guilds")
 	{

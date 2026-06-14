@@ -89,10 +89,25 @@ func firstOrCreateMaps(maps []Map) int {
 func seedNpcs() int {
 	npcs := default079NPCs()
 	for i := range npcs {
-		if err := DB.FirstOrCreate(&npcs[i], NPC{ID: npcs[i].ID}).Error; err != nil {
-			log.Printf("[Seed] NPC插入失败 id=%d: %v", npcs[i].ID, err)
+		var existing NPC
+		err := DB.Where("id = ?", npcs[i].ID).First(&existing).Error
+		if err == nil {
+			_ = DB.Model(&existing).Updates(map[string]interface{}{
+				"name":        npcs[i].Name,
+				"description": npcs[i].Description,
+				"map_id":      npcs[i].MapID,
+				"position_x":  npcs[i].PositionX,
+				"position_y":  npcs[i].PositionY,
+				"has_shop":    npcs[i].HasShop,
+			}).Error
+		} else {
+			if err := DB.FirstOrCreate(&npcs[i], NPC{ID: npcs[i].ID}).Error; err != nil {
+				log.Printf("[Seed] NPC插入失败 id=%d: %v", npcs[i].ID, err)
+			}
 		}
 	}
+	// 移除误放在彩虹村(1000000)上的非本图 NPC
+	_ = DB.Where("map_id = ? AND id IN ?", 1000000, []uint{12000, 1012112, 1012114}).Delete(&NPC{}).Error
 	log.Printf("[Seed] NPC 数据初始化完成（共 %d 个）", len(npcs))
 	return len(npcs)
 }
@@ -178,11 +193,18 @@ func seedSkills() int {
 
 func seedQuests() int {
 	quests := []Quest{
-		// 新手任务
-		{ID: 400000, Name: "初来乍到", Description: "与彩虹村村长希娜对话", NPCID: 12000, LevelReq: 1, ExpReward: 15, MesosReward: 100, CreatedAt: time.Now()},
-		{ID: 400001, Name: "击退蜗牛", Description: "击败10只蜗牛", NPCID: 12000, LevelReq: 1, ExpReward: 50, MesosReward: 300, CreatedAt: time.Now()},
-		{ID: 400002, Name: "蓝蜗牛的秘密", Description: "收集5个蓝蜗牛壳", NPCID: 12000, LevelReq: 3, ExpReward: 150, MesosReward: 500, CreatedAt: time.Now()},
-		{ID: 400003, Name: "前往明珠港", Description: "前往明珠港与船长对话", NPCID: 22000, LevelReq: 5, ExpReward: 200, MesosReward: 800, CreatedAt: time.Now()},
+		// 彩虹岛新手任务链（079 官方 Quest ID）
+		{ID: 1000, Name: "借来莎丽的镜子", Description: "去找希娜。她需要从姐姐莎丽那里借镜子。", NPCID: 2101, LevelReq: 1, ExpReward: 10, MesosReward: 50, CreatedAt: time.Now()},
+		{ID: 1001, Name: "给希娜弄来镜子", Description: "找到正在晾衣的莎丽借到镜子，拿给希娜。", NPCID: 2100, LevelReq: 1, ExpReward: 20, MesosReward: 100, CreatedAt: time.Now()},
+		{ID: 1005, Name: "传递信件", Description: "蘑菇村的玛利亚需要你把信送给彩虹村的路卡斯长老。", NPCID: 2103, LevelReq: 3, ExpReward: 50, MesosReward: 200, CreatedAt: time.Now()},
+		{ID: 1006, Name: "长老的回信", Description: "把路卡斯的回信交给玛利亚。", NPCID: 12000, LevelReq: 3, ExpReward: 80, MesosReward: 300, CreatedAt: time.Now()},
+		{ID: 1008, Name: "皮奥的垃圾回收", Description: "帮彩虹村的皮奥收集还可以用的垃圾。", NPCID: 10000, LevelReq: 5, ExpReward: 100, MesosReward: 500, CreatedAt: time.Now()},
+		{ID: 1009, Name: "瑞恩的冒险岛问答1", Description: "回答瑞恩的问题：打开背包的快捷键是什么？", NPCID: 12101, LevelReq: 6, ExpReward: 50, MesosReward: 200, CreatedAt: time.Now()},
+		// 兼容旧自定义任务 ID（修正 NPC 指向）
+		{ID: 400000, Name: "初来乍到", Description: "与希娜对话，了解彩虹村。", NPCID: 2101, LevelReq: 1, ExpReward: 15, MesosReward: 100, CreatedAt: time.Now()},
+		{ID: 400001, Name: "击退蜗牛", Description: "击败10只蜗牛", NPCID: 12100, LevelReq: 1, ExpReward: 50, MesosReward: 300, CreatedAt: time.Now()},
+		{ID: 400002, Name: "蓝蜗牛的秘密", Description: "收集5个蓝蜗牛壳", NPCID: 12100, LevelReq: 3, ExpReward: 150, MesosReward: 500, CreatedAt: time.Now()},
+		{ID: 400003, Name: "前往明珠港", Description: "前往明珠港与船长桑克斯对话", NPCID: 22000, LevelReq: 5, ExpReward: 200, MesosReward: 800, CreatedAt: time.Now()},
 		{ID: 400004, Name: "长老斯坦的信", Description: "将信送到射手村斯坦族长处", NPCID: 1012008, LevelReq: 8, ExpReward: 300, MesosReward: 1000, CreatedAt: time.Now()},
 
 		// 1转转职任务
@@ -220,7 +242,18 @@ func seedQuests() int {
 		{ID: 400404, Name: "4转 - 海盗", Description: "120级完成海盗4转试炼", NPCID: 1072009, LevelReq: 120, ExpReward: 50000, MesosReward: 100000, CreatedAt: time.Now()},
 	}
 	for i := range quests {
-		if err := DB.FirstOrCreate(&quests[i], Quest{ID: quests[i].ID}).Error; err != nil {
+		var existing Quest
+		err := DB.Where("id = ?", quests[i].ID).First(&existing).Error
+		if err == nil {
+			_ = DB.Model(&existing).Updates(map[string]interface{}{
+				"name":        quests[i].Name,
+				"description": quests[i].Description,
+				"npc_id":      quests[i].NPCID,
+				"level_req":   quests[i].LevelReq,
+				"exp_reward":  quests[i].ExpReward,
+				"mesos_reward": quests[i].MesosReward,
+			}).Error
+		} else if err := DB.FirstOrCreate(&quests[i], Quest{ID: quests[i].ID}).Error; err != nil {
 			log.Printf("[Seed] 任务插入失败 id=%d: %v", quests[i].ID, err)
 		}
 	}

@@ -1,0 +1,12 @@
+{
+  "pose": "stand1",
+  "frames": 3,
+  "widths": [
+    54,
+    54,
+    54
+  ],
+  "height": 46,
+  "stepTime": 0.5,
+  "anchor": "feet"
+}

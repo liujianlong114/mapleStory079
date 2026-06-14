@@ -6,20 +6,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/resources/assets.dart';
+import 'map_render_utils.dart';
 import 'wz_map_layer.dart';
 
 /// 079 地图 Tile + Obj 前景层（HeavenClient MapTilesObjs）
+///
+/// **世界坐标 1:1 像素**：`screen = world + viewpos`，origin 从锚点减去。
 class WzMapForegroundLayer extends PositionComponent
     with HasGameReference<FlameGame> {
   WzMapForegroundLayer({
     required this.mapId,
     required this.basePriority,
-  }) : super(priority: basePriority);
+    required double width,
+    required double height,
+  }) : super(
+          size: Vector2(width, height),
+          priority: basePriority,
+        );
 
   final int mapId;
   final int basePriority;
 
   final Map<String, ui.Image> _images = {};
+  final List<MapForegroundLayerDef> _layerDefs = [];
   final List<_DrawItem> _items = [];
 
   @override
@@ -27,6 +36,7 @@ class WzMapForegroundLayer extends PositionComponent
     final full = await MapMetaFull.load(mapId);
     final layers = full?.mapLayers ?? [];
     if (layers.isEmpty) return;
+    _layerDefs.addAll(layers);
 
     for (final layer in layers) {
       final tS = layer.tS.isNotEmpty ? layer.tS : 'grassySoil';
@@ -71,7 +81,7 @@ class WzMapForegroundLayer extends PositionComponent
       }
     }
 
-    // 079：按层 → obj(z) → tile(zM) 排序
+    // 079：按层 id → obj 先于 tile → z 升序
     _items.sort((a, b) {
       final lc = a.layerId.compareTo(b.layerId);
       if (lc != 0) return lc;
@@ -97,19 +107,37 @@ class WzMapForegroundLayer extends PositionComponent
   @override
   void render(Canvas canvas) {
     if (_items.isEmpty) return;
+
+    final v = MapRenderUtils.msView(game);
     final paint = Paint()..filterQuality = FilterQuality.none;
-    for (final item in _items) {
-      final dx = item.x - item.ox;
-      final dy = item.y - item.oy;
+
+    // 079 Stage::draw：按 mapLayer id 0→7 逐层绘制（层内已 obj→tile 排序）
+    for (final layerDef in _layerDefs) {
+      for (final item in _items.where((i) => i.layerId == layerDef.id)) {
+      final left = item.x - item.ox;
+      final top = item.y - item.oy;
+      final iw = item.image.width.toDouble();
+      final ih = item.image.height.toDouble();
+
+      // 视口外剔除（世界坐标）
+      final cam = v.cam;
+      if (left + iw < cam.x ||
+          left > cam.x + v.viewW ||
+          top + ih < cam.y ||
+          top > cam.y + v.viewH) {
+        continue;
+      }
+
       if (!item.flip) {
-        canvas.drawImage(item.image, Offset(dx, dy), paint);
+        canvas.drawImage(item.image, Offset(left, top), paint);
         continue;
       }
       canvas.save();
-      canvas.translate(item.x + item.ox, item.y - item.oy);
+      canvas.translate(left + item.ox, top);
       canvas.scale(-1, 1);
       canvas.drawImage(item.image, Offset(-item.ox, 0), paint);
       canvas.restore();
+      }
     }
   }
 

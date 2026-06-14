@@ -92,6 +92,21 @@ func (m *MapLife) MobSpawns() []LifeEntry {
 	return out
 }
 
+// NpcSpawns 返回 type=n 且未 hide 的 NPC 刷点（屏幕坐标）。
+func (m *MapLife) NpcSpawns() []LifeEntry {
+	if m == nil {
+		return nil
+	}
+	out := make([]LifeEntry, 0, len(m.Life))
+	for _, e := range m.Life {
+		if e.Type != "n" || e.Hide != 0 {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
 // ToScreen 将 WZ 坐标转为客户端屏幕坐标（与 export 脚本一致）。
 func ToScreen(x, cy, vrLeft, vrBottom int) (float64, float64) {
 	sx := float64(x - vrLeft)

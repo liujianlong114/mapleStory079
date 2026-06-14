@@ -105,7 +105,8 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
         final mapId = map?.id ?? char.mapId;
         final mapName = map?.name ?? _mapMeta?.name ?? '彩虹村';
         final mapW = (_mapMeta?.width ?? map?.width ?? 1705).toDouble();
-        final mapH = MapMeta.officialViewportH;
+        // 079 地图逻辑高度 = VRBottom - VRTop（非视口 600px）
+        final mapH = (_mapMeta?.height ?? 1230).toDouble();
         final groundY = (_mapMeta?.spawnY ?? 605).toDouble();
 
         return FadeTransition(
@@ -138,6 +139,14 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
             playerBottom: char.bottom,
             playerShoes: char.shoes,
             playerWeapon: char.weapon,
+            playerCap: char.cap,
+            playerCape: char.cape,
+            playerGlove: char.glove,
+            playerShield: char.shield,
+            playerFaceAcc: char.faceAcc,
+            playerEyeAcc: char.eyeAcc,
+            playerEarring: char.earring,
+            playerLongcoat: char.longcoat,
           ),
         );
       },

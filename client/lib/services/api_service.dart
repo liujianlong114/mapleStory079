@@ -634,4 +634,33 @@ class ApiService {
     final list = data['npcs'] as List? ?? [];
     return list.map((e) => e as Map<String, dynamic>).toList();
   }
+
+  Future<List<Map<String, dynamic>>> getShopItems(int npcId) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/shop/npc/$npcId'),
+      headers: _headers(),
+    );
+    final data = await _handleResponse(response);
+    final list = data['items'] as List? ?? [];
+    return list.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<int> buyShopItem({
+    required int npcId,
+    required int characterId,
+    required int itemId,
+    int quantity = 1,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/shop/npc/$npcId/buy'),
+      headers: _headers(),
+      body: jsonEncode({
+        'character_id': characterId,
+        'item_id': itemId,
+        'quantity': quantity,
+      }),
+    );
+    final data = await _handleResponse(response);
+    return (data['mesos'] as num?)?.toInt() ?? 0;
+  }
 }

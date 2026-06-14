@@ -381,7 +381,8 @@ const (
 // 参考经典冒险岛命名，使用与原版相近的整数 ID
 const (
 	// ms079 创建角色出生地图（MapleCharacter.saveNewCharToDB L876）
-	MapTutorialStart = 1000000     // 冒险家 — 彩虹村（Maple Island Amherst）；原版 DB 写入 0 为教程房，进游戏后在彩虹村
+	// 冒险家新手出生：彩虹村（Maple Island Amherst）
+	MapTutorialStart = 1000000
 	MapKnightStart   = 130030000 // 骑士团
 	MapAranStart     = 914000000 // 战神
 

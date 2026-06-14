@@ -38,6 +38,7 @@ class BgmAssets {
   static const String herbTown     = 'audio/01000000.ogg';
 
   static String? byMapId(int mapId) {
+    if (mapId == 104000000 || mapId == 10300 || mapId == 10400) return lithHarbor;
     if (mapId >= 990000000) return 'audio/boss_zakum.wav';
     if (mapId >= 220000000) return 'audio/00300000.wav';
     if (mapId >= 201000000) return 'audio/00200001.wav';
@@ -186,6 +187,12 @@ class GameConstants {
     final need = expRequired(currentLevel);
     final rest = need - currentExp;
     return rest < 0 ? 0 : rest;
+  }
+
+  static double expPercent(int level, int exp) {
+    final need = expRequired(level);
+    if (need <= 0) return 0;
+    return (exp / need) * 100.0;
   }
 }
 

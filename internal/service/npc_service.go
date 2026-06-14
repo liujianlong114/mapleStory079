@@ -68,6 +68,7 @@ type NPCService struct {
 func NewNPCService() *NPCService {
 	svc := &NPCService{scripts: make(map[int]NPCScript)}
 	svc.registerDefaultScripts()
+	registerWZDialogueScripts(svc)
 	return svc
 }
 
@@ -112,14 +113,18 @@ func (s *NPCService) StartDialogue(npcID uint, characterID uint) (*DialogueResul
 		}, nil
 	}
 
-	// 默认对话（未注册脚本的NPC）
+	// 默认对话（未注册脚本的 NPC）：使用种子库中的 WZ 台词
+	text := npc.Description
+	if text == "" {
+		text = fmt.Sprintf("你好，冒险者 %s！欢迎来到枫叶世界。", character.Name)
+	}
 	return &DialogueResult{
 		NPCID:   npcID,
 		NPCName: npc.Name,
 		Node: &DialogueNode{
 			ID:       "start",
 			Speaker:  npc.Name,
-			Text:     fmt.Sprintf("你好，冒险者 %s！欢迎来到枫叶世界。", character.Name),
+			Text:     text,
 			NodeType: "choice",
 			Choices: []DialogueChoice{
 				{Text: "再见", NextID: "end", Action: "close"},

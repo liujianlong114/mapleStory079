@@ -25,6 +25,14 @@ class Character {
   final int bottom;
   final int shoes;
   final int weapon;
+  final int cap;
+  final int cape;
+  final int glove;
+  final int shield;
+  final int faceAcc;
+  final int eyeAcc;
+  final int earring;
+  final int longcoat;
 
   Character({
     required this.id,
@@ -53,6 +61,14 @@ class Character {
     this.bottom = 0,
     this.shoes = 0,
     this.weapon = 0,
+    this.cap = 0,
+    this.cape = 0,
+    this.glove = 0,
+    this.shield = 0,
+    this.faceAcc = 0,
+    this.eyeAcc = 0,
+    this.earring = 0,
+    this.longcoat = 0,
   });
 
   factory Character.fromJson(Map<String, dynamic> json) =>
@@ -92,6 +108,14 @@ class Character {
       bottom: asInt(json['bottom']),
       shoes: asInt(json['shoes']),
       weapon: asInt(json['weapon']),
+      cap: asInt(json['cap']),
+      cape: asInt(json['cape']),
+      glove: asInt(json['glove']),
+      shield: asInt(json['shield']),
+      faceAcc: asInt(json['face_acc']),
+      eyeAcc: asInt(json['eye_acc']),
+      earring: asInt(json['earring']),
+      longcoat: asInt(json['longcoat']),
     );
   }
 
@@ -123,6 +147,14 @@ class Character {
       'bottom': bottom,
       'shoes': shoes,
       'weapon': weapon,
+      'cap': cap,
+      'cape': cape,
+      'glove': glove,
+      'shield': shield,
+      'face_acc': faceAcc,
+      'eye_acc': eyeAcc,
+      'earring': earring,
+      'longcoat': longcoat,
     };
   }
 

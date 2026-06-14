@@ -52,8 +52,10 @@ def extract_avatars(client_root: str, out_dir: str, region: str = "EMS", force: 
     ok = fail = 0
     for gender, face, hair, top, bottom, shoes, weapon in LOOKS:
         body = 2001 if gender == 1 else 2000
+        head = body + 10000
         equip: List[str] = [
             _equip_id(body),
+            _equip_id(head),
             _equip_id(face),
             _equip_id(hair),
             _equip_id(top),

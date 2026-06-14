@@ -53,22 +53,23 @@ class MapFootholds {
     return out;
   }
 
-  /// 求站立 Y。feetY 为当前脚点；无 feetY 时取最低地面（最大 Y）
-  double groundYAt(double x, {double? feetY, double tolerance = 12}) {
+  /// 079：求脚下站立面。foothold Y 只能 **≥** 脚点（更大=更靠下），
+  /// 不能把头顶平台（Y 更小）当成地面。
+  double? groundYAt(double x, {double? feetY, double tolerance = 8}) {
     final ys = walkableYAt(x);
-    if (ys.isEmpty) return fallbackY;
-    if (feetY == null) return ys.reduce(math.max);
-    final below = ys.where((y) => y <= feetY + tolerance).toList();
-    if (below.isEmpty) return ys.reduce(math.min);
-    return below.reduce(math.max);
+    if (ys.isEmpty) return null;
+    final refY = feetY ?? fallbackY;
+    final candidates = ys.where((y) => y >= refY - tolerance).toList();
+    if (candidates.isEmpty) return null;
+    return candidates.reduce(math.min);
   }
 
-  /// 空中落下时检测着陆面
+  /// 空中落下时检测着陆面（第一个 Y ≥ 脚点的面）
   double? landingYAt(double x, double feetY, {double tolerance = 6}) {
     final ys = walkableYAt(x);
     if (ys.isEmpty) return null;
-    final below = ys.where((y) => y >= feetY - tolerance).toList();
-    if (below.isEmpty) return null;
-    return below.reduce(math.min);
+    final hits = ys.where((y) => y >= feetY - tolerance).toList();
+    if (hits.isEmpty) return null;
+    return hits.reduce(math.min);
   }
 }

@@ -8,13 +8,21 @@ import '../../providers/inventory_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
-import '../../widgets/player_stats.dart';
-import '../../widgets/mini_map.dart';
+import '../../widgets/maple_mini_map.dart';
+import '../../widgets/maple_status_bar.dart';
+import '../../widgets/npc_dialogue_widget.dart';
 import '../../game/engine/game_controls.dart';
 import '../../game/engine/game_world.dart';
+import '../../game/engine/map_life_loader.dart';
 import '../../models/mob.dart';
 import 'key_config_dialog.dart';
+import 'npc_shop_panel.dart';
+import 'official_game_viewport.dart';
 
+/// 游戏场景页（Flutter 壳 + Flame [GameWorld]）
+///
+/// **流程**：等 [GameWorld.mapReady] → 按地图 foothold 生成玩家/NPC/怪 → WebSocket 同步。
+/// **在用**：本页 + GameWorld + WzMapLayer；旧 TileMapLayer 仅作无 JSON 回退。
 class GameScenePage extends StatefulWidget {
   final int mapId;
   final String mapName;
@@ -43,6 +51,14 @@ class GameScenePage extends StatefulWidget {
   final int playerBottom;
   final int playerShoes;
   final int playerWeapon;
+  final int playerCap;
+  final int playerCape;
+  final int playerGlove;
+  final int playerShield;
+  final int playerFaceAcc;
+  final int playerEyeAcc;
+  final int playerEarring;
+  final int playerLongcoat;
 
   const GameScenePage({
     super.key,
@@ -73,6 +89,14 @@ class GameScenePage extends StatefulWidget {
     this.playerBottom = 0,
     this.playerShoes = 0,
     this.playerWeapon = 0,
+    this.playerCap = 0,
+    this.playerCape = 0,
+    this.playerGlove = 0,
+    this.playerShield = 0,
+    this.playerFaceAcc = 0,
+    this.playerEyeAcc = 0,
+    this.playerEarring = 0,
+    this.playerLongcoat = 0,
   });
 
   @override
@@ -82,6 +106,9 @@ class GameScenePage extends StatefulWidget {
 class _GameScenePageState extends State<GameScenePage> {
   late final GameWorld _gameWorld;
   late final WebSocketService _ws;
+  final ValueNotifier<int> _minimapTick = ValueNotifier(0);
+  bool _shopOpen = false;
+  NPCComponent? _shopNpc;
 
   @override
   void initState() {
@@ -109,6 +136,14 @@ class _GameScenePageState extends State<GameScenePage> {
       playerBottom: widget.playerBottom,
       playerShoes: widget.playerShoes,
       playerWeapon: widget.playerWeapon,
+      playerCap: widget.playerCap,
+      playerCape: widget.playerCape,
+      playerGlove: widget.playerGlove,
+      playerShield: widget.playerShield,
+      playerFaceAcc: widget.playerFaceAcc,
+      playerEyeAcc: widget.playerEyeAcc,
+      playerEarring: widget.playerEarring,
+      playerLongcoat: widget.playerLongcoat,
     );
     _gameWorld.ws = _ws;
     _gameWorld.api = ApiService();
@@ -117,6 +152,8 @@ class _GameScenePageState extends State<GameScenePage> {
     _gameWorld.mp = widget.initialMp;
     _gameWorld.maxMp = widget.initialMaxMp;
     _gameWorld.level = widget.initialLevel;
+    _gameWorld.onNpcInteract = _onNpcInteract;
+    _gameWorld.onViewChanged = () => _minimapTick.value++;
     _setupStatSync();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _connectWebSocket();
@@ -136,6 +173,8 @@ class _GameScenePageState extends State<GameScenePage> {
 
   @override
   void dispose() {
+    _gameWorld.onViewChanged = null;
+    _minimapTick.dispose();
     _ws.disconnect();
     super.dispose();
   }
@@ -219,20 +258,55 @@ class _GameScenePageState extends State<GameScenePage> {
       for (final row in npcs) {
         final id = (row['id'] as num?)?.toInt() ?? (row['npc_id'] as num?)?.toInt() ?? 0;
         final name = row['name'] as String? ?? 'NPC';
-        final x = (row['pos_x'] as num?)?.toDouble() ??
-            (row['position_x'] as num?)?.toDouble() ??
+        final dialogue = row['description'] as String? ?? '';
+        final hasShop = row['has_shop'] == true;
+        final x = (row['position_x'] as num?)?.toDouble() ??
+            (row['pos_x'] as num?)?.toDouble() ??
             (row['x'] as num?)?.toDouble() ??
             widget.mapWidth / 2;
         if (id == 0) continue;
-        _gameWorld.addNPC(id: id, name: name, position: Vector2(x, 0));
+        _gameWorld.addNPC(
+          id: id,
+          name: name,
+          position: Vector2(x, 0),
+          hasShop: hasShop,
+          dialogue: dialogue,
+        );
       }
-    } else if (widget.mapId == 1000000 || widget.mapId == 10000) {
-      _gameWorld.addNPC(
-        id: 12000,
-        name: '希娜',
-        position: Vector2(400, 0),
-      );
+    } else if (widget.mapId == 1000000 || widget.mapId == 1000001) {
+      final spawns = await loadMapLifeNpcs(widget.mapId);
+      for (final npc in spawns) {
+        _gameWorld.addNPC(
+          id: npc.id,
+          name: npc.name,
+          dialogue: npc.dialogue,
+          hasShop: npc.hasShop,
+          position: Vector2(npc.x, 0),
+        );
+      }
     }
+  }
+
+  void _onNpcInteract(NPCComponent npc) {
+    if (npc.hasShop) {
+      setState(() {
+        _shopNpc = npc;
+        _shopOpen = true;
+      });
+      return;
+    }
+    showNPCDialogue(
+      context,
+      npcName: npc.npcName,
+      dialogue: npc.dialogue.isNotEmpty
+          ? npc.dialogue
+          : '你好，冒险者！',
+      options: const ['再见'],
+    );
+  }
+
+  int _currentMesos() {
+    return context.read<GameProvider>().mesos;
   }
 
   void _spawnFallbackMobs() {
@@ -267,91 +341,118 @@ class _GameScenePageState extends State<GameScenePage> {
     Navigator.pushNamed(context, route);
   }
 
+  void _showGameMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF2d1f10),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.keyboard, color: Color(0xFFffe08a)),
+              title: const Text('键盘设置', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                KeyConfigDialog.show(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.inventory_2, color: Color(0xFFffe08a)),
+              title: const Text('背包', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openMenu(Routes.inventory);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: Color(0xFFffe08a)),
+              title: const Text('技能', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openMenu(Routes.skills);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: Color(0xFFffe08a)),
+              title: const Text('社交', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openMenu(Routes.social);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: GameWidget(
-              game: _gameWorld,
-              autofocus: true,
-              backgroundBuilder: (_) => Container(color: const Color(0xFF87CEEB)),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 88,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0),
-                      Colors.black.withValues(alpha: 0.55),
-                    ],
+      body: OfficialGameSceneShell(
+        game: GameWidget(
+          game: _gameWorld,
+          autofocus: true,
+        ),
+        overlays: [
+          Stack(
+            children: [
+              if (_shopOpen && _shopNpc != null)
+                NpcShopPanel(
+                  npcId: _shopNpc!.npcId,
+                  npcName: _shopNpc!.npcName,
+                  characterId: widget.characterId,
+                  mesos: _currentMesos(),
+                  onClose: () => setState(() {
+                    _shopOpen = false;
+                    _shopNpc = null;
+                  }),
+                  onMesosChanged: (m) {
+                    context.read<GameProvider>().syncFromGameWorld(mesos: m);
+                    _gameWorld.onStatChange?.call(mesos: m);
+                  },
+                ),
+              Positioned(
+                left: 10,
+                top: 10,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _minimapTick,
+                  builder: (_, __, ___) => MapleMiniMap(
+                    vrLeft: _gameWorld.vrLeft,
+                    vrRight: _gameWorld.vrRight,
+                    vrTop: _gameWorld.vrTop,
+                    vrBottom: _gameWorld.vrBottom,
+                    cameraX: _gameWorld.cameraWorldX,
+                    cameraY: _gameWorld.cameraWorldY,
+                    viewW: _gameWorld.viewportW,
+                    viewH: _gameWorld.viewportH,
+                    playerX: _gameWorld.playerPosition.x,
+                    playerY: _gameWorld.playerPosition.y,
+                    mapName: widget.mapName,
+                    npcDots: _gameWorld.npcs
+                        .map((n) => Offset(n.position.x, n.position.y))
+                        .toList(),
+                    mobDots: _gameWorld.mobs
+                        .map((m) => Offset(m.position.x, m.position.y))
+                        .toList(),
                   ),
                 ),
               ),
-            ),
-          ),
-          const Positioned(
-            top: 8,
-            left: 8,
-            right: 8,
-            child: PlayerStatsBar(),
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: PopupMenuButton<String>(
-              icon: const Icon(Icons.settings, color: Color(0xFFFFD54F), size: 22),
-              color: const Color(0xFF1a1208),
-              onSelected: (value) {
-                if (value == 'keys') {
-                  KeyConfigDialog.show(context);
-                } else {
-                  _openMenu(value);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'keys', child: Text('键盘设置')),
-                const PopupMenuItem(value: Routes.inventory, child: Text('背包 (I)')),
-                const PopupMenuItem(value: Routes.skills, child: Text('技能')),
-                const PopupMenuItem(value: Routes.chat, child: Text('聊天')),
-                const PopupMenuItem(value: Routes.social, child: Text('社交')),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 72,
-            right: 8,
-            child: MiniMapWidget(
-              mapWidth: widget.mapWidth.toInt(),
-              mapHeight: widget.mapHeight.toInt(),
-              playerX: _gameWorld.playerPosition.x,
-              playerY: _gameWorld.playerPosition.y,
-              mapName: widget.mapName,
-            ),
-          ),
-          Positioned(
-            bottom: 12,
-            left: 12,
-            right: 12,
-            child: Text(
-              GameControls.hint,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 11,
-                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: MapleStatusBar(
+                  onMenu: () => _showGameMenu(context),
+                  onChat: () => _openMenu(Routes.chat),
+                  onShop: () {},
+                  onInventory: () => _openMenu(Routes.inventory),
+                  onSkills: () => _openMenu(Routes.skills),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'dart:math' as math;
 
+import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/extensions.dart';
@@ -13,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../../core/resources/avatar_assets.dart';
 import '../../core/resources/assets.dart';
 import '../../core/resources/map_meta.dart';
+import '../../models/char_look.dart';
 import '../../models/mob.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
@@ -21,14 +23,18 @@ import 'map_foothold.dart';
 import 'maple_island_map_layer.dart';
 import 'wz_map_layer.dart';
 import 'wz_map_foreground.dart';
-import 'character_part_composer.dart';
 import 'sprite_loader.dart';
 
-/// Flame 游戏世界 —— 负责 Canvas 渲染循环、实体管理、输入处理
+/// 079 横版游戏主世界（Flame Game）
 ///
-/// 主要特性：
-/// - 相机跟随玩家 (camera.follow)
-/// - 键盘：079 方向键移动 / Ctrl 攻击 / Z 拾取
+/// **在用模块**：
+/// - [WzMapLayer] / [WzMapForegroundLayer] — WZ 地图 back + tile/obj（有 JSON 时）
+/// - [MapleIslandMapLayer] — 无 JSON 时彩虹岛程序化回退
+/// - [PlayerComponent] — 本地玩家（WZ 行走/站立动画 + 部件合成回退）
+/// - [MobComponent] / [NPCComponent] — 怪物与 NPC
+/// - [MapFootholds] — 地面碰撞与跳跃
+///
+/// **已弃用/回退**： [TileMapLayer] 仅在没有地图 JSON 时显示格子占位。
 class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   GameWorld({
     this.mapId = 1,
@@ -53,6 +59,14 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     this.playerBottom = 0,
     this.playerShoes = 0,
     this.playerWeapon = 0,
+    this.playerCap = 0,
+    this.playerCape = 0,
+    this.playerGlove = 0,
+    this.playerShield = 0,
+    this.playerFaceAcc = 0,
+    this.playerEyeAcc = 0,
+    this.playerEarring = 0,
+    this.playerLongcoat = 0,
   })  : _defaultGroundY = playerInitial?.y ?? 605,
         player = PlayerComponent(
           position: Vector2(
@@ -67,6 +81,14 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
           bottom: playerBottom,
           shoes: playerShoes,
           weapon: playerWeapon,
+          cap: playerCap,
+          cape: playerCape,
+          glove: playerGlove,
+          shield: playerShield,
+          faceAcc: playerFaceAcc,
+          eyeAcc: playerEyeAcc,
+          earring: playerEarring,
+          longcoat: playerLongcoat,
         );
 
   // ===== 地图属性 =====
@@ -84,6 +106,14 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final int playerBottom;
   final int playerShoes;
   final int playerWeapon;
+  final int playerCap;
+  final int playerCape;
+  final int playerGlove;
+  final int playerShield;
+  final int playerFaceAcc;
+  final int playerEyeAcc;
+  final int playerEarring;
+  final int playerLongcoat;
 
   /// 079 默认地面 Y（无 foothold 数据时的回退）
   final double _defaultGroundY;
@@ -93,21 +123,51 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   double _vrTop = 0;
   double _vrBottom = 600;
 
+  double get vrLeft => _vrLeft;
+  double get vrRight => _vrRight;
+  double get vrTop => _vrTop;
+  double get vrBottom => _vrBottom;
+  double get cameraWorldX => camera.viewfinder.position.x;
+  double get cameraWorldY => camera.viewfinder.position.y;
+  /// 079 固定逻辑视口（不读 game.size，避免布局前断言崩溃）
+  double get viewportW => MapMeta.officialViewportW;
+  double get viewportH => MapMeta.officialViewportH;
+
+  /// 小地图 / HUD 刷新（相机跟随每帧，延迟到帧末避免 build 中 setState）
+  VoidCallback? onViewChanged;
+  bool _viewNotifyQueued = false;
+
+  void _scheduleViewNotify() {
+    final cb = onViewChanged;
+    if (cb == null) return;
+    if (_viewNotifyQueued) return;
+    _viewNotifyQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _viewNotifyQueued = false;
+      cb();
+    });
+  }
+
   // 垂直运动（079：Alt 跳跃 + 重力）
   double _vy = 0;
   bool _onGround = true;
   bool _jumpHeldLast = false;
   static const double _gravity = 2000;
   static const double _jumpSpeed = -640;
-  static const double _cameraFootOffset = 520;
+  static const double _cameraFootOffset = 300; // 由 _syncCamera 按 viewH/2 覆盖
 
   void Function()? onOpenKeyConfig;
 
   /// 当前玩家所在 x 的可走 foothold Y
   double get groundY => groundAt(player.position.x, feetY: player.position.y);
 
+  double? tryGroundAt(double x, {double? feetY}) {
+    if (_footholds == null) return _defaultGroundY;
+    return _footholds!.groundYAt(x, feetY: feetY ?? player.position.y);
+  }
+
   double groundAt(double x, {double? feetY}) =>
-      _footholds?.groundYAt(x, feetY: feetY ?? player.position.y) ?? _defaultGroundY;
+      tryGroundAt(x, feetY: feetY) ?? _defaultGroundY;
 
   // ===== 角色属性 =====
   final int characterId;
@@ -155,6 +215,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     double? posX,
     double? posY,
   })? onStatChange;
+  void Function(NPCComponent npc)? onNpcInteract;
 
   // ===== 实体集合 =====
   final PlayerComponent player;
@@ -191,7 +252,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       } else if (GameControls.isAttack(event.logicalKey)) {
         _performAttack();
       } else if (GameControls.isPickup(event.logicalKey)) {
-        _tryAutoPickup(force: true);
+        if (!tryInteractNearestNpc()) {
+          _tryAutoPickup(force: true);
+        }
       }
     }
     return KeyEventResult.handled;
@@ -205,7 +268,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       if (GameControls.isAttack(key)) {
         _performAttack();
       } else if (GameControls.isPickup(key)) {
-        _tryAutoPickup(force: true);
+        if (!tryInteractNearestNpc()) {
+          _tryAutoPickup(force: true);
+        }
       }
     } else {
       _keysPressed.remove(key);
@@ -225,6 +290,14 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     await super.onLoad();
     await GameControls.ensureLoaded();
 
+    // 079 固定逻辑视口 800×600（HeavenClient Configuration）
+    camera.viewport = FixedResolutionViewport(
+      resolution: Vector2(
+        MapMeta.officialViewportW,
+        MapMeta.officialViewportH,
+      ),
+    );
+
     final mapFull = await MapMetaFull.load(mapId);
     _footholds = mapFull?.footholds;
     if (mapFull != null) {
@@ -232,20 +305,29 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       _vrRight = mapFull.meta.vrRight.toDouble();
       _vrTop = mapFull.meta.vrTop.toDouble();
       _vrBottom = mapFull.meta.vrBottom.toDouble();
-      add(WzMapLayer(mapId: mapId, width: mapWidth, height: mapHeight));
+      camera.backdrop = WzMapLayer(
+        mapId: mapId,
+        width: mapWidth,
+        height: mapHeight,
+      );
       if (mapFull.mapLayers.isNotEmpty) {
-        add(WzMapForegroundLayer(mapId: mapId, basePriority: -4));
+        await world.add(WzMapForegroundLayer(
+          mapId: mapId,
+          basePriority: -4,
+          width: mapWidth,
+          height: mapHeight,
+        ));
       }
     } else if (_useIslandMap) {
-      add(MapleIslandMapLayer(mapId: mapId, width: mapWidth, height: mapHeight));
+      await world.add(MapleIslandMapLayer(mapId: mapId, width: mapWidth, height: mapHeight));
     } else {
-      add(TileMapLayer(
+      await world.add(TileMapLayer(
         width: mapWidth,
         height: mapHeight,
         tileSize: tileSize,
         mapId: mapId,
       ));
-      add(_WorldBackground(width: mapWidth, height: mapHeight));
+      await world.add(_WorldBackground(width: mapWidth, height: mapHeight));
     }
 
     // 脚点对齐 foothold 主地面
@@ -255,14 +337,11 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     _onGround = true;
     _vy = 0;
 
-    await add(player);
+    await world.add(player);
 
     camera.viewfinder.anchor = Anchor.topLeft;
     _syncCamera();
-    camera.setBounds(
-      Rect.fromLTWH(_vrLeft, _vrTop, mapWidth, mapHeight).toFlameRectangle(),
-      considerViewport: true,
-    );
+    // 不用 setBounds：边界外会露出纯色底，产生随镜头移动的「蓝框」
 
     // ===== 音频：优先服务端 music 字段，否则按 mapId 匹配 =====
     final bgm = bgmAsset ?? BgmAssets.byMapId(mapId);
@@ -360,20 +439,27 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       _vy += _gravity * dt;
       player.position.y += _vy * dt;
       final landing = _footholds?.landingYAt(player.position.x, player.position.y);
-      if (landing != null && player.position.y >= landing && _vy >= 0) {
+      if (landing != null && player.position.y >= landing - 2 && _vy >= 0) {
         player.position.y = landing;
         _vy = 0;
         _onGround = true;
-        player.animationState = moved ? 'walk' : 'idle';
+        if (!player.isAttacking) {
+          player.animationState = moved ? 'walk' : 'idle';
+        }
+      } else if (player.position.y > _vrBottom + 120) {
+        _respawnOnMap();
       }
     } else {
-      final gy = groundAt(player.position.x, feetY: player.position.y);
-      if (gy > player.position.y + 18) {
+      final gy = tryGroundAt(player.position.x, feetY: player.position.y);
+      if (gy == null) {
+        _onGround = false;
+        _vy = 0;
+      } else if (gy > player.position.y + 4) {
         _onGround = false;
         _vy = 0;
       } else {
         player.position.y = gy;
-        if (!moved) player.animationState = 'idle';
+        if (!moved && !player.isAttacking) player.animationState = 'idle';
       }
     }
 
@@ -390,7 +476,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
         );
       }
       _scheduleMoveApiSave();
-      if (_onGround) player.animationState = 'walk';
+      if (_onGround && !player.isAttacking) player.animationState = 'walk';
     }
 
     // --- 怪物 AI（无 WS 同步时本地模拟）---
@@ -422,13 +508,15 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   }
 
   void _syncCamera() {
-    final viewW = size.x > 0 ? size.x : 800;
-    final viewH = size.y > 0 ? size.y : MapMeta.officialViewportH;
+    const viewW = MapMeta.officialViewportW;
+    const viewH = MapMeta.officialViewportH;
+    // 079 HeavenClient：viewy = VHEIGHT/2 - playerY → camY = playerY - viewH/2
     var camX = player.position.x - viewW / 2;
-    var camY = player.position.y - _cameraFootOffset;
+    var camY = player.position.y - viewH / 2;
     camX = camX.clamp(_vrLeft, math.max(_vrLeft, _vrRight - viewW));
     camY = camY.clamp(_vrTop, math.max(_vrTop, _vrBottom - viewH));
     camera.viewfinder.position = Vector2(camX, camY);
+    if (hasLayout) _scheduleViewNotify();
   }
 
   @override
@@ -553,7 +641,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   }) {
     damageDealt += finalDmg;
     if (applyDamage) nearest.takeDamage(finalDmg);
-    add(DamagePopup(
+    world.add(DamagePopup(
       damage: finalDmg,
       origin: nearest.position.clone(),
       isCritical: isCrit,
@@ -605,7 +693,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       position: Vector2(x, y),
     );
     _groundLoots[dropId] = comp;
-    add(comp);
+    world.add(comp);
   }
 
   void removeGroundLoot(String dropId) {
@@ -716,6 +804,16 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     onStatChange?.call(hp: hp);
   }
 
+  void _respawnOnMap() {
+    final rx = playerInitial?.x ?? mapWidth / 2;
+    final gy = groundAt(rx);
+    player.position = Vector2(rx, gy);
+    _vy = 0;
+    _onGround = true;
+    player.animationState = 'idle';
+    _syncCamera();
+  }
+
   void _doRevive() {
     hp = maxHp;
     mp = maxMp;
@@ -785,7 +883,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       if (dmg > 0) {
         hp -= dmg;
         if (hp < 0) hp = 0;
-        add(DamagePopup(
+        world.add(DamagePopup(
           damage: dmg,
           origin: player.position.clone(),
           isCritical: payload['critical'] == true,
@@ -797,7 +895,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       for (final mob in mobs) {
         if (mob.mob.id == target && mob.mob.isAlive) {
           mob.takeDamage(dmg);
-          add(DamagePopup(
+          world.add(DamagePopup(
             damage: dmg,
             origin: mob.position.clone(),
             isCritical: payload['critical'] == true,
@@ -896,7 +994,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     final component = MobComponent(mob: mob, position: Vector2(x, y), planeY: y);
     component.applyServerState(p);
     mobs.add(component);
-    add(component);
+    world.add(component);
   }
 
   void _onServerMobMove(WsMessage msg) {
@@ -953,7 +1051,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       position: position,
     );
     remotePlayers[characterId] = c;
-    add(c);
+    world.add(c);
   }
 
   void removeRemotePlayer(int characterId) {
@@ -972,22 +1070,61 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       planeY: y,
     );
     mobs.add(component);
-    add(component);
+    world.add(component);
   }
 
-  void addNPC({required int id, required String name, Vector2? position}) {
+  void addNPC({
+    required int id,
+    required String name,
+    Vector2? position,
+    bool hasShop = false,
+    String dialogue = '',
+  }) {
     final x = position?.x ?? mapWidth / 2;
     final npc = NPCComponent(
       npcId: id,
       npcName: name,
+      dialogue: dialogue,
+      hasShop: hasShop,
       position: Vector2(x, groundAt(x)),
+      onInteract: _tryNpcInteract,
     );
     npcs.add(npc);
-    add(npc);
+    world.add(npc);
+  }
+
+  void _tryNpcInteract(NPCComponent npc) {
+    final dx = (player.position.x - npc.position.x).abs();
+    final dy = (player.position.y - npc.position.y).abs();
+    if (dx > 140 || dy > 80) return;
+    onNpcInteract?.call(npc);
+  }
+
+  NPCComponent? _nearestNpc({double rangeX = 140, double rangeY = 80}) {
+    NPCComponent? nearest;
+    var best = double.infinity;
+    for (final npc in npcs) {
+      final dx = (player.position.x - npc.position.x).abs();
+      final dy = (player.position.y - npc.position.y).abs();
+      if (dx > rangeX || dy > rangeY) continue;
+      final d = dx + dy * 0.5;
+      if (d < best) {
+        best = d;
+        nearest = npc;
+      }
+    }
+    return nearest;
+  }
+
+  bool tryInteractNearestNpc() {
+    final npc = _nearestNpc();
+    if (npc == null) return false;
+    onNpcInteract?.call(npc);
+    return true;
   }
 
   void showDamage(int damage, Vector2 origin, {bool critical = false}) {
-    add(DamagePopup(damage: damage, origin: origin, isCritical: critical));
+    world.add(DamagePopup(damage: damage, origin: origin, isCritical: critical));
   }
 
   void updatePlayerStats({int? hp, int? maxHp, int? mp, int? maxMp, int? level}) {
@@ -999,7 +1136,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   }
 
   @override
-  Color backgroundColor() => const Color(0xFF87CEEB);
+  Color backgroundColor() => const Color(0xFF5BA3D9);
 }
 
 /// ==================== 世界背景 ====================
@@ -1033,14 +1170,27 @@ class _WorldBackground extends Component with HasGameRef {
   }
 }
 
-/// ==================== 玩家组件 ====================
+/// 本地玩家 — WZ Character 条带动画，079 原尺寸 1:1 像素（无额外缩放）
 class PlayerComponent extends PositionComponent {
-  static const double moveSpeed = 220; // 像素/秒
-  int direction = 1; // 1: 右, -1: 左
+  static const double moveSpeed = 220;
+  int direction = 1; // 1 右 / -1 左
   String animationState = 'idle';
   double attackCooldown = 0.45;
   double _attackTimer = 0.0;
-  Sprite? _sprite;
+
+  SpriteAnimation? _standAnim;
+  SpriteAnimationTicker? _standTicker;
+  SpriteAnimation? _walkAnim;
+  SpriteAnimationTicker? _walkTicker;
+  SpriteAnimation? _attackAnim;
+  SpriteAnimationTicker? _attackTicker;
+  Sprite? _standSprite;
+  Sprite? _attackSprite;
+  Sprite? _jumpSprite;
+  bool _composeReady = false;
+
+  bool get isAttacking => _attackTimer > 0;
+
   final int gender;
   final int face;
   final int hair;
@@ -1048,6 +1198,14 @@ class PlayerComponent extends PositionComponent {
   final int bottom;
   final int shoes;
   final int weapon;
+  final int cap;
+  final int cape;
+  final int glove;
+  final int shield;
+  final int faceAcc;
+  final int eyeAcc;
+  final int earring;
+  final int longcoat;
 
   PlayerComponent({
     required Vector2 position,
@@ -1059,42 +1217,195 @@ class PlayerComponent extends PositionComponent {
     this.bottom = 0,
     this.shoes = 0,
     this.weapon = 0,
+    this.cap = 0,
+    this.cape = 0,
+    this.glove = 0,
+    this.shield = 0,
+    this.faceAcc = 0,
+    this.eyeAcc = 0,
+    this.earring = 0,
+    this.longcoat = 0,
   }) : super(
           position: position,
-          size: size ?? Vector2(48, 64),
+          size: size ?? Vector2(52, 80),
           anchor: Anchor.bottomCenter,
         );
 
   @override
   Future<void> onLoad() async {
-    final paths = AvatarAssets.candidatePaths(
+    final look = CharLook.fromCharacterFields(
       gender: gender,
-      face: face,
-      hair: hair,
-      top: top,
-      bottom: bottom,
-      shoes: shoes,
-      weapon: weapon,
+      face: AvatarAssets.resolveFace(gender, face),
+      hair: AvatarAssets.resolveHair(gender, hair),
+      top: top != 0 ? top : AvatarAssets.defaultTop(gender),
+      bottom: bottom != 0 ? bottom : AvatarAssets.defaultBottom(gender),
+      shoes: shoes != 0 ? shoes : AvatarAssets.defaultShoes(),
+      weapon: weapon != 0 ? weapon : AvatarAssets.defaultBeginnerWeapon,
+      cap: cap,
+      cape: cape,
+      glove: glove,
+      shield: shield,
+      faceAcc: faceAcc,
+      eyeAcc: eyeAcc,
+      earring: earring,
+      longcoat: longcoat,
     );
-    _sprite = await SpriteLoader.tryLoadFirst(paths);
-    _sprite ??= await CharacterPartComposer.composeStand(
-      gender: gender,
-      face: face,
-      hair: hair,
-      top: top,
-      bottom: bottom,
-      shoes: shoes,
-      weapon: weapon,
+
+    // 1) Phase 1：后端 CharLook 合成（含 Head；walk1 多帧动画，对齐 HeavenClient CharLook::update）
+    _standSprite = await SpriteLoader.tryLoadCompose(look, pose: 'stand1', scale: 1);
+    if (_standSprite != null) {
+      _composeReady = true;
+      _walkAnim = await SpriteLoader.tryLoadComposeAnimation(
+        look,
+        pose: 'walk1',
+        scale: 1,
+        maxFrames: 4,
+        stepTime: 0.18,
+      );
+      if (_walkAnim == null) {
+        for (final strip in AvatarAssets.animStripCandidates(
+          gender: gender,
+          face: face,
+          hair: hair,
+          top: top,
+          bottom: bottom,
+          shoes: shoes,
+          weapon: weapon,
+          pose: 'walk1',
+        )) {
+          final manifest = strip.replaceAll('.png', '_manifest.json');
+          _walkAnim = await SpriteLoader.tryLoadStripManifest(strip, manifest);
+          if (_walkAnim != null) break;
+        }
+      }
+      if (_walkAnim != null) {
+        _walkTicker = SpriteAnimationTicker(_walkAnim!);
+      }
+      _attackAnim = await SpriteLoader.tryLoadComposeAnimation(
+        look,
+        pose: 'swingO1',
+        scale: 1,
+        maxFrames: 4,
+        stepTime: 0.08,
+        loop: false,
+      );
+      if (_attackAnim != null) {
+        _attackTicker = SpriteAnimationTicker(_attackAnim!);
+      } else {
+        _attackSprite =
+            (await SpriteLoader.tryLoadCompose(look, pose: 'swingO1', scale: 1)) ??
+                _standSprite;
+      }
+      _jumpSprite =
+          (await SpriteLoader.tryLoadCompose(look, pose: 'jump', scale: 1)) ??
+              _standSprite;
+      _applyDisplaySize();
+      return;
+    }
+
+    // 2) 本地烘焙立绘回退
+    _standSprite = await SpriteLoader.tryLoadFirst(
+      AvatarAssets.candidatePaths(
+        gender: gender, face: face, hair: hair,
+        top: top, bottom: bottom, shoes: shoes, weapon: weapon,
+      ),
     );
-    if (_sprite == null) {
-      _sprite = await SpriteLoader.tryLoad(SpriteDirs.playerStand());
+
+    // 3) walk1/stand1 动画条带（仅 compose 失败时使用）
+    for (final strip in AvatarAssets.animStripCandidates(
+      gender: gender, face: face, hair: hair,
+      top: top, bottom: bottom, shoes: shoes, weapon: weapon, pose: 'walk1',
+    )) {
+      final manifest = strip.replaceAll('.png', '_manifest.json');
+      final anim = await SpriteLoader.tryLoadStripManifest(strip, manifest);
+      if (anim != null) {
+        _walkAnim = anim;
+        _walkTicker = SpriteAnimationTicker(anim);
+        break;
+      }
     }
-    if (_sprite != null) {
-      final sw = _sprite!.image.width.toDouble();
-      final sh = _sprite!.image.height.toDouble();
-      const scale = 1.85;
-      size = Vector2(sw * scale + 4, sh * scale + 4);
+    for (final strip in AvatarAssets.animStripCandidates(
+      gender: gender, face: face, hair: hair,
+      top: top, bottom: bottom, shoes: shoes, weapon: weapon, pose: 'stand1',
+    )) {
+      final manifest = strip.replaceAll('.png', '_manifest.json');
+      final anim = await SpriteLoader.tryLoadStripManifest(strip, manifest, loop: true);
+      if (anim != null) {
+        _standAnim = anim;
+        _standTicker = SpriteAnimationTicker(anim);
+        break;
+      }
     }
+    if (_attackAnim == null) {
+      for (final strip in AvatarAssets.animStripCandidates(
+        gender: gender, face: face, hair: hair,
+        top: top, bottom: bottom, shoes: shoes, weapon: weapon, pose: 'swingO1',
+      )) {
+        final manifest = strip.replaceAll('.png', '_manifest.json');
+        final anim = await SpriteLoader.tryLoadStripManifest(strip, manifest, loop: false);
+        if (anim != null) {
+          _attackAnim = anim;
+          _attackTicker = SpriteAnimationTicker(anim);
+          break;
+        }
+      }
+    }
+
+    // 4) 最终回退：同性别默认立绘（禁止 parts 碎片叠层）
+    if (_standSprite == null) {
+      final d = AvatarAssets.resolveLook(
+        gender: gender, face: face, hair: hair,
+        top: top, bottom: bottom, shoes: shoes, weapon: weapon,
+      );
+      _standSprite = await SpriteLoader.tryLoadFirst(
+        AvatarAssets.candidatePaths(
+          gender: d.gender, face: d.face, hair: d.hair,
+          top: d.top, bottom: d.bottom, shoes: d.shoes, weapon: d.weapon,
+        ),
+      );
+    }
+
+    _applyDisplaySize();
+  }
+
+  void _applyDisplaySize() {
+    double maxW = 52, maxH = 80;
+    void scan(SpriteAnimation? anim) {
+      if (anim == null) return;
+      for (final f in anim.frames) {
+        maxW = math.max(maxW, f.sprite.srcSize.x);
+        maxH = math.max(maxH, f.sprite.srcSize.y);
+      }
+    }
+    scan(_walkAnim);
+    scan(_standAnim);
+    scan(_attackAnim);
+    for (final s in [_standSprite, _attackSprite, _jumpSprite]) {
+      if (s != null) {
+        maxW = math.max(maxW, s.srcSize.x);
+        maxH = math.max(maxH, s.srcSize.y);
+      }
+    }
+    size = Vector2(maxW, maxH);
+  }
+
+  Sprite? _activeSprite() {
+    if (animationState == 'attack' && _attackTicker != null) {
+      return _attackTicker!.getSprite();
+    }
+    if (animationState == 'walk' && _walkTicker != null) {
+      return _walkTicker!.getSprite();
+    }
+    if (_composeReady) {
+      if (animationState == 'attack' && _attackSprite != null) return _attackSprite;
+      if (animationState == 'jump' && _jumpSprite != null) return _jumpSprite;
+      return _standSprite;
+    }
+    if (animationState == 'walk' && _walkTicker != null) {
+      return _walkTicker!.getSprite();
+    }
+    if (_standTicker != null) return _standTicker!.getSprite();
+    return _standSprite;
   }
 
   @override
@@ -1103,6 +1414,15 @@ class PlayerComponent extends PositionComponent {
     if (_attackTimer > 0) {
       _attackTimer -= dt;
       if (_attackTimer < 0) _attackTimer = 0;
+    } else if (animationState == 'attack') {
+      animationState = 'idle';
+    }
+    if (animationState == 'attack' && _attackTicker != null) {
+      _attackTicker!.update(dt);
+    } else if (animationState == 'walk' && _walkTicker != null) {
+      _walkTicker!.update(dt);
+    } else if (animationState == 'idle' && _standTicker != null) {
+      _standTicker!.update(dt);
     }
   }
 
@@ -1110,7 +1430,7 @@ class PlayerComponent extends PositionComponent {
     if (dir != 0) {
       direction = dir > 0 ? 1 : -1;
       position.x += direction * moveSpeed * dt;
-      animationState = 'walk';
+      if (!isAttacking) animationState = 'walk';
     }
   }
 
@@ -1124,6 +1444,7 @@ class PlayerComponent extends PositionComponent {
     if (_attackTimer <= 0) {
       _attackTimer = attackCooldown;
       animationState = 'attack';
+      _attackTicker?.reset();
       return true;
     }
     return false;
@@ -1135,21 +1456,14 @@ class PlayerComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    // 优先渲染 PNG 精灵
-    if (_sprite != null) {
-      canvas.save();
-      if (direction < 0) {
-        canvas.translate(size.x, 0);
-        canvas.scale(-1, 1);
-      }
-      final paint = Paint()..filterQuality = FilterQuality.none;
-      _sprite!.render(canvas, size: size, overridePaint: paint);
-      canvas.restore();
+    final sprite = _activeSprite();
+    if (sprite != null) {
+      _drawSprite(canvas, sprite);
       _renderAttackGlow(canvas);
       return;
     }
 
-    // 回退：程序化 Canvas 绘制
+    // 最终回退：程序化火柴人（无 WZ 资源时）
     // 阴影
     canvas.drawOval(
       Rect.fromCenter(
@@ -1209,12 +1523,38 @@ class PlayerComponent extends PositionComponent {
     _renderAttackGlow(canvas);
   }
 
+  /// 079 bottomCenter 锚点：局部 (0,0) 为脚底中心
+  void _drawSprite(Canvas canvas, Sprite sprite) {
+    final w = sprite.srcSize.x;
+    final h = sprite.srcSize.y;
+    final paint = Paint()..filterQuality = FilterQuality.none;
+
+    canvas.save();
+    if (direction > 0) {
+      canvas.scale(-1, 1);
+      sprite.render(
+        canvas,
+        position: Vector2(-w / 2, -h),
+        size: Vector2(w, h),
+        overridePaint: paint,
+      );
+    } else {
+      sprite.render(
+        canvas,
+        position: Vector2(-w / 2, -h),
+        size: Vector2(w, h),
+        overridePaint: paint,
+      );
+    }
+    canvas.restore();
+  }
+
   void _renderAttackGlow(Canvas canvas) {
     if (_attackTimer > 0) {
       final glow = Paint()
         ..color = Colors.yellow.withOpacity(_attackTimer / attackCooldown * 0.8);
       canvas.drawCircle(
-        Offset(size.x / 2 + direction * size.x * 0.6, size.y * 0.4),
+        Offset(direction * 24.0, -size.y * 0.45),
         size.x * 0.3,
         glow,
       );
@@ -1223,14 +1563,20 @@ class PlayerComponent extends PositionComponent {
 }
 
 /// ==================== NPC 组件 ====================
-class NPCComponent extends PositionComponent {
+class NPCComponent extends PositionComponent with TapCallbacks {
   final int npcId;
   final String npcName;
+  final String dialogue;
+  final bool hasShop;
+  final void Function(NPCComponent npc)? onInteract;
 
   NPCComponent({
     required this.npcId,
     required this.npcName,
+    this.dialogue = '',
+    this.hasShop = false,
     required Vector2 position,
+    this.onInteract,
   }) : super(
           position: position,
           size: Vector2(48, 64),
@@ -1243,18 +1589,20 @@ class NPCComponent extends PositionComponent {
   Future<void> onLoad() async {
     _sprite = await SpriteLoader.tryLoad(SpriteDirs.npcPath(npcId));
     if (_sprite != null) {
-      final sw = _sprite!.image.width.toDouble();
-      final sh = _sprite!.image.height.toDouble();
-      const scale = 1.85;
-      size = Vector2(sw * scale + 4, sh * scale + 4);
+      size = Vector2(_sprite!.srcSize.x, _sprite!.srcSize.y);
     }
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    onInteract?.call(this);
+    super.onTapDown(event);
   }
 
   @override
   void render(Canvas canvas) {
     if (_sprite != null) {
-      final paint = Paint()..filterQuality = FilterQuality.none;
-      _sprite!.render(canvas, size: size, overridePaint: paint);
+      SpriteLoader.renderFeetAnchored(canvas, _sprite!, size);
       _renderNpcName(canvas);
       return;
     }
@@ -1354,11 +1702,20 @@ class MobComponent extends PositionComponent {
       }
     }
     if (_standSprite != null) {
-      final sw = _standSprite!.image.width.toDouble();
-      final sh = _standSprite!.image.height.toDouble();
-      const scale = 2.5;
-      size = Vector2(sw * scale + 8, sh * scale + 8);
+      _applyNativeDisplaySize(_standSprite!);
     }
+  }
+
+  void _applyNativeDisplaySize(Sprite sprite) {
+    var maxW = sprite.srcSize.x;
+    var maxH = sprite.srcSize.y;
+    if (_moveAnim != null) {
+      for (final f in _moveAnim!.frames) {
+        maxW = math.max(maxW, f.sprite.srcSize.x);
+        maxH = math.max(maxH, f.sprite.srcSize.y);
+      }
+    }
+    size = Vector2(maxW, maxH);
   }
 
   void applyServerState(Map<String, dynamic> p, {double minDelta = 0}) {
@@ -1462,14 +1819,7 @@ class MobComponent extends PositionComponent {
     final moving = mob.status == MobStatus.moving && _moveTicker != null;
     final sprite = moving ? _moveTicker!.getSprite() : _standSprite;
     if (mob.isAlive && sprite != null) {
-      canvas.save();
-      if (_facing < 0) {
-        canvas.translate(size.x, 0);
-        canvas.scale(-1, 1);
-      }
-      final paint = Paint()..filterQuality = FilterQuality.none;
-      sprite.render(canvas, size: size, overridePaint: paint);
-      canvas.restore();
+      SpriteLoader.renderFeetAnchored(canvas, sprite, size, direction: _facing);
       _renderMobHud(canvas);
       return;
     }

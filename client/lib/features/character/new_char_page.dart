@@ -223,7 +223,7 @@ class _NewCharPageState extends State<NewCharPage> {
                       bottom: _look.bottom,
                       shoes: _look.shoes,
                       weapon: _look.weapon,
-                      scale: 1.1,
+                      height: 100,
                     ),
                   ),
                 ),

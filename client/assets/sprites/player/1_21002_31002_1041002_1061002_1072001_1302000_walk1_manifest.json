@@ -1,0 +1,13 @@
+{
+  "pose": "walk1",
+  "frames": 4,
+  "widths": [
+    61,
+    61,
+    61,
+    61
+  ],
+  "height": 45,
+  "stepTime": 0.18,
+  "anchor": "feet"
+}

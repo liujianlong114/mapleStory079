@@ -13,15 +13,23 @@ var (
 	forbiddenList []string
 )
 
-// InitForbiddenNames 从 ms079-main Etc.wz/ForbiddenName.img.xml 加载禁名列表
+// InitForbiddenNames 从外部 ms079-main 的 Etc.wz/ForbiddenName.img.xml 加载禁名列表
 func InitForbiddenNames() error {
 	var err error
 	forbiddenOnce.Do(func() {
 		candidates := []string{
-			filepath.Join("examples", "ms079-main", "wz", "Etc.wz", "ForbiddenName.img.xml"),
-			filepath.Join("..", "examples", "ms079-main", "wz", "Etc.wz", "ForbiddenName.img.xml"),
+			// 外部参考目录（与 mapleStory079 同级）
+			filepath.Join("..", "mapleStory079-external", "02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML", "wz", "Etc.wz", "ForbiddenName.img.xml"),
+			os.Getenv("MAPLE_MS079_WZ"),
+			filepath.Join(os.Getenv("MAPLE_EXTERNAL_ROOT"), "02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML", "wz", "Etc.wz", "ForbiddenName.img.xml"),
+		}
+		if ext := os.Getenv("MAPLE_EXTERNAL_ROOT"); ext != "" {
+			candidates = append(candidates, filepath.Join(ext, "02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML", "wz", "Etc.wz", "ForbiddenName.img.xml"))
 		}
 		for _, p := range candidates {
+			if p == "" {
+				continue
+			}
 			if e := loadForbiddenFile(p); e == nil {
 				return
 			} else {

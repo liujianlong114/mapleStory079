@@ -167,8 +167,8 @@ def parse_spawn(map_img: WzSubProperty) -> Tuple[int, int]:
     return 400, 605
 
 
-def ground_y_at(footholds: List[Dict[str, int]], x: int, fallback: int = 605) -> int:
-    """与客户端 MapFootholds.groundYAt 一致：取最低可站立面（最大 Y）。"""
+def ground_y_at(footholds: List[Dict[str, int]], x: int, feet_y: int, fallback: int = 605) -> int:
+    """与 HeavenClient FootholdTree::get_fhid_below 一致：脚下最近可站立面（Y≥脚点）。"""
     ys: List[float] = []
     for s in footholds:
         x1, x2, y1, y2 = s["x1"], s["x2"], s["y1"], s["y2"]
@@ -177,11 +177,15 @@ def ground_y_at(footholds: List[Dict[str, int]], x: int, fallback: int = 605) ->
         mn, mx = (x1, x2) if x1 <= x2 else (x2, x1)
         if x < mn - 8 or x > mx + 8:
             continue
-        t = max(0.0, min(1.0, (x - x1) / (x2 - x1)))
+        t = (x - x1) / (x2 - x1)
+        t = max(0.0, min(1.0, t))
         ys.append(y1 + (y2 - y1) * t)
     if not ys:
         return fallback
-    return int(max(ys))
+    candidates = [y for y in ys if y >= feet_y - 8]
+    if not candidates:
+        return int(min(ys))
+    return int(min(candidates))
 
 
 def canvas_origin(canvas: WzCanvasProperty) -> Tuple[int, int]:

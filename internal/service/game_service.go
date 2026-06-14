@@ -7,6 +7,8 @@ import (
 
 	"mapleStory079/internal/repository"
 	"mapleStory079/pkg/database"
+	"mapleStory079/pkg/maplife"
+	"mapleStory079/pkg/npcdata"
 	"mapleStory079/pkg/utils"
 )
 
@@ -42,6 +44,12 @@ func (s *GameService) GetNPC(npcID uint) (*database.NPC, error) {
 }
 
 func (s *GameService) GetNPCsByMap(mapID uint) ([]database.NPC, error) {
+	// 优先使用 WZ maplife 刷点，避免种子库中错配 ID/坐标。
+	if ml, err := maplife.Load(mapID); err == nil {
+		if npcs := npcdata.NPCsFromMapLife(ml); len(npcs) > 0 {
+			return npcs, nil
+		}
+	}
 	return repository.GetNPCsByMapID(mapID)
 }
 

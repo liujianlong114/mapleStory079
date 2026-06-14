@@ -29,25 +29,44 @@ flutter:
   assets:
     - assets/images/
     - assets/images/ui/login/
+    - assets/images/ui/hud/
     - assets/images/ui/login/back/
     - assets/scenes/
     - assets/maps/
+    - assets/maplife/
     - assets/maps/back/
+    - assets/maps/back/Rien/
     - assets/maps/back/grassySoil/
+    - assets/maps/back/shineWood/
+    - assets/maps/back/sunsetCity/
+    - assets/maps/back/vicportTown/
     - assets/maps/tiles/
+    - assets/maps/tiles/brownBrick/
+    - assets/maps/tiles/dryRock/
     - assets/maps/tiles/grassySoil/
+    - assets/maps/tiles/holeBrick/
+    - assets/maps/tiles/whiteMarble/
+    - assets/maps/tiles/woodMarble/
     - assets/maps/obj/
     - assets/maps/obj/acc1/
+    - assets/maps/obj/acc11/
+    - assets/maps/obj/acc12/
+    - assets/maps/obj/acc2/
+    - assets/maps/obj/acc3/
     - assets/maps/obj/acc8/
     - assets/maps/obj/connect/
     - assets/maps/obj/door/
     - assets/maps/obj/guide/
     - assets/maps/obj/house/
+    - assets/maps/obj/houseDR/
     - assets/maps/obj/houseGS/
+    - assets/maps/obj/houseMC/
+    - assets/maps/obj/houseSW/
+    - assets/maps/obj/houseVPT/
     - assets/maps/obj/innSystemTW/
+    - assets/maps/obj/pachinko/
     - assets/maps/obj/signboard/
-    - assets/maps/tiles/grassySoil/
-    - assets/maps/tiles/woodMarble/
+    - assets/maps/obj/vehicle/
     - assets/audio/
     # Flutter 目录声明不含子目录，必须分别列出
     - assets/sprites/mob/
