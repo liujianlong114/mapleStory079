@@ -1,277 +1,318 @@
 # 冒险岛 079 精灵（Sprite）资源清单
 
-> 记录冒险岛 079 版本中的角色 / 怪物 / NPC / 坐骑 等精灵动画资源。
+> 记录冒险岛 079 版本中的角色 / 怪物 / NPC / 坐骑 / 宠物 等精灵动画资源。
 > 资源路径：`client/assets/sprites/`
-> 所有精灵建议使用 **PNG 序列帧 / Aseprite / Spritesheet + JSON** 格式。
+> 原始数据参考：HeavenMS handbook Mob.txt / Map.txt / Skill.txt
+> 所有精灵建议使用 **PNG 序列帧 + JSON 描述** 格式；战斗动画建议使用 Spritesheet + Frame Metadata。
 
 ---
 
 ## 一、角色精灵（玩家角色）
 
+> 角色精灵由多部件叠加合成：`Body（身体）+ Hair（发型）+ Face（表情）+ 装备（Cap / Coat / Pants / Shoes / Weapon / Shield / Cape / Accessory）`。每个部件独立一个 spritesheet。
+
 ### 1.1 基础动作（全职业通用）
 
-| 动作名称 | 帧数 | 说明 | 状态 |
-|---------|------|------|------|
-| `stand` / `idle` | 4 | 站立待机 | ⏳ 待获取 |
-| `walk` | 4 | 行走（左右方向需翻转） | ⏳ 待获取 |
-| `jump` | 4 | 跳跃上升 | ⏳ 待获取 |
-| `fall` | 2 | 下落 | ⏳ 待获取 |
-| `alert` | 3 | 警戒 / 惊讶 | ⏳ 待获取 |
-| `prone` | 2 | 匍匐 | ⏳ 待获取 |
-| `dead` | 4 | 死亡 | ⏳ 待获取 |
-| `ladder` | 4 | 爬梯子 | ⏳ 待获取 |
-| `rope` | 4 | 爬绳子 | ⏳ 待获取 |
-| `hurt` | 2 | 受伤 | ⏳ 待获取 |
-| `sit` | 3 | 坐下 | ⏳ 待获取 |
-| `portal` | 4 | 进传送门 | ⏳ 待获取 |
+| 动作名 | 帧数 | 帧速率 | 说明 | 状态 |
+|--------|------|--------|------|------|
+| `stand` | 4 | 1 fps | 待机动画（站立呼吸） | ⏳ 待获取 |
+| `walk` | 4 | 8 fps | 行走动画（左右翻转） | ⏳ 待获取 |
+| `jump` | 3 | 10 fps | 跳跃上升 | ⏳ 待获取 |
+| `fall` | 2 | 8 fps | 下落中 | ⏳ 待获取 |
+| `alert` | 3 | 2 fps | 警戒/惊讶表情循环 | ⏳ 待获取 |
+| `prone` | 2 | 1 fps | 匍匐姿态 | ⏳ 待获取 |
+| `dead` | 4 | 2 fps | 倒地死亡 | ⏳ 待获取 |
+| `ladder` | 3 | 4 fps | 爬梯子（上下） | ⏳ 待获取 |
+| `rope` | 3 | 4 fps | 爬绳子 | ⏳ 待获取 |
+| `hurt` | 2 | 4 fps | 受击后仰 | ⏳ 待获取 |
+| `sit` | 3 | 2 fps | 坐下/起身 | ⏳ 待获取 |
+| `portal_in` | 4 | 10 fps | 进入传送门 | ⏳ 待获取 |
+| `portal_out` | 4 | 10 fps | 从传送门出现 | ⏳ 待获取 |
+| `levelup` | 6 | 8 fps | 升级姿势（双手高举） | ⏳ 待获取 |
+| `cheer` | 6 | 6 fps | 欢呼/成功姿势 | ⏳ 待获取 |
 
-### 1.2 职业动作
+### 1.2 职业专属攻击动作（每职业独立动画）
 
-| 动作 | 职业 | 说明 | 状态 |
-|------|------|------|------|
-| `attack_sword` | 战士 | 单手剑攻击 | ⏳ 待获取 |
-| `attack_spear` | 战士 | 长枪/矛攻击 | ⏳ 待获取 |
-| `attack_polearm` | 战士 | 斧/锤攻击 | ⏳ 待获取 |
-| `shoot_bow` | 弓箭手 | 弓射击 | ⏳ 待获取 |
-| `shoot_crossbow` | 弓箭手 | 弩射击 | ⏳ 待获取 |
-| `cast_magic` | 法师 | 施法动作 | ⏳ 待获取 |
-| `attack_dagger` | 飞侠 | 短剑攻击 | ⏳ 待获取 |
-| `throw_star` | 飞侠 | 投掷飞镖 | ⏳ 待获取 |
-| `attack_gun` | 海盗 | 火枪射击 | ⏳ 待获取 |
-| `attack_knuckle` | 海盗 | 指节拳击 | ⏳ 待获取 |
+| 职业 | 动作 | 帧数 | 说明 | 状态 |
+|------|------|------|------|------|
+| **战士（Fighter / Page / Spearman）** | `attack_sword_1h` | 4 | 单手剑挥砍 | ⏳ 待获取 |
+| **战士** | `attack_sword_2h` | 4 | 双手剑劈砍 | ⏳ 待获取 |
+| **战士** | `attack_axe_1h` | 4 | 单手斧攻击 | ⏳ 待获取 |
+| **战士** | `attack_axe_2h` | 4 | 双手斧重击 | ⏳ 待获取 |
+| **战士** | `attack_spear` | 4 | 长枪突刺 | ⏳ 待获取 |
+| **战士** | `attack_polearm` | 4 | 长矛横扫 | ⏳ 待获取 |
+| **战士** | `skill_power_strike` | 6 | Power Strike 技能动作 | ⏳ 待获取 |
+| **战士** | `skill_slash_blast` | 6 | Slash Blast 范围攻击 | ⏳ 待获取 |
+| **战士** | `skill_rage` | 4 | Rage 怒吼加攻 | ⏳ 待获取 |
+| **法师（Mage - I/L / F/P / Priest）** | `cast_wand` | 5 | 魔杖施法（前推/抬起） | ⏳ 待获取 |
+| **法师** | `cast_staff` | 5 | 法杖施法（举向天空） | ⏳ 待获取 |
+| **法师** | `skill_magic_claw` | 6 | 紫色魔力之爪（特效叠加） | ⏳ 待获取 |
+| **法师** | `skill_heal` | 4 | 治疗光效（绿色圆环） | ⏳ 待获取 |
+| **弓箭手（Hunter / Crossbowman）** | `shoot_bow` | 6 | 弓射箭动作（拉弦-释放） | ⏳ 待获取 |
+| **弓箭手** | `shoot_crossbow` | 5 | 弩射击（上弦-发射） | ⏳ 待获取 |
+| **弓箭手** | `skill_arrow_rain` | 6 | 箭矢雨下落动作 | ⏳ 待获取 |
+| **飞侠（Assassin / Bandit）** | `attack_dagger` | 5 | 短剑快速连刺 | ⏳ 待获取 |
+| **飞侠** | `throw_star` | 4 | 投掷飞镖（飞侠） | ⏳ 待获取 |
+| **飞侠** | `skill_lucky_seven` | 6 | Lucky Seven 技能动作 | ⏳ 待获取 |
+| **飞侠** | `skill_savage_blow` | 8 | Savage Blow 六连刺 | ⏳ 待获取 |
+| **海盗（Infighter / Gunslinger）** | `attack_knuckle` | 4 | 指节拳击 | ⏳ 待获取 |
+| **海盗** | `attack_gun` | 5 | 火枪射击 | ⏳ 待获取 |
+| **海盗** | `skill_somersault_kick` | 6 | 翻踢攻击 | ⏳ 待获取 |
+| **海盗** | `skill_double_shot` | 6 | Double Shot 双发 | ⏳ 待获取 |
 
-### 1.3 装备部位（Body / Hair / Face / Weapon）
+### 1.3 角色部件分层（每个部件独立 spritesheet）
 
-冒险岛的角色精灵由多个部件叠加合成：
+| 部件 | 说明 | 推荐尺寸 | 状态 |
+|------|------|---------|------|
+| `body` | 身体（基础服装） | 60x96 | ⏳ 待获取 |
+| `hair_001` ~ `hair_030` | 发型（约 30 种经典样式） | 60x96 | ⏳ 待获取 |
+| `face_normal` / `face_hurt` / `face_smile` | 表情（眨眼/受击/笑） | 60x96 | ⏳ 待获取 |
+| `cap_001` ~ `cap_050` | 帽子（装备类） | 60x96 | ⏳ 待获取 |
+| `coat_001` ~ `coat_050` | 上衣（装备类） | 60x96 | ⏳ 待获取 |
+| `pants_001` ~ `pants_050` | 下装（装备类） | 60x96 | ⏳ 待获取 |
+| `shoes_001` ~ `shoes_030` | 鞋子（装备类） | 60x96 | ⏳ 待获取 |
+| `weapon_sword_001` ~ `weapon_gun_030` | 武器（每职业对应 spritesheet） | 60x96 | ⏳ 待获取 |
+| `shield_001` ~ `shield_020` | 盾牌（战士 / 法师专属） | 60x96 | ⏳ 待获取 |
+| `cape_001` ~ `cape_030` | 披风（动态飘动） | 60x96 | ⏳ 待获取 |
+| `accessory_ring_earring_pendant` | 饰品（戒指/耳环/项链，可合并） | 60x96 | ⏳ 待获取 |
+| `belt_001` ~ `belt_010` | 腰带 | 60x96 | ⏳ 待获取 |
 
-| 部件 | 说明 | 尺寸 | 状态 |
-|------|------|------|------|
-| `body` | 身体（基础服装） | ~ 60x96 | ⏳ 待获取 |
-| `hair` | 发型（需多种款式） | ~ 60x96 | ⏳ 待获取 |
-| `face` | 表情（眨眼/笑/怒等） | ~ 60x96 | ⏳ 待获取 |
-| `cap` | 帽子 | ~ 60x96 | ⏳ 待获取 |
-| `coat` | 上衣 | ~ 60x96 | ⏳ 待获取 |
-| `pants` | 下装 | ~ 60x96 | ⏳ 待获取 |
-| `shoes` | 鞋子 | ~ 60x96 | ⏳ 待获取 |
-| `weapon` | 武器 | ~ 60x96 | ⏳ 待获取 |
-| `shield` | 盾牌 | ~ 60x96 | ⏳ 待获取 |
-| `cape` | 披风 | ~ 60x96 | ⏳ 待获取 |
-| `accessory` | 饰品（戒指/耳环等） | ~ 60x96 | ⏳ 待获取 |
-| `mount` | 坐骑（可叠加） | ~ 120x96 | ⏳ 待获取 |
+### 1.4 坐骑（Mount）
 
-> 建议每个角色精灵以 **spritesheet** 形式发布：
-> ```
-> warrior/walk.png (4 frames, 每帧 60x96)
-> warrior/walk.json  (frame metadata)
-> ```
+| 坐骑 ID | 名称 | 职业/等级限制 | 推荐尺寸 | 状态 |
+|---------|------|---------------|---------|------|
+| `mount_001` | 小野猪 Pig | 全职业 Lv 70+ | 80x64 | ⏳ 待获取 |
+| `mount_002` | 银色野猪 Silver Mane | 全职业 Lv 120+ | 100x72 | ⏳ 待获取 |
+| `mount_003` | 红飞龙 Red Draco | 全职业 Lv 200 | 120x96 | ⏳ 待获取 |
+| `mount_004` | 蓝色飞龙 Blue Draco | 全职业 Lv 200 | 120x96 | ⏳ 待获取 |
+| `mount_005` | 黑色飞龙 Black Draco | 全职业 Lv 200 | 120x96 | ⏳ 待获取 |
 
-## 二、怪物精灵
+### 1.5 宠物（Pet）
 
-### 2.1 新手 / 初级怪物
+| 宠物 ID | 名称 | 说明 | 推荐尺寸 | 状态 |
+|---------|------|------|---------|------|
+| `pet_001` | 小白猫（White Kitty） | 经典白色猫宠物 | 40x40 | ⏳ 待获取 |
+| `pet_002` | 棕色小狗（Brown Puppy） | 可爱小狗 | 40x40 | ⏳ 待获取 |
+| `pet_003` | 粉色小兔（Pink Bunny） | 粉色兔子 | 40x40 | ⏳ 待获取 |
+| `pet_004` | 雪狐（Snow Fox） | 极地白狐 | 40x40 | ⏳ 待获取 |
+| `pet_005` | 幼龙（Baby Dragon） | 新手龙宠物 | 48x48 | ⏳ 待获取 |
 
-| 怪物 ID | 名称 | 等级 | 动作 | 状态 |
+---
+
+## 二、怪物精灵（Mob）
+
+> 参考数据：HeavenMS Mob.txt（怪物 ID 与名称映射）。
+> 每只怪物需要至少 4 种动作：`stand / move / attack / hit / dead`。
+
+### 2.1 新手区域（Lv 1 - 10，Snail / Mushroom 系列）
+
+| 怪物 ID | 名称 | 等级 | 推荐动作 | 状态 |
+|---------|------|------|---------|------|
+| `100100` | Snail（蜗牛） | 1 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `100101` | Blue Snail（蓝蜗牛） | 2 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1110100` | Green Mushroom（绿蘑菇） | 3 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1110101` | Dark Stump（黑树桩） | 4 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1210100` | Pig（小猪） | 5 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1210101` | Ribbon Pig（红丝带猪） | 6 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1210102` | Orange Mushroom（橙蘑菇） | 7 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `130100` | Stump（树桩） | 8 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `130101` | Red Snail（红蜗牛） | 9 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `210100` | Slime（绿水灵） | 10 | stand/move/attack/hit/dead | ⏳ 待获取 |
+
+### 2.2 初级区域（Lv 11 - 30，Ellinia / Henesys 近郊）
+
+| 怪物 ID | 名称 | 等级 | 推荐动作 | 状态 |
+|---------|------|------|---------|------|
+| `1140100` | Ghost Stump（幽灵树桩） | 12 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1130100` | Axe Stump（斧树桩） | 14 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `1120100` | Octopus（章鱼） | 15 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2100100` | Desert Rabbit F（沙漠兔♀） | 15 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2100101` | Desert Rabbit M（沙漠兔♂） | 16 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2100102` | Jr. Cactus（小仙人掌） | 17 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2100103` | Cactus（仙人掌） | 18 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2110200` | Horny Mushroom（毒蘑菇） | 20 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2110300` | Sand Rat（沙鼠） | 22 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2110301` | Scorpion（蝎子） | 25 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2220100` | Blue Mushroom（蓝蘑菇） | 28 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2230100` | Evil Eye（邪眼） | 25 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2230101` | Zombie Mushroom（僵尸蘑菇） | 26 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2230102` | Wild Boar（野猪） | 30 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2220000` | Mano（蘑菇王 BOSS） | 30 | stand/move/attack/hit/dead | ⏳ 待获取 |
+
+### 2.3 中级区域（Lv 30 - 60，Perion / 废弃都市周边）
+
+| 怪物 ID | 名称 | 等级 | 推荐动作 | 状态 |
+|---------|------|------|---------|------|
+| `2130100` | Dark Axe Stump（黑斧树桩） | 32 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2130103` | Jr. Necki（小僵尸猴） | 35 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `2300100` | Stirge（斯丁吉 / 吸血虫） | 30 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3100101` | Sand Dwarf（沙漠矮人） | 38 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3110100` | Ligator（鳄鱼人） | 40 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3110101` | Pink Teddy（粉色泰迪熊） | 42 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3110102` | Ratz（玩具老鼠） | 40 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3110300` | Cube Slime（方块史莱姆） | 38 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210100` | Fire Boar（火独眼兽） | 40 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210200` | Jr. Cellion（小狮子） | 45 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210201` | Jr. Lioner（小狮王） | 48 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210202` | Jr. Grupin（小狮鹫） | 50 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210203` | Panda Teddy（熊猫泰迪） | 52 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210204` | Roloduck（玩具鸭） | 45 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210205` | Black Ratz（黑色玩具鼠） | 42 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3210800` | Lupin（猴子战士） | 55 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3220001` | Deo（恶魔 BOSS 候选） | 50 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230100` | Curse Eye（诅咒邪眼） | 52 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230101` | Jr. Wraith（小幽灵） | 55 | float/attack/hit/dead | ⏳ 待获取 |
+| `3230102` | Lorang（玩具飞机） | 55 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3230103` | King Bloctopus（墨鱼王） | 58 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230104` | Mask Fish（面具鱼） | 55 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230200` | Star Pixie（星光精灵） | 60 | float/attack/hit/dead | ⏳ 待获取 |
+| `3230301` | Jr. Boogie 2（小布基 2） | 60 | float/attack/hit/dead | ⏳ 待获取 |
+| `3230303` | Propelly（螺旋桨飞机） | 55 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3230304` | Planey（玩具飞机） | 55 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3230305` | Toy Trojan（木马兵） | 55 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230306` | Chronos（时空机器） | 58 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230400` | Drumming Bunny（打鼓兔子） | 55 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3230405` | Jr. Seal（小海豹） | 60 | stand/move/attack/hit/dead | ⏳ 待获取 |
+
+### 2.4 中高级区域（Lv 60 - 100，Ludibrium / El Nath / Orbis）
+
+| 怪物 ID | 名称 | 等级 | 推荐动作 | 状态 |
+|---------|------|------|---------|------|
+| `4090000` | Iron Hook（铁钩海盗） | 60 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4110300` | Iron Mutae（铁皮变种） | 65 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4110301` | Reinforced Iron Mutae（强化铁皮变种） | 70 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4110302` | Mithril Mutae（秘银变种） | 75 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4130100` | Copper Drake（铜龙） | 70 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4130101` | Tortie（乌龟战士） | 72 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4130102` | Dark Nependeath（黑暗食花怪） | 75 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4130103` | Rombot（龙机甲） | 80 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230100` | Cold Eye（冰邪眼） | 72 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230101` | Zombie Lupin（僵尸猴） | 75 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230102` | Wraith（大幽灵） | 78 | float/attack/hit/dead | ⏳ 待获取 |
+| `4230103` | Iron Hog（铁野猪） | 80 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230104` | Clang（铁叮当） | 80 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230105` | Nependeath（食花怪） | 85 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `4230106` | Lunar Pixie（月光精灵） | 90 | float/attack/hit/dead | ⏳ 待获取 |
+| `4230107` | Flyeye（飞眼怪） | 88 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3000003` / `3000004` | 棕色/金色 Teddy（Boss 级泰迪熊） | 70 / 80 | stand/move/attack/hit/dead | ⏳ 待获取 |
+| `3000001` | Fairy（妖精士兵） | 65 | fly/attack/hit/dead | ⏳ 待获取 |
+| `3000002` | Fairy（妖精法师） | 68 | float/attack/hit/dead | ⏳ 待获取 |
+
+### 2.5 高级 BOSS（Lv 80 - 120）
+
+| 怪物 ID | 名称 | 等级 | 说明 | 状态 |
 |---------|------|------|------|------|
-| `0100100` | 蜗牛 Snail | 1 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100101` | 蓝蜗牛 Blue Snail | 2 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100102` | 红蜗牛 Red Snail | 3 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100200` | 蘑菇仔 Orange Mushroom | 5 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100300` | 绿水灵 Slime | 5 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100400` | 花蘑菇 Pig | 6 | move/attack/dead/hit | ⏳ 待获取 |
-| `0100500` | 猪猪 Ribbon Pig | 8 | move/attack/dead/hit | ⏳ 待获取 |
+| `boss_mushmom` | Mushmom（蘑菇王 BOSS） | 30 | 蘑菇王国统治者 | ⏳ 待获取 |
+| `boss_alishar` | Alishar（组队任务 BOSS） | 50 | 玩具城地下通道 BOSS | ⏳ 待获取 |
+| `boss_papulatus` | Papulatus（皮亚努斯） | 80 | 玩具城时空裂缝 BOSS | ⏳ 待获取 |
+| `boss_pianus_left` | Pianus Left（左皮亚纳斯） | 85 | 海底世界左 BOSS | ⏳ 待获取 |
+| `boss_pianus_right` | Pianus Right（右皮亚纳斯） | 85 | 海底世界右 BOSS | ⏳ 待获取 |
+| `boss_zakum_arm_01` ~ `boss_zakum_arm_08` | Zakum Arms（扎昆八只手） | 85 | 扎昆前置 BOSS | ⏳ 待获取 |
+| `boss_zakum_body_1` | Zakum Body 1（扎昆主体 1） | 90 | 扎昆第一形态 | ⏳ 待获取 |
+| `boss_zakum_body_2` | Zakum Body 2（扎昆主体 2） | 100 | 扎昆第二形态 | ⏳ 待获取 |
+| `boss_zakum_body_3` | Zakum Body 3（扎昆主体 3） | 110 | 扎昆第三形态（终极 BOSS） | ⏳ 待获取 |
+| `boss_ice_unicorn` | 玄冰独角兽 | 70 | 冰峰雪域 BOSS | ⏳ 待获取 |
+| `boss_black_knight` | 暗黑骑士团将领 | 95 | 战士团 BOSS | ⏳ 待获取 |
 
-### 2.2 中级怪物
+---
 
-| 怪物 ID | 名称 | 等级 | 状态 |
-|---------|------|------|------|
-| `0200100` | 石球 Stone Golem | 15 | ⏳ 待获取 |
-| `0200200` | 火独眼兽 Fire Boar | 22 | ⏳ 待获取 |
-| `0200300` | 冰独眼兽 Ice Boar | 25 | ⏳ 待获取 |
-| `0300100` | 僵尸猴 Zombie Mushmom | 35 | ⏳ 待获取 |
-| `0300200` | 大幽灵 Wraith | 45 | ⏳ 待获取 |
-| `0400100` | 灰狼 Werewolf | 55 | ⏳ 待获取 |
-| `0500100` | 白狼 White Fang | 60 | ⏳ 待获取 |
+## 三、NPC 精灵（Non-Player Character）
 
-### 2.3 BOSS
+> 参考数据：HeavenMS NPC.txt。每个 NPC 需要至少 `stand` / `talk`（对话动画）两种状态。
 
-| BOSS ID | 名称 | 等级 | 状态 |
-|---------|------|------|------|
-| `boss_001` | 蘑菇王 Mushmom | 30 | ⏳ 待获取 |
-| `boss_002` | 阿丽莎乐 Alishar | 45 | ⏳ 待获取 |
-| `boss_003` | 皮亚努斯 Papulatus | 80 | ⏳ 待获取 |
-| `boss_004` | 扎昆 Zakum | 90 | ⏳ 待获取 |
-| `boss_005` | 皮亚纳斯 Pianus | 85 | ⏳ 待获取 |
-| `boss_006` | 玄冰独角兽 | 70 | ⏳ 待获取 |
+### 3.1 新手村 NPC
 
-## 三、NPC 精灵
+| NPC ID | 名称 | 位置 | 推荐尺寸 | 状态 |
+|--------|------|------|---------|------|
+| `10000` | Sena（新手向导） | Maple Road | 60x96 | ⏳ 待获取 |
+| `10100` | Lucas（明珠港传送员） | Lith Harbor | 60x96 | ⏳ 待获取 |
+| `10200` | Perion Village Chief（勇士部落村长） | Perion | 60x96 | ⏳ 待获取 |
+| `10300` | Ellinia Elder（魔法密林长老） | Ellinia | 60x96 | ⏳ 待获取 |
+| `10400` | Henesys Village Chief（射手村长老） | Henesys | 60x96 | ⏳ 待获取 |
+| `10500` | Kerning City Mayor（废弃都市市长） | Kerning City | 60x96 | ⏳ 待获取 |
+| `10600` | General Store Merchant（杂货商店老板） | 全地图 | 60x96 | ⏳ 待获取 |
+| `10700` | Weapon Shop Merchant（武器店老板） | 各村落 | 60x96 | ⏳ 待获取 |
+| `10800` | Armor Shop Merchant（防具店老板） | 各村落 | 60x96 | ⏳ 待获取 |
+| `10900` | Potion Shop Merchant（药水店老板） | 各村落 | 60x96 | ⏳ 待获取 |
+| `20000` | Orbis Ticket Seller（天空之城售票员） | Orbis | 60x96 | ⏳ 待获取 |
+| `20100` | El Nath Trader（冰峰雪域商人） | El Nath | 60x96 | ⏳ 待获取 |
 
-| NPC ID | 名称 | 场景 | 状态 |
-|--------|------|------|------|
-| `10000` | 希娜（新手向导） | 彩虹村 | ⏳ 待获取 |
-| `10100` | 露西娅（明珠港向导） | 明珠港 | ⏳ 待获取 |
-| `10200` | 勇士部落村长 | 勇士部落 | ⏳ 待获取 |
-| `10300` | 魔法密林长老 | 魔法密林 | ⏳ 待获取 |
-| `10400` | 射手村长老 | 射手村 | ⏳ 待获取 |
-| `10500` | 废弃都市老板 | 废弃都市 | ⏳ 待获取 |
-| `10600` | 商店老板（通用） | 全地图 | ⏳ 待获取 |
-| `10700` | 武器店老板 | 全地图 | ⏳ 待获取 |
-| `10800` | 防具店老板 | 全地图 | ⏳ 待获取 |
-| `10900` | 药水店老板 | 全地图 | ⏳ 待获取 |
-| `20000` | 飞天术师（天空之城） | 天空之城 | ⏳ 待获取 |
+### 3.2 关键任务 NPC（Quest NPCs）
 
-## 四、其他精灵
+| NPC ID | 名称 | 相关任务 | 状态 |
+|--------|------|---------|------|
+| `20200` | Athena Pierce（弓箭手导师） | 弓箭手 1-3 转转职 | ⏳ 待获取 |
+| `20300` | Grendel the Really Old（法师导师） | 法师 1-3 转转职 | ⏳ 待获取 |
+| `20400` | Dark Lord（飞侠导师） | 飞侠 1-3 转转职 | ⏳ 待获取 |
+| `20500` | Dances with Balrog（战士导师） | 战士 1-3 转转职 | ⏳ 待获取 |
+| `20600` | Kyrin（海盗导师） | 海盗 1-3 转转职 | ⏳ 待获取 |
+| `20800` | 4th Job Instructor（四转导师） | 四转终极任务 | ⏳ 待获取 |
+| `21000` | 扎昆祭台祭司 | 扎昆前置任务 | ⏳ 待获取 |
+| `22000` | 时空门守卫（皮亚努斯） | 玩具城组队任务 | ⏳ 待获取 |
 
-| 类别 | 描述 | 状态 |
-|------|------|------|
-| `mount/001` | 坐骑 1（小猪） | ⏳ 待获取 |
-| `mount/002` | 坐骑 2（银色野猪） | ⏳ 待获取 |
-| `mount/003` | 坐骑 3（飞龙） | ⏳ 待获取 |
-| `pet/001` | 宠物（白色小猫） | ⏳ 待获取 |
-| `pet/002` | 宠物（棕色小狗） | ⏳ 待获取 |
-| `pet/003` | 宠物（粉色小兔） | ⏳ 待获取 |
-| `portal/normal` | 普通传送门动画 | ⏳ 待获取 |
-| `portal/party` | 组队传送门 | ⏳ 待获取 |
-| `portal/cashshop` | 商城传送门 | ⏳ 待获取 |
+---
+
+## 四、传送门 / 特效精灵（Portal / Effects）
+
+| 精灵文件 | 描述 | 推荐尺寸 | 状态 |
+|---------|------|---------|------|
+| `portal_normal.png` | 普通传送门（发光蓝色圈） | 64x96 | ⏳ 待获取 |
+| `portal_hidden.png` | 隐藏传送门（闪烁金色粒子） | 64x96 | ⏳ 待获取 |
+| `portal_party.png` | 组队传送门（红色光环） | 64x96 | ⏳ 待获取 |
+| `portal_cashshop.png` | 现金商城传送门 | 64x96 | ⏳ 待获取 |
+| `portal_town.png` | 回城传送门（绿色图腾） | 64x96 | ⏳ 待获取 |
+| `effect_hit_spark.png` | 击中火星特效 | 48x48 | ⏳ 待获取 |
+| `effect_critical_hit.png` | 暴击闪光（红色大光爆） | 64x64 | ⏳ 待获取 |
+| `effect_damage_number.png` | 伤害数字字体 | 位图字体 | ⏳ 待获取 |
+| `effect_levelup_halo.png` | 升级光环（金色环上升） | 128x128 | ⏳ 待获取 |
+
+---
 
 ## 五、精灵格式规范
 
-### 5.1 推荐：Spritesheet + JSON
+### 5.1 推荐：Spritesheet + JSON Metadata
+
+每个精灵资源需要一个 PNG 图集 + 一个 JSON 描述文件：
 
 ```json
 {
-  "image": "warrior_walk.png",
+  "image": "mob/100100.png",
   "frame_width": 60,
-  "frame_height": 96,
+  "frame_height": 60,
   "origin_x": 30,
-  "origin_y": 90,
-  "frames": 4,
+  "origin_y": 55,
   "fps": 8,
-  "loop": true
+  "actions": {
+    "stand":    { "frames": [0, 1, 2, 3], "loop": true },
+    "move":     { "frames": [4, 5, 6, 7], "loop": true },
+    "attack":   { "frames": [8, 9, 10, 11, 12], "loop": false },
+    "hit":      { "frames": [13, 14], "loop": false },
+    "dead":     { "frames": [15, 16, 17, 18], "loop": false }
+  }
 }
 ```
 
-### 5.2 备用：Aseprite .aseprite 文件
-
-直接保存源文件，后续用 `aseprite --batch ...` 自动导出序列帧。
-
-### 5.3 图像参数
+### 5.2 图像参数
 
 | 参数 | 推荐值 |
 |------|--------|
-| 格式 | PNG-32 (带 Alpha) |
-| 缩放 | 建议 1x（原始像素），在客户端用最近邻缩放放大 |
-| 色板 | 建议保留原始 16-bit 色板以保持风格 |
-| 单帧大小 | 60x96（角色）/ 100x100（怪物） |
+| 格式 | PNG-32（带 Alpha 通道） |
+| 色板 | 保留原始 16-bit 色板以保持风格 |
+| 缩放 | 建议 1x 原始像素，在引擎中使用最近邻缩放 |
+| 角色帧大小 | 60x96（全职业统一） |
+| 怪物帧大小 | 60x60（普通）/ 100x100（大型）/ 200x200（BOSS） |
+| NPC 帧大小 | 60x96 |
+
+---
 
 ## 六、开源替代资源
 
 | 资源 | 说明 | 许可证 |
 |------|------|--------|
-| [opengameart.org - 2D RPG sprites](https://opengameart.org) | 2D RPG 角色 / 怪物 精灵 | CC0 / CC-BY |
-| [itch.io - Free 2D Assets](https://itch.io/game-assets/free/tag-2d) | 免费 2D 精灵合集 | 各作者 |
+| [opengameart.org - 2D RPG sprites](https://opengameart.org) | 2D RPG 角色 / 怪物精灵合集 | CC0 / CC-BY |
+| [itch.io - Free 2D Assets](https://itch.io/game-assets/free/tag-2d) | 免费 2D 精灵合集（支持 spritesheet） | 各独立作者 |
 | [kenney.nl/assets](https://kenney.nl/assets) | Kenney 的 CC0 1-Bit / Roguelike 素材 | CC0 |
-| [Ansimuz / SecretAncientTech Pack](https://ansimuz.itch.io) | 多款免费 RPG 素材 | Free / Paid |
-
-## 七、Flutter 渲染建议
-
-- 使用 `flame` 的 `SpriteAnimation` 加载 spritesheet
-- 角色合成：使用 `Canvas.drawAtlas` 进行多部件叠加绘制
-- 行走动画帧速率：8–12 FPS（与原版一致）
-- 伤害数字 / 浮动文字：叠加在角色头顶 30 px 处
-
----
-
-## 八、自动导入清单
-
-以下内容可直接粘贴到 Dart 文件中作为资源加载器使用的字符串常量清单（以精灵目录+关键动作为主）。
-
-```dart
-// === 一、角色精灵（玩家角色）===
-// 基础动作（全职业通用）
-static const String playerSpriteStand      = 'assets/sprites/player/common/stand.png';
-static const String playerSpriteWalk        = 'assets/sprites/player/common/walk.png';
-static const String playerSpriteJump        = 'assets/sprites/player/common/jump.png';
-static const String playerSpriteFall        = 'assets/sprites/player/common/fall.png';
-static const String playerSpriteAlert       = 'assets/sprites/player/common/alert.png';
-static const String playerSpriteProne       = 'assets/sprites/player/common/prone.png';
-static const String playerSpriteDead        = 'assets/sprites/player/common/dead.png';
-static const String playerSpriteLadder      = 'assets/sprites/player/common/ladder.png';
-static const String playerSpriteRope        = 'assets/sprites/player/common/rope.png';
-static const String playerSpriteHurt        = 'assets/sprites/player/common/hurt.png';
-static const String playerSpriteSit          = 'assets/sprites/player/common/sit.png';
-static const String playerSpritePortal     = 'assets/sprites/player/common/portal.png';
-
-// 职业动作
-static const String playerSpriteAttackSword   = 'assets/sprites/player/warrior/attack_sword.png';
-static const String playerSpriteAttackSpear   = 'assets/sprites/player/warrior/attack_spear.png';
-static const String playerSpriteAttackPolearm = 'assets/sprites/player/warrior/attack_polearm.png';
-static const String playerSpriteShootBow       = 'assets/sprites/player/bowman/shoot_bow.png';
-static const String playerSpriteShootCrossbow   = 'assets/sprites/player/bowman/shoot_crossbow.png';
-static const String playerSpriteCastMagic      = 'assets/sprites/player/magician/cast_magic.png';
-static const String playerSpriteAttackDagger    = 'assets/sprites/player/thief/attack_dagger.png';
-static const String playerSpriteThrowStar       = 'assets/sprites/player/thief/throw_star.png';
-static const String playerSpriteAttackGun       = 'assets/sprites/player/pirate/attack_gun.png';
-static const String playerSpriteAttackKnuckle   = 'assets/sprites/player/pirate/attack_knuckle.png';
-
-// 装备部件
-static const String playerBody      = 'assets/sprites/player/parts/body.png';
-static const String playerHair      = 'assets/sprites/player/parts/hair.png';
-static const String playerFace      = 'assets/sprites/player/parts/face.png';
-static const String playerCap       = 'assets/sprites/player/parts/cap.png';
-static const String playerCoat      = 'assets/sprites/player/parts/coat.png';
-static const String playerPants     = 'assets/sprites/player/parts/pants.png';
-static const String playerShoes     = 'assets/sprites/player/parts/shoes.png';
-static const String playerWeapon     = 'assets/sprites/player/parts/weapon.png';
-static const String playerShield     = 'assets/sprites/player/parts/shield.png';
-static const String playerCape       = 'assets/sprites/player/parts/cape.png';
-static const String playerAccessory   = 'assets/sprites/player/parts/accessory.png';
-static const String playerMount       = 'assets/sprites/player/parts/mount.png';
-
-// === 二、怪物精灵 ===
-static const String mobSnail            = 'assets/sprites/mob/0100100.png';
-static const String mobBlueSnail        = 'assets/sprites/mob/0100101.png';
-static const String mobRedSnail         = 'assets/sprites/mob/0100102.png';
-static const String mobOrangeMushroom  = 'assets/sprites/mob/0100200.png';
-static const String mobSlime            = 'assets/sprites/mob/0100300.png';
-static const String mobPig              = 'assets/sprites/mob/0100400.png';
-static const String mobRibbonPig        = 'assets/sprites/mob/0100500.png';
-static const String mobStoneGolem      = 'assets/sprites/mob/0200100.png';
-static const String mobFireBoar         = 'assets/sprites/mob/0200200.png';
-static const String mobIceBoar         = 'assets/sprites/mob/0200300.png';
-static const String mobZombieMushmom   = 'assets/sprites/mob/0300100.png';
-static const String mobWraith           = 'assets/sprites/mob/0300200.png';
-static const String mobWerewolf         = 'assets/sprites/mob/0400100.png';
-static const String mobWhiteFang       = 'assets/sprites/mob/0500100.png';
-static const String mobBossMushmom      = 'assets/sprites/mob/boss_001.png';
-static const String mobBossAlishar       = 'assets/sprites/mob/boss_002.png';
-static const String mobBossPapulatus     = 'assets/sprites/mob/boss_003.png';
-static const String mobBossZakum        = 'assets/sprites/mob/boss_004.png';
-static const String mobBossPianus       = 'assets/sprites/mob/boss_005.png';
-static const String mobBossUnicorn      = 'assets/sprites/mob/boss_006.png';
-
-// === 三、NPC 精灵 ===
-static const String npc10000              = 'assets/sprites/npc/10000.png';
-static const String npc10100              = 'assets/sprites/npc/10100.png';
-static const String npc10200              = 'assets/sprites/npc/10200.png';
-static const String npc10300              = 'assets/sprites/npc/10300.png';
-static const String npc10400              = 'assets/sprites/npc/10400.png';
-static const String npc10500              = 'assets/sprites/npc/10500.png';
-static const String npc10600              = 'assets/sprites/npc/10600.png';
-static const String npc10700              = 'assets/sprites/npc/10700.png';
-static const String npc10800              = 'assets/sprites/npc/10800.png';
-static const String npc10900              = 'assets/sprites/npc/10900.png';
-static const String npc20000              = 'assets/sprites/npc/20000.png';
-
-// === 四、其他精灵（坐骑 / 宠物 / 传送门）===
-static const String mount001              = 'assets/sprites/mount/001.png';
-static const String mount002              = 'assets/sprites/mount/002.png';
-static const String mount003              = 'assets/sprites/mount/003.png';
-static const String pet001                = 'assets/sprites/pet/001.png';
-static const String pet002                = 'assets/sprites/pet/002.png';
-static const String pet003                = 'assets/sprites/pet/003.png';
-static const String portalNormal         = 'assets/sprites/portal/normal.png';
-static const String portalParty           = 'assets/sprites/portal/party.png';
-static const String portalCashShop       = 'assets/sprites/portal/cashshop.png';
-```
+| [ansimuz.com](https://ansimuz.com) | Ansimuz 的免费 RPG 角色 / 怪物集合 | Free / Paid |
 
 ---
 

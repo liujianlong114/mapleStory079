@@ -28,7 +28,7 @@ class GameScenePage extends StatefulWidget {
 }
 
 class _GameScenePageState extends State<GameScenePage> {
-  late GameWorld _gameWorld;
+  late final GameWorld _gameWorld;
   final _damageNumbers = <_DamageFloat>[];
 
   @override
@@ -42,7 +42,38 @@ class _GameScenePageState extends State<GameScenePage> {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _spawnDefaultEntities();
+      _setupStatSync();
     });
+  }
+
+  void _setupStatSync() {
+    if (!mounted) return;
+    final gp = context.read<GameProvider>();
+    _gameWorld.onStatChange = ({
+      int? hp,
+      int? maxHp,
+      int? mp,
+      int? maxMp,
+      int? level,
+      int? exp,
+      int? mesos,
+    }) {
+      gp.syncFromGameWorld(
+        hp: hp,
+        maxHp: maxHp,
+        mp: mp,
+        maxMp: maxMp,
+        level: level,
+        exp: exp,
+        mesos: mesos,
+      );
+    };
+    _gameWorld.onLevelUp = (newLevel) {
+      gp.syncFromGameWorld(level: newLevel);
+    };
+    _gameWorld.onPlayerDead = () {
+      gp.syncFromGameWorld(hp: 0);
+    };
   }
 
   void _spawnDefaultEntities() {

@@ -105,6 +105,10 @@ func GetMobByID(id uint) (*model.Mob, error) {
 	return &m, nil
 }
 
+func UpdateMob(m *model.Mob) error {
+	return database.GetDB().Save(m).Error
+}
+
 // NPC
 func GetNPCByID(id uint) (*model.NPC, error) {
 	var n model.NPC
@@ -211,4 +215,41 @@ func GetCharacterSkills(characterID uint) ([]model.CharacterSkill, error) {
 	var cs []model.CharacterSkill
 	err := database.GetDB().Where("character_id = ?", characterID).Find(&cs).Error
 	return cs, err
+}
+
+func UpdateCharacterPosition(characterID uint, mapID, x, y int) error {
+	return database.GetDB().Model(&database.Character{}).
+		Where("id = ?", characterID).
+		Updates(map[string]interface{}{
+			"map_id":     mapID,
+			"position_x": x,
+			"position_y": y,
+		}).Error
+}
+
+func UpdateCharacterStats(characterID uint, stats map[string]interface{}) error {
+	if len(stats) == 0 {
+		return nil
+	}
+	return database.GetDB().Model(&database.Character{}).
+		Where("id = ?", characterID).
+		Updates(stats).Error
+}
+
+func AddCharacterExp(characterID uint, exp int) error {
+	return database.GetDB().Model(&database.Character{}).
+		Where("id = ?", characterID).
+		Update("exp", database.GetDB().Raw("exp + ?", exp)).Error
+}
+
+func AddCharacterMesos(characterID uint, mesos int) error {
+	return database.GetDB().Model(&database.Character{}).
+		Where("id = ?", characterID).
+		Update("mesos", database.GetDB().Raw("mesos + ?", mesos)).Error
+}
+
+func GetNPCsByMapID(mapID uint) ([]model.NPC, error) {
+	var npcs []model.NPC
+	err := database.GetDB().Where("map_id = ?", mapID).Find(&npcs).Error
+	return npcs, err
 }

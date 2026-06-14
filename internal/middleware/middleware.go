@@ -7,3 +7,4 @@ package middleware
 //   - rate_limit.go : IP + 端点限流
 //   - request_id.go : 链路追踪 request id
 //   - logger.go     : 请求日志
+//   - recovery.go   : panic 恢复，避免服务进程被拉倒

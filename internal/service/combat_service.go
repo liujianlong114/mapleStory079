@@ -1,11 +1,13 @@
 package service
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"time"
 
 	"mapleStory079/pkg/database"
+	"mapleStory079/pkg/utils"
 )
 
 type CombatService struct{}
@@ -94,9 +96,9 @@ func (s *CombatService) PlayerAttackMob(player *database.Character, mob *databas
 	}
 	result.IsHit = true
 
-	// 暴击判定：LUK 越高暴击率越高，飞侠额外加成。
+	// 暴击判定：LUK 越高暴击率越高，飞侠额外加成（与 constants 中 crit 常量对齐）。
 	critBase := 0.03 + float64(player.LUK)/200.0
-	if player.Class == 4 {
+	if player.Class == utils.JobThief {
 		critBase += 0.08
 	}
 	critBase += float64(player.Level) * 0.002
@@ -107,26 +109,30 @@ func (s *CombatService) PlayerAttackMob(player *database.Character, mob *databas
 	// 伤害计算（按职业偏向：战士→力量，法师→智力，弓→敏捷，飞侠→运气）。
 	var baseAtk float64
 	switch player.Class {
-	case 1: // 战士
+	case utils.JobWarrior:
 		baseAtk = float64(player.STR)*1.2 + float64(player.DEX)*0.3
-	case 2: // 法师
+	case utils.JobMagician:
 		baseAtk = float64(player.INT)*1.3 + float64(player.LUK)*0.2
-	case 3: // 弓箭手
+	case utils.JobBowman:
 		baseAtk = float64(player.DEX)*1.25 + float64(player.STR)*0.3
-	case 4: // 飞侠
+	case utils.JobThief:
 		baseAtk = float64(player.LUK)*1.2 + float64(player.DEX)*0.4
 	default: // 新手/海盗/未知
 		baseAtk = float64(player.STR) + 10
 	}
 
-	// 基础伤害 = (攻击力 * 随机波动) - 怪物防御。
-	fluctuation := 0.8 + rand.Float64()*0.4
+	// 基础伤害 = (攻击力 * 随机波动) - 怪物防御（与 constants.Factor 对齐）。
+	fluctuation := utils.DamageBaseFactor + rand.Float64()*(utils.DamageCeilingFactor-utils.DamageBaseFactor)
 	damage := int(baseAtk*fluctuation) - mob.PhysicalDefense
 	if damage < 1 {
 		damage = 1
 	}
 	if isCrit {
-		damage = int(float64(damage) * 1.5)
+		critMul := utils.CritMultiplierDefault
+		if player.Class == utils.JobThief {
+			critMul = utils.CritMultiplierThief
+		}
+		damage = int(float64(damage) * critMul)
 	}
 	result.Damage = damage
 
@@ -247,4 +253,107 @@ func (s *CombatService) Respawn(ch *database.Character, mapID uint, x, y int) {
 	ch.MapID = mapID
 	ch.PositionX = x
 	ch.PositionY = y
+}
+
+// FullAttack 一次完整战斗：玩家攻击怪物，命中判定+暴击+伤害，
+// 若怪物未死亡则怪物反击。返回详细战斗结果。
+func (s *CombatService) FullAttack(player *database.Character, mob *database.Mob) (*BattleResult, error) {
+	result := &BattleResult{Message: "攻击完成"}
+	levelDiff := float64(mob.Level - player.Level)
+	baseHit := 0.85 + float64(player.DEX)/400.0
+	hitRate := math.Max(0.2, math.Min(0.98, baseHit-levelDiff*0.02))
+	if rand.Float64() > hitRate {
+		result.IsHit = false
+		result.Message = "MISS！"
+		return result, nil
+	}
+	result.IsHit = true
+
+	critBase := 0.03 + float64(player.LUK)/200.0
+	if player.Class == utils.JobThief {
+		critBase += 0.08
+	}
+	critBase += float64(player.Level) * 0.002
+	critRate := math.Min(0.7, critBase)
+	isCrit := rand.Float64() < critRate
+	result.IsCritical = isCrit
+
+	var baseAtk float64
+	switch player.Class {
+	case utils.JobWarrior:
+		baseAtk = float64(player.STR)*1.2 + float64(player.DEX)*0.3
+	case utils.JobMagician:
+		baseAtk = float64(player.INT)*1.3 + float64(player.LUK)*0.2
+	case utils.JobBowman:
+		baseAtk = float64(player.DEX)*1.25 + float64(player.STR)*0.3
+	case utils.JobThief:
+		baseAtk = float64(player.LUK)*1.2 + float64(player.DEX)*0.4
+	default:
+		baseAtk = float64(player.STR) + 10
+	}
+
+	fluctuation := utils.DamageBaseFactor +
+		rand.Float64()*(utils.DamageCeilingFactor-utils.DamageBaseFactor)
+	damage := int(baseAtk*fluctuation) - mob.PhysicalDefense
+	if damage < 1 {
+		damage = 1
+	}
+	if isCrit {
+		critMul := utils.CritMultiplierDefault
+		if player.Class == utils.JobThief {
+			critMul = utils.CritMultiplierThief
+		}
+		damage = int(float64(damage) * critMul)
+	}
+	result.Damage = damage
+	mob.HP -= damage
+	if mob.HP < 0 {
+		mob.HP = 0
+	}
+	result.TargetHP = mob.HP
+
+	if mob.HP <= 0 {
+		result.TargetDead = true
+		expReward := mob.ExpReward
+		if expReward <= 0 {
+			expReward = mob.Level*4 + 10
+		}
+		mesosReward := mob.MesosReward
+		if mesosReward <= 0 {
+			mesosReward = mob.Level*2 + rand.Intn(5)
+		}
+		player.Exp += expReward
+		player.Mesos += mesosReward
+		result.ExpGained = expReward
+		result.MesosGained = mesosReward
+		if LevelUp(player) {
+			result.LevelUp = true
+			result.Message = "击败怪物并升级！"
+		} else {
+			result.Message = "击败怪物！"
+		}
+		return result, nil
+	}
+
+	// 怪物反击
+	dodgeRate := math.Min(0.5, float64(player.DEX)/300.0)
+	if rand.Float64() < dodgeRate {
+		result.Message = "命中！玩家闪避了反击"
+		return result, nil
+	}
+	mobAtk := mob.PhysicalAttack
+	if mobAtk <= 0 {
+		mobAtk = mob.Level + 2
+	}
+	playerDef := player.DEX/5 + player.STR/10
+	playerDmg := mobAtk - playerDef
+	if playerDmg < 1 {
+		playerDmg = 1
+	}
+	player.HP -= playerDmg
+	if player.HP < 0 {
+		player.HP = 0
+	}
+	result.Message = fmt.Sprintf("命中！怪物反击造成 %d 点伤害", playerDmg)
+	return result, nil
 }

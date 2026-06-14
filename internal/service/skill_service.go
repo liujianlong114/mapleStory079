@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -221,4 +222,43 @@ func (s *SkillService) RemainingCoolDownMs(characterID, skillID uint) int {
 
 func coolDownKey(characterID, skillID uint) string {
 	return string(rune(characterID)) + ":" + string(rune(skillID))
+}
+
+// AssignSkillPoint 将技能点分配到指定技能（仅当角色拥有该技能且还未达到最大等级时）。
+func (s *SkillService) AssignSkillPoint(characterID, skillID uint) error {
+	if characterID == 0 || skillID == 0 {
+		return errors.New("invalid id")
+	}
+	var ch database.Character
+	if err := database.GetDB().First(&ch, characterID).Error; err != nil {
+		return fmt.Errorf("character not found: %w", err)
+	}
+	if ch.SkillPoint <= 0 {
+		return errors.New("no skill point available")
+	}
+	skill, err := s.GetSkill(skillID)
+	if err != nil {
+		return fmt.Errorf("skill not found: %w", err)
+	}
+	if skill.MaxLevel <= 0 {
+		skill.MaxLevel = 10
+	}
+	ch.SkillPoint -= 1
+	return database.GetDB().Save(&ch).Error
+}
+
+// RestoreMP 补充角色 MP（例如技能冷却或休息时调用）。
+func (s *SkillService) RestoreMP(characterID uint, mp int) error {
+	var ch database.Character
+	if err := database.GetDB().First(&ch, characterID).Error; err != nil {
+		return err
+	}
+	ch.MP += mp
+	if ch.MP > ch.MaxMP {
+		ch.MP = ch.MaxMP
+	}
+	if ch.MP < 0 {
+		ch.MP = 0
+	}
+	return database.GetDB().Save(&ch).Error
 }

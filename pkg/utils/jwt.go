@@ -73,11 +73,6 @@ func NowTimestamp() int64 {
 	return time.Now().Unix()
 }
 
-// NowUnix 与 NowTimestamp 等价，便于统一响应结构使用
-func NowUnix() int64 {
-	return time.Now().Unix()
-}
-
 func ExpiresInHours(hours int) int64 {
 	return time.Now().Add(time.Duration(hours) * time.Hour).Unix()
 }

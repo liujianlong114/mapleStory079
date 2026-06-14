@@ -8,7 +8,7 @@
 - **客户端**: Flutter 3.x / Dart 3.x / Flame 1.10.1 (2D 游戏引擎)
 - **数据库**: MySQL 8.0+
 - **实时通信**: WebSocket
-- **版本**: v0.6.0
+- **版本**: v0.9.15
 
 ⚠️ **重要提示**: 本项目仅供学习研究使用，不得用于商业用途，请尊重原作版权。
 
@@ -55,11 +55,13 @@ mapleStory079/
 │   └── lib/
 │       ├── main.dart       # 客户端入口
 │       ├── config/         # 配置
+│       ├── core/           # 网络/存储/主题/资源
 │       ├── models/         # 数据模型
 │       ├── providers/      # 状态管理
-│       ├── pages/          # UI页面
-│       ├── widgets/        # 组件
-│       └── ...
+│       ├── features/       # 功能页面（login/character/game/combat/inventory/skills/chat/social）
+│       ├── game/           # Flame 游戏引擎层
+│       ├── services/       # 网络服务
+│       └── widgets/        # 组件库
 ├── examples/                 # 开源项目参考
 │   ├── HeavenMS/           # v83服务端
 │   ├── ZLHSS2/             # v079服务端

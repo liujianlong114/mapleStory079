@@ -4,11 +4,20 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
 /// WebSocket 消息类型
+///
+/// 与服务端 `pkg/utils/constants.go` 中的 WSMessageTypes 保持一致。
+/// 服务端仅接受白名单内的 type 字段，扩展时请同步更新两端。
 class WsMessageType {
+  // 服务端到客户端 / 双向
   static const String chat = 'chat';
+  static const String position = 'position';
   static const String move = 'move';
   static const String attack = 'attack';
-  static const String levelup = 'levelup';
+  static const String damage = 'damage';
+  static const String exp = 'exp';
+  static const String loot = 'loot';
+  static const String dead = 'dead';
+  static const String revive = 'revive';
   static const String system = 'system';
   static const String ping = 'ping';
   static const String pong = 'pong';
@@ -147,17 +156,149 @@ class WebSocketService {
     ));
   }
 
-  /// 发送移动坐标更新
+  /// 发送位置同步（对应服务端 WSMessageTypePosition，节流 50ms）
+  void sendPosition({
+    required int characterId,
+    required double x,
+    required double y,
+    String? mapId,
+  }) {
+    send(WsMessage(
+      type: WsMessageType.position,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        'x': x,
+        'y': y,
+        if (mapId != null) 'map_id': mapId,
+      },
+    ));
+  }
+
+  /// 发送移动方向（对应服务端 WSMessageTypeMove，节流 50ms）
   void sendMove({
     required int characterId,
     required double x,
     required double y,
-    required String mapId,
+    String? mapId,
   }) {
     send(WsMessage(
       type: WsMessageType.move,
       senderId: characterId,
-      payload: {'x': x, 'y': y, 'map_id': mapId},
+      payload: {
+        'character_id': characterId,
+        'x': x,
+        'y': y,
+        if (mapId != null) 'map_id': mapId,
+      },
+    ));
+  }
+
+  /// 发送攻击（对应服务端 WSMessageTypeAttack，节流 200ms）
+  void sendAttack({
+    required int characterId,
+    required int? skillId,
+    required int? targetId,
+    required double x,
+    required double y,
+  }) {
+    send(WsMessage(
+      type: WsMessageType.attack,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        if (skillId != null) 'skill_id': skillId,
+        if (targetId != null) 'target_id': targetId,
+        'x': x,
+        'y': y,
+      },
+    ));
+  }
+
+  /// 广播伤害（用于本地预测，服务端会再次校验）
+  void sendDamage({
+    required int characterId,
+    required int targetId,
+    required int damage,
+    required bool critical,
+  }) {
+    if (damage <= 0) return;
+    send(WsMessage(
+      type: WsMessageType.damage,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        'target_id': targetId,
+        'damage': damage,
+        'critical': critical,
+      },
+    ));
+  }
+
+  /// 广播经验获取（含升级标志）
+  void sendExp({
+    required int characterId,
+    required int expGained,
+    bool levelUp = false,
+  }) {
+    if (expGained <= 0) return;
+    send(WsMessage(
+      type: WsMessageType.exp,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        'exp_gained': expGained,
+        'level_up': levelUp,
+      },
+    ));
+  }
+
+  /// 广播拾取物品 / 金币
+  void sendLoot({
+    required int characterId,
+    int? itemId,
+    int quantity = 1,
+    int mesos = 0,
+  }) {
+    if (itemId == null && mesos <= 0) return;
+    send(WsMessage(
+      type: WsMessageType.loot,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        if (itemId != null) 'item_id': itemId,
+        'quantity': quantity,
+        'mesos': mesos,
+      },
+    ));
+  }
+
+  /// 广播死亡事件
+  void sendDead({required int characterId, int? targetId}) {
+    send(WsMessage(
+      type: WsMessageType.dead,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        if (targetId != null) 'target_id': targetId,
+      },
+    ));
+  }
+
+  /// 广播复活事件
+  void sendRevive({
+    required int characterId,
+    required double x,
+    required double y,
+  }) {
+    send(WsMessage(
+      type: WsMessageType.revive,
+      senderId: characterId,
+      payload: {
+        'character_id': characterId,
+        'x': x,
+        'y': y,
+      },
     ));
   }
 

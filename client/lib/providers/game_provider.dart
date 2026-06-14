@@ -313,6 +313,50 @@ class GameProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// 从 GameWorld 同步玩家状态（双向绑定）
+  void syncFromGameWorld({
+    int? hp,
+    int? maxHp,
+    int? mp,
+    int? maxMp,
+    int? level,
+    int? exp,
+    int? mesos,
+  }) {
+    bool changed = false;
+    if (hp != null && _state.hp != hp) {
+      _state.hp = hp;
+      changed = true;
+    }
+    if (maxHp != null && _state.maxHp != maxHp) {
+      _state.maxHp = maxHp;
+      changed = true;
+    }
+    if (mp != null && _state.mp != mp) {
+      _state.mp = mp;
+      changed = true;
+    }
+    if (maxMp != null && _state.maxMp != maxMp) {
+      _state.maxMp = maxMp;
+      changed = true;
+    }
+    if (level != null && _state.level != level) {
+      _state.level = level;
+      changed = true;
+    }
+    if (exp != null && _state.exp != exp) {
+      _state.exp = exp;
+      changed = true;
+    }
+    if (mesos != null && _state.mesos != mesos) {
+      _state.mesos = mesos;
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
   void updatePlayerPosition(int characterId, double x, double y) {
     final existingIndex = _players.indexWhere((p) => p['characterId'] == characterId);
     if (existingIndex >= 0) {

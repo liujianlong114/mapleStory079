@@ -15,6 +15,11 @@ func Now() time.Time {
 	return time.Now()
 }
 
+// NowUnix 返回当前时间的 Unix 秒时间戳（供 Response 使用）。
+func NowUnix() int64 {
+	return time.Now().Unix()
+}
+
 // FormatTime 格式化时间为 Y-m-d H:i:s
 func FormatTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")

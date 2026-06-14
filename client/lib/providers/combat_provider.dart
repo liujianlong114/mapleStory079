@@ -150,6 +150,40 @@ class CombatProvider with ChangeNotifier {
     await _enemyTurn();
   }
 
+  Future<int> attackMob(int characterId, int attackerStr, {Skill? skill}) async {
+    final char = game.currentCharacter;
+    if (char == null) {
+      _addLog('⚠️ 尚未选择角色');
+      return 0;
+    }
+
+    final skillMult = skill?.damageAtCurrentLevel ?? 1.0;
+    final isCritical = _random.nextDouble() < (game.luk / 200.0 + 0.05);
+    final base = (attackerStr * 1.2 + char.dex * 0.3).toInt();
+    final damage = isCritical ? (base * 1.5).toInt() : base;
+    final finalDamage = (damage * skillMult).toInt();
+
+    if (skill != null) {
+      _addLog('🔮 ${skill.name} 造成 ${finalDamage}${isCritical ? ' (暴击!)' : ''} 点伤害');
+    } else {
+      _addLog('⚔️ 普通攻击造成 ${finalDamage}${isCritical ? ' (暴击!)' : ''} 点伤害');
+    }
+
+    if (_mobs.isNotEmpty) {
+      final target = _mobs.firstWhere((m) => m.isAlive, orElse: () => _mobs.first);
+      target.hp -= finalDamage;
+      if (target.hp <= 0) {
+        target.status = MobStatus.dead;
+        _addLog('💀 ${target.name} 被击败!');
+        await game.gainExperience(target.expReward);
+      }
+    }
+
+    _turnCount++;
+    notifyListeners();
+    return finalDamage;
+  }
+
   Future<void> _enemyTurn() async {
     if (_status != CombatStatus.enemyTurn) return;
     if (game.currentCharacter == null) return;
