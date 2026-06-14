@@ -11,7 +11,7 @@ import '../../services/websocket_service.dart';
 import '../../widgets/maple_game_panels.dart';
 import '../../widgets/maple_mini_map.dart';
 import '../../widgets/maple_status_bar.dart';
-import '../../widgets/npc_dialogue_widget.dart';
+import '../../widgets/npc_dialogue_panel.dart';
 import '../../game/engine/game_controls.dart';
 import '../../game/engine/game_world.dart';
 import '../../game/engine/map_life_loader.dart';
@@ -317,14 +317,87 @@ class _GameScenePageState extends State<GameScenePage> {
       });
       return;
     }
-    showNPCDialogue(
-      context,
-      npcName: npc.npcName,
-      dialogue: npc.dialogue.isNotEmpty
-          ? npc.dialogue
-          : '你好，冒险者！',
-      options: const ['再见'],
+    _showServerNpcDialogue(npc.npcId, npc.npcName);
+  }
+
+  Future<void> _showServerNpcDialogue(int npcId, String fallbackName) async {
+    final api = ApiService();
+    try {
+      final res = await api.startNpcDialogue(
+        npcId: npcId,
+        characterId: widget.characterId,
+      );
+      if (!mounted) return;
+      final data = res['data'] as Map<String, dynamic>? ?? res;
+      final nodeJson = data['node'] as Map<String, dynamic>?;
+      if (nodeJson == null) {
+        _showFallbackDialogue(fallbackName);
+        return;
+      }
+      await _runDialogueLoop(npcId, NpcDialogueNode.fromJson(nodeJson));
+    } catch (_) {
+      if (mounted) _showFallbackDialogue(fallbackName);
+    }
+  }
+
+  void _showFallbackDialogue(String npcName) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => NpcDialoguePanel(
+        node: NpcDialogueNode(
+          id: 'start',
+          speaker: npcName,
+          text: '你好，冒险者！',
+          choices: const [NpcDialogueChoice(text: '再见', action: 'close')],
+        ),
+        onChoice: (_, __) => Navigator.of(ctx).pop(),
+        onClose: () => Navigator.of(ctx).pop(),
+      ),
     );
+  }
+
+  Future<void> _runDialogueLoop(int npcId, NpcDialogueNode node) async {
+    while (mounted) {
+      final choice = await showDialog<NpcDialogueChoice>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => NpcDialoguePanel(
+          node: node,
+          onChoice: (c, _) => Navigator.of(ctx).pop(c),
+          onClose: () => Navigator.of(ctx).pop(),
+        ),
+      );
+      if (!mounted || choice == null) return;
+      if (choice.action == 'close' || choice.nextId == 'end') return;
+
+      final idx = node.choices.indexOf(choice);
+      final api = ApiService();
+      try {
+        final res = await api.continueNpcDialogue(
+          npcId: npcId,
+          characterId: widget.characterId,
+          nodeId: node.id,
+          choiceIndex: idx < 0 ? 0 : idx,
+        );
+        if (!mounted) return;
+        final effects = res['effects'] as Map<String, dynamic>?;
+        if (effects != null) {
+          final gp = context.read<GameProvider>();
+          final mesos = (effects['new_mesos'] as num?)?.toInt();
+          final hp = (effects['new_hp'] as num?)?.toInt();
+          final mp = (effects['new_mp'] as num?)?.toInt();
+          gp.syncFromGameWorld(mesos: mesos, hp: hp, mp: mp);
+          _gameWorld.onStatChange?.call(mesos: mesos, hp: hp, mp: mp);
+        }
+        final data = res['data'] as Map<String, dynamic>? ?? res;
+        final nodeJson = data['node'] as Map<String, dynamic>?;
+        if (nodeJson == null) return;
+        node = NpcDialogueNode.fromJson(nodeJson);
+        if (node.isEnd && node.choices.isEmpty) return;
+      } catch (_) {
+        return;
+      }
+    }
   }
 
   int _currentMesos() {

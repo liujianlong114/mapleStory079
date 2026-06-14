@@ -14,6 +14,7 @@ import (
 type GameHandler struct {
 	gameSvc   *service.GameService
 	combatSvc *service.CombatService
+	questSvc  *service.QuestService
 	lootSvc   *service.LootService
 	instances *service.MobInstanceService
 	wsHandler *WebSocketHandler
@@ -23,6 +24,7 @@ func NewGameHandler() *GameHandler {
 	return &GameHandler{
 		gameSvc:   service.NewGameService(),
 		combatSvc: service.NewCombatService(),
+		questSvc:  service.NewQuestService(),
 		lootSvc:   service.DefaultLootService,
 		instances: service.DefaultMobInstanceService,
 	}
@@ -593,6 +595,13 @@ func (h *GameHandler) PlayerAttackMob(c *gin.Context) {
 	}
 
 	groundLoots := []service.GroundLoot(nil)
+	if result.TargetDead {
+		mobTemplateID := req.MobID
+		if mobTemplateID == 0 {
+			mobTemplateID = mob.ID
+		}
+		h.questSvc.OnMobKilled(ch.ID, mobTemplateID)
+	}
 	if result.TargetDead && len(result.ItemsDropped) > 0 {
 		mapID := req.MapID
 		if mapID == 0 {

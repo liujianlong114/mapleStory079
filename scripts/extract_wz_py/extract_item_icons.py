@@ -28,18 +28,36 @@ BEGINNER_ITEMS = [
 ]
 
 
-def _item_spec(item_id: int) -> tuple:
-    """079 Item.wz 分 Consume/Etc/Install 等子目录，条目在 .img 内按 8 位 ID 索引。"""
+def _item_spec(item_id: int) -> list[tuple]:
+    """079 Item.wz 分卷规则；装备在 Character/* 下按完整 8 位 ID 建 .img。"""
     s = f"{item_id:08d}"
     prefix4 = s[:4]
     if 2000000 <= item_id < 3000000:
-        return ("Item.wz", f"Consume/{prefix4}.img"), (s, "info", "icon")
-    if 4000000 <= item_id < 5000000:
-        return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    if 4030000 <= item_id < 4040000:
-        return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    # 装备类在 Install 下按 ID 前 4 位分卷
-    return ("Item.wz", f"Install/{prefix4}.img"), (s, "info", "icon")
+        return [("Item.wz", f"Consume/{prefix4}.img", (s, "info", "icon"))]
+    if 4000000 <= item_id < 5000000 or 4030000 <= item_id < 4040000:
+        return [("Item.wz", f"Etc/{prefix4}.img", (s, "info", "icon"))]
+    if 1000000 <= item_id < 2000000:
+        # 对照 extract_beginner_parts：武器/防具在 Character 子目录
+        if 1300000 <= item_id < 1500000:
+            sub = "Weapon"
+        elif 1100000 <= item_id < 1200000:
+            sub = "Cap"
+        elif 1040000 <= item_id < 1050000:
+            sub = "Coat"
+        elif 1060000 <= item_id < 1070000:
+            sub = "Pants"
+        elif 1070000 <= item_id < 1080000:
+            sub = "Shoes"
+        elif 1370000 <= item_id < 1380000:
+            sub = "Weapon"  # 杖类
+        else:
+            sub = "Weapon"
+        return [
+            ("Item.wz", f"Character/{sub}/{s}.img", (s, "info", "icon")),
+            ("Item.wz", f"Character/{sub}/{s}.img", (s, "icon")),
+            ("Item.wz", f"Install/{prefix4}.img", (s, "info", "icon")),
+        ]
+    return [("Item.wz", f"Install/{prefix4}.img", (s, "info", "icon"))]
 
 
 def main() -> int:
@@ -58,13 +76,20 @@ def main() -> int:
         if not args.force and os.path.isfile(out_path) and os.path.getsize(out_path) >= 80:
             ok += 1
             continue
-        spec, inner = _item_spec(item_id)
+        specs = _item_spec(item_id)
         try:
-            img, region, _ = src.load_img(spec)
-            node = resolve_prop(img._root, inner)
-            if node is None:
-                # 部分物品 icon 在 iconRaw
-                node = resolve_prop(img._root, (*inner[:-1], "iconRaw"))
+            node = None
+            region = None
+            for wz_file, img_path, inner in specs:
+                try:
+                    img, region, _ = src.load_img((wz_file, img_path))
+                    node = resolve_prop(img._root, inner)
+                    if node is None:
+                        node = resolve_prop(img._root, (*inner[:-1], "iconRaw"))
+                    if node is not None:
+                        break
+                except Exception:
+                    continue
             if node is None:
                 print(f"✗ {item_id} missing icon")
                 fail += 1

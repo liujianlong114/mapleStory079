@@ -69,6 +69,7 @@ func NewNPCService() *NPCService {
 	svc := &NPCService{scripts: make(map[int]NPCScript)}
 	svc.registerDefaultScripts()
 	registerWZDialogueScripts(svc)
+	registerQuestDialogueScripts(svc, NewQuestService())
 	return svc
 }
 
