@@ -51,6 +51,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	chatHandler := NewChatHandler()
 	socialHandler := NewSocialHandler()
 	avatarHandler := NewAvatarHandler()
+	questHandler := NewQuestHandler()
 
 	api := r.Group("/api")
 	{
@@ -67,6 +68,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 			registerChatRoutes(v1, chatHandler)
 			registerSocialRoutes(v1, socialHandler)
 			registerLookRoutes(v1, avatarHandler)
+			registerQuestRoutes(v1, questHandler)
 		}
 	}
 
@@ -148,6 +150,15 @@ func registerGameRoutes(r *gin.RouterGroup, h *GameHandler) {
 		game.POST("/levelup/:id", h.LevelUpCharacter)
 		game.POST("/add-ap", h.AddAbilityPoints)
 		game.GET("/map-instances", h.ListMapMobInstances)
+	}
+}
+
+func registerQuestRoutes(r *gin.RouterGroup, h *QuestHandler) {
+	quests := r.Group("/quests")
+	{
+		quests.GET("/character/:characterId", h.ListCharacterQuests)
+		quests.POST("/accept", h.Accept)
+		quests.POST("/complete", h.Complete)
 	}
 }
 

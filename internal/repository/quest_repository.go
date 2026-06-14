@@ -57,3 +57,30 @@ func (r *QuestRepository) Count() (int64, error) {
 	err := database.DB.Model(&database.Quest{}).Count(&count).Error
 	return count, err
 }
+
+// CharacterQuest 角色任务进度
+func GetCharacterQuest(characterID, questID uint) (*database.CharacterQuest, error) {
+	var cq database.CharacterQuest
+	err := database.DB.Where("character_id = ? AND quest_id = ?", characterID, questID).First(&cq).Error
+	if err != nil {
+		return nil, err
+	}
+	return &cq, nil
+}
+
+func ListCharacterQuests(characterID uint) ([]database.CharacterQuest, error) {
+	var list []database.CharacterQuest
+	err := database.DB.Where("character_id = ?", characterID).Find(&list).Error
+	return list, err
+}
+
+func UpsertCharacterQuest(cq *database.CharacterQuest) error {
+	var existing database.CharacterQuest
+	err := database.DB.Where("character_id = ? AND quest_id = ?", cq.CharacterID, cq.QuestID).First(&existing).Error
+	if err != nil {
+		return database.DB.Create(cq).Error
+	}
+	existing.Status = cq.Status
+	existing.Progress = cq.Progress
+	return database.DB.Save(&existing).Error
+}

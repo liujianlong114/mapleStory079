@@ -606,18 +606,24 @@ func (h *GameHandler) PlayerAttackMob(c *gin.Context) {
 		h.broadcastLootSpawns(mapID, groundLoots)
 	}
 
+	var questProgress []uint
+	if result.TargetDead && req.MobID > 0 {
+		questProgress = service.DefaultQuestService.RecordMobKill(ch.ID, req.MobID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"damage":       result.Damage,
-		"is_critical":  result.IsCritical,
-		"is_hit":       result.IsHit,
-		"mob_killed":   result.TargetDead,
-		"target_hp":    result.TargetHP,
-		"exp_gained":   result.ExpGained,
-		"mesos_gained": result.MesosGained,
-		"level_up":     result.LevelUp,
-		"message":      result.Message,
-		"ground_loots": groundLoots,
-		"instance_id":  req.InstanceID,
+		"damage":         result.Damage,
+		"is_critical":    result.IsCritical,
+		"is_hit":         result.IsHit,
+		"mob_killed":     result.TargetDead,
+		"target_hp":      result.TargetHP,
+		"exp_gained":     result.ExpGained,
+		"mesos_gained":   result.MesosGained,
+		"level_up":       result.LevelUp,
+		"message":        result.Message,
+		"ground_loots":   groundLoots,
+		"instance_id":    req.InstanceID,
+		"quest_progress": questProgress,
 	})
 }
 

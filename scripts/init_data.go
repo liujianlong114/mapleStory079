@@ -64,7 +64,7 @@ func main() {
 	if err := database.AutoMigrate(
 		&database.Account{}, &database.Character{}, &database.CharacterStats{},
 		&database.CharacterInventory{}, &database.Item{}, &database.Skill{},
-		&database.Quest{}, &database.Map{}, &database.NPC{}, &database.Mob{}, &database.MobDrop{},
+		&database.Quest{}, &database.CharacterQuest{}, &database.Map{}, &database.NPC{}, &database.Mob{}, &database.MobDrop{},
 		&database.Guild{}, &database.Party{}, &database.Friend{},
 		&database.LoginLog{}, &database.TradeLog{}, &database.ChatLog{},
 	); err != nil {

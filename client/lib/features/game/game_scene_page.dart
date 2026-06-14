@@ -11,7 +11,7 @@ import '../../services/websocket_service.dart';
 import '../../widgets/maple_game_panels.dart';
 import '../../widgets/maple_mini_map.dart';
 import '../../widgets/maple_status_bar.dart';
-import '../../widgets/npc_dialogue_widget.dart';
+import '../../widgets/maple_npc_dialogue.dart';
 import '../../game/engine/game_controls.dart';
 import '../../game/engine/game_world.dart';
 import '../../game/engine/map_life_loader.dart';
@@ -317,13 +317,22 @@ class _GameScenePageState extends State<GameScenePage> {
       });
       return;
     }
-    showNPCDialogue(
+    showServerNpcDialogue(
       context,
-      npcName: npc.npcName,
-      dialogue: npc.dialogue.isNotEmpty
-          ? npc.dialogue
-          : '你好，冒险者！',
-      options: const ['再见'],
+      npcId: npc.npcId,
+      characterId: widget.characterId,
+      onEffects: (effects) {
+        if (effects == null || !mounted) return;
+        final gp = context.read<GameProvider>();
+        if (effects['exp_gained'] != null || effects['new_mesos'] != null) {
+          gp.loadCharacterState(widget.characterId);
+        }
+        if (effects['level_up'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('恭喜升级！')),
+          );
+        }
+      },
     );
   }
 

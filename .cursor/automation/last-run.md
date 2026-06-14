@@ -1,23 +1,30 @@
-# 自动推进进度 — 2026-06-14 首轮
+# 自动推进进度 — 2026-06-14 18:20
 
 ## 本轮完成
-- [x] 创建 Cursor 定时 Automation（每 30 分钟，`*/30 * * * *`），已打开 Glass 编辑器待你确认保存
-- [x] 本地循环脚本 `.cursor/automation/local-loop.sh`（30 分钟健康检查 + 计划缺口记录）
-- [x] 导出 UIWindow 窗口贴图 40 张 → `client/assets/images/ui/windows/`
-- [x] 游戏内 WZ 叠加面板：背包/装备/属性/技能（`maple_game_panels.dart`），不再跳转 Material 全屏页
-- [x] 状态栏 EXP 条宽度修正为 WZ 实际 340px；装备键与背包键分离
-- [x] 物品图标导出脚本 `extract_item_icons.py`（Consume/Etc 路径已对齐 079 分卷规则）
+- [x] **彩虹岛新手任务链（服务端 + 客户端）**
+  - `CharacterQuest` 表 + `QuestService`（接取/完成/击杀进度）
+  - 希娜(2101)/莎丽(2100) 任务对话脚本：1000 借镜子 → 1001 还镜子 → 400001 击退蜗牛
+  - API：`POST /quests/accept`、`/quests/complete`、`GET /quests/character/:id`
+  - 击杀蜗牛时 `player-attack-mob` 自动更新任务进度
+  - 客户端 `maple_npc_dialogue.dart`：服务端多轮对话，游戏内与 NPC 交互走 API
+- [x] **物品图标提取**：`extract_item_icons.py` 装备类增加 Install + Character/Weapon 多路径探测
+- [x] Go 自检：`go build ./cmd/server` ✅、`go test ./internal/service -run Quest` ✅
 
-## 下轮优先（按 PROJECT_PLAN §11）
-1. 地图 1000000：补全 enH0/enV0/edU 真实贴图或确认 fallback 视觉可接受；脚点与 spawn/NPC/portal 验收
-2. 物品贴图：装备类 Install 分卷路径探测 + 彩虹岛任务道具 403xxxx
-3. 彩虹岛任务链：希娜对话 → 接任务 → 打蜗牛经验 → 南门传送（对照 ms079 Java Handler）
-4. HUD 细调：quickSlot 快捷栏、聊天条、商城/菜单按钮 hover 态
+## 下轮优先（按 PROJECT_PLAN §11.2）
+1. 地图 1000000：enH0/enV0 真实贴图 + spawn/NPC/portal 脚点验收
+2. 本地有 WZ 时运行 `extract_item_icons.py --client … --force` 补 1302000 等装备图标
+3. HUD 细调：quickSlot 快捷栏、聊天条、按钮 hover 态
+4. 任务链延伸：1005 传递信件（蘑菇村玛利亚→路卡斯）
 
 ## 自检
-- backend :8080 — 200
-- frontend :5173 — 200
+- backend :8080 — **未启动**（云环境无 MySQL/apt 权限，需在本地 `go run cmd/server`）
+- frontend :5173 — **未启动**（云环境无 Flutter，需本地 `flutter run -d chrome --web-port=5173`）
+- `go build ./cmd/server` — ✅
+- `flutter analyze` — 跳过（无 Flutter SDK）
 
-## 操作提示
-- Glass Automations 里确认 cron 已启用并保存（需登录 GitHub repo `liujianlong114/mapleStory079`）
-- 游戏内按 I/装备键/属性键/技能键打开 WZ 面板；Cmd+Shift+R 强刷看新贴图
+## 游戏内验证步骤
+1. 登录 test/test123456 → 选角进彩虹村
+2. 与希娜对话 →「接受任务：借来莎丽的镜子」
+3. 与莎丽对话 →「向莎丽借镜子」
+4. 回希娜 →「交给希娜镜子」（获 EXP/金币）
+5. 希娜 →「接受任务：击退蜗牛」→ 南门外出打 10 只蜗牛 → 回希娜报告
