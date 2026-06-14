@@ -175,7 +175,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
               bottom: c.bottom,
               shoes: c.shoes,
               weapon: c.weapon,
-              scale: 0.95,
+              scale: 1.35,
             ),
             const SizedBox(height: 4),
             Container(

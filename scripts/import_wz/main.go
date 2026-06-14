@@ -1,4 +1,4 @@
-// WZ XML 批量导入：从 examples/ZLHSS2/wz 解析 Mob/Npc/Item/Sound 元数据，
+// WZ XML 批量导入：从外部 ZLHSS2/wz 解析 Mob/Npc/Item/Sound 元数据，
 // 生成 client/assets 占位 PNG/WAV，并输出 manifest.json。
 //
 // 用法:
@@ -21,12 +21,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	ext "mapleStory079/scripts/lib"
 )
 
 var (
-	wzRoot  = flag.String("wz-root", "examples/ZLHSS2/wz", "WZ XML 根目录")
+	wzRoot  = flag.String("wz-root", "", "WZ XML 根目录（默认外部 ZLHSS2）")
 	outRoot = flag.String("out", "client/assets", "输出资源目录")
-	image2  = flag.String("image2", "examples/ZLHSS2/src/image2", "已有 PNG 图标目录")
+	image2  = flag.String("image2", "", "已有 PNG 图标目录")
 )
 
 type manifest struct {
@@ -61,6 +63,14 @@ var soundRe = regexp.MustCompile(`<sound name="([^"]+)"`)
 
 func main() {
 	flag.Parse()
+	wz := *wzRoot
+	if wz == "" {
+		wz = ext.ZLHSS2WzDir()
+	}
+	img2 := *image2
+	if img2 == "" {
+		img2 = filepath.Join(ext.ExternalRoot(), ext.DirZLHSS2, "src", "image2")
+	}
 	m := manifest{
 		Mobs:   make(map[string]mobEntry),
 		NPCs:   make(map[string]npcEntry),
@@ -103,7 +113,7 @@ func main() {
 }
 
 func importMobs(m *manifest) int {
-	mobDir := filepath.Join(*wzRoot, "Mob.wz")
+	mobDir := filepath.Join(wz, "Mob.wz")
 	entries, err := os.ReadDir(mobDir)
 	if err != nil {
 		fmt.Printf("  [warn] Mob.wz 不可用: %v\n", err)
@@ -142,7 +152,7 @@ func importMobs(m *manifest) int {
 }
 
 func importNPCs(m *manifest) int {
-	npcDir := filepath.Join(*wzRoot, "Npc.wz")
+	npcDir := filepath.Join(wz, "Npc.wz")
 	entries, err := os.ReadDir(npcDir)
 	if err != nil {
 		fmt.Printf("  [warn] Npc.wz 不可用: %v\n", err)
@@ -180,8 +190,8 @@ func importNPCs(m *manifest) int {
 func importItems(m *manifest) int {
 	count := 0
 	// 从 image2 复制数字文件名的 PNG
-	if st, err := os.Stat(*image2); err == nil && st.IsDir() {
-		entries, _ := os.ReadDir(*image2)
+	if st, err := os.Stat(img2); err == nil && st.IsDir() {
+		entries, _ := os.ReadDir(img2)
 		for _, e := range entries {
 			if !strings.HasSuffix(strings.ToLower(e.Name()), ".png") {
 				continue
@@ -190,7 +200,7 @@ func importItems(m *manifest) int {
 			if _, err := strconv.Atoi(base); err != nil {
 				continue
 			}
-			src := filepath.Join(*image2, e.Name())
+			src := filepath.Join(img2, e.Name())
 			dst := filepath.Join(*outRoot, "sprites/item", e.Name())
 			if err := copyFile(src, dst); err == nil {
 				m.Items[base] = itemEntry{Source: "copied", Path: "sprites/item/" + e.Name()}
@@ -199,7 +209,7 @@ func importItems(m *manifest) int {
 		}
 	}
 	// Item.wz 仅记录 ID（无内嵌 PNG）
-	itemDir := filepath.Join(*wzRoot, "Item.wz")
+	itemDir := filepath.Join(wz, "Item.wz")
 	filepath.WalkDir(itemDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".img.xml") {
 			return nil
@@ -222,7 +232,7 @@ func importItems(m *manifest) int {
 }
 
 func importSound(m *manifest) int {
-	soundDir := filepath.Join(*wzRoot, "Sound.wz")
+	soundDir := filepath.Join(wz, "Sound.wz")
 	entries, err := os.ReadDir(soundDir)
 	if err != nil {
 		fmt.Printf("  [warn] Sound.wz 不可用: %v\n", err)

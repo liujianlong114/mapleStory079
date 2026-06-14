@@ -1,7 +1,5 @@
-import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
@@ -12,15 +10,17 @@ import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
 import '../../widgets/player_stats.dart';
 import '../../widgets/mini_map.dart';
+import '../../game/engine/game_controls.dart';
 import '../../game/engine/game_world.dart';
 import '../../models/mob.dart';
-import '../../core/theme/app_theme.dart';
+import 'key_config_dialog.dart';
 
 class GameScenePage extends StatefulWidget {
   final int mapId;
   final String mapName;
   final double mapWidth;
   final double mapHeight;
+  final double groundY;
   final int characterId;
   final int jobId;
   final int initialHp;
@@ -33,14 +33,24 @@ class GameScenePage extends StatefulWidget {
   final int initialDex;
   final int initialIntl;
   final int initialLuk;
+  final double initialPosX;
+  final double initialPosY;
   final String? bgmAsset;
+  final int playerGender;
+  final int playerFace;
+  final int playerHair;
+  final int playerTop;
+  final int playerBottom;
+  final int playerShoes;
+  final int playerWeapon;
 
   const GameScenePage({
     super.key,
     required this.mapId,
     required this.mapName,
     this.mapWidth = 1600,
-    this.mapHeight = 900,
+    this.mapHeight = 600,
+    this.groundY = 605,
     this.characterId = 1,
     this.jobId = 0,
     this.initialHp = 50,
@@ -53,7 +63,16 @@ class GameScenePage extends StatefulWidget {
     this.initialDex = 4,
     this.initialIntl = 4,
     this.initialLuk = 4,
+    this.initialPosX = 400,
+    this.initialPosY = 605,
     this.bgmAsset,
+    this.playerGender = 0,
+    this.playerFace = 20100,
+    this.playerHair = 30000,
+    this.playerTop = 0,
+    this.playerBottom = 0,
+    this.playerShoes = 0,
+    this.playerWeapon = 0,
   });
 
   @override
@@ -63,12 +82,11 @@ class GameScenePage extends StatefulWidget {
 class _GameScenePageState extends State<GameScenePage> {
   late final GameWorld _gameWorld;
   late final WebSocketService _ws;
-  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    GameControls.ensureLoaded();
     _ws = WebSocketService();
     _gameWorld = GameWorld(
       mapId: widget.mapId,
@@ -77,12 +95,20 @@ class _GameScenePageState extends State<GameScenePage> {
       mapHeight: widget.mapHeight,
       characterId: widget.characterId,
       jobId: widget.jobId,
+      playerInitial: Vector2(widget.initialPosX, widget.groundY),
       str: widget.initialStr,
       dex: widget.initialDex,
       intelligence: widget.initialIntl,
       luk: widget.initialLuk,
       exp: widget.initialExp,
       bgmAsset: widget.bgmAsset,
+      playerGender: widget.playerGender,
+      playerFace: widget.playerFace,
+      playerHair: widget.playerHair,
+      playerTop: widget.playerTop,
+      playerBottom: widget.playerBottom,
+      playerShoes: widget.playerShoes,
+      playerWeapon: widget.playerWeapon,
     );
     _gameWorld.ws = _ws;
     _gameWorld.api = ApiService();
@@ -92,10 +118,11 @@ class _GameScenePageState extends State<GameScenePage> {
     _gameWorld.maxMp = widget.initialMaxMp;
     _gameWorld.level = widget.initialLevel;
     _setupStatSync();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-      _connectWebSocket();
-      _spawnServerEntities();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _connectWebSocket();
+      await _gameWorld.mapReady;
+      if (!mounted) return;
+      await _spawnServerEntities();
     });
   }
 
@@ -110,7 +137,6 @@ class _GameScenePageState extends State<GameScenePage> {
   @override
   void dispose() {
     _ws.disconnect();
-    _focusNode.dispose();
     super.dispose();
   }
 
@@ -151,6 +177,9 @@ class _GameScenePageState extends State<GameScenePage> {
     _gameWorld.onInventoryChanged = () {
       inv.loadInventory(widget.characterId);
     };
+    _gameWorld.onOpenKeyConfig = () {
+      if (mounted) KeyConfigDialog.show(context);
+    };
   }
 
   Future<void> _spawnServerEntities() async {
@@ -161,6 +190,7 @@ class _GameScenePageState extends State<GameScenePage> {
         final instanceId = (row['instance_id'] as num?)?.toInt() ?? 0;
         final templateId = (row['template_id'] as num?)?.toInt() ?? 0;
         if (instanceId == 0 || templateId == 0) continue;
+        final x = (row['x'] as num?)?.toDouble() ?? widget.mapWidth / 2;
         final mob = Mob(
           id: instanceId,
           mobId: templateId,
@@ -172,27 +202,43 @@ class _GameScenePageState extends State<GameScenePage> {
           defense: 0,
           expReward: 0,
           mesoReward: 0,
-          posX: (row['x'] as num?)?.toDouble() ?? widget.mapWidth / 2,
-          posY: (row['y'] as num?)?.toDouble() ?? widget.mapHeight / 2,
+          posX: x,
+          posY: 0,
+          rx0: (row['rx0'] as num?)?.toDouble() ?? (x - 100),
+          rx1: (row['rx1'] as num?)?.toDouble() ?? (x + 100),
+          spawnY: 0,
+          speed: (row['speed'] as num?)?.toInt() ?? 60,
         );
-        _gameWorld.addMob(
-          mob,
-          position: Vector2(mob.posX, mob.posY),
-        );
+        _gameWorld.addMob(mob, position: Vector2(x, 0));
       }
     } else {
       _spawnFallbackMobs();
     }
-    _gameWorld.addNPC(
-      id: 1,
-      name: '卡姆伊',
-      position: Vector2(widget.mapWidth / 2 - 200, widget.mapHeight / 2),
-    );
+    final npcs = await api.getNPCsByMap(widget.mapId);
+    if (npcs.isNotEmpty) {
+      for (final row in npcs) {
+        final id = (row['id'] as num?)?.toInt() ?? (row['npc_id'] as num?)?.toInt() ?? 0;
+        final name = row['name'] as String? ?? 'NPC';
+        final x = (row['pos_x'] as num?)?.toDouble() ??
+            (row['position_x'] as num?)?.toDouble() ??
+            (row['x'] as num?)?.toDouble() ??
+            widget.mapWidth / 2;
+        if (id == 0) continue;
+        _gameWorld.addNPC(id: id, name: name, position: Vector2(x, 0));
+      }
+    } else if (widget.mapId == 1000000 || widget.mapId == 10000) {
+      _gameWorld.addNPC(
+        id: 12000,
+        name: '希娜',
+        position: Vector2(400, 0),
+      );
+    }
   }
 
   void _spawnFallbackMobs() {
     for (int i = 0; i < 5; i++) {
       final template = MobCatalog.templates[i % MobCatalog.templates.length];
+      final x = (widget.mapWidth / 2) + (i - 2) * 140;
       final mob = Mob(
         id: 10000 + i,
         mobId: template.mobId,
@@ -204,73 +250,87 @@ class _GameScenePageState extends State<GameScenePage> {
         defense: template.defense,
         expReward: template.expReward,
         mesoReward: template.mesoReward,
-        posX: (widget.mapWidth / 2) + (i - 2) * 140,
-        posY: (widget.mapHeight / 2) + (i % 2 == 0 ? -60 : 60),
+        posX: x,
+        posY: 0,
+        rx0: x - 100,
+        rx1: x + 100,
+        spawnY: 0,
+        speed: 60,
+        attackRange: template.attackRange,
+        attackCooldown: template.attackCooldown,
       );
       _gameWorld.addMob(mob);
     }
   }
 
-  void _onAttack() {
-    _gameWorld.playerAttack();
-  }
-
-  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent) {
-      _gameWorld.handleKeyDown(event.logicalKey, true);
-      if (event.logicalKey == LogicalKeyboardKey.keyJ ||
-          event.logicalKey == LogicalKeyboardKey.space) {
-        _onAttack();
-      }
-    } else if (event is KeyUpEvent) {
-      _gameWorld.handleKeyDown(event.logicalKey, false);
-    }
-    return KeyEventResult.handled;
+  void _openMenu(String route) {
+    Navigator.pushNamed(context, route);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.dark.scaffoldBackgroundColor,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           Positioned.fill(
-            child: Focus(
-              focusNode: _focusNode,
+            child: GameWidget(
+              game: _gameWorld,
               autofocus: true,
-              onKeyEvent: _onKeyEvent,
-              child: GameWidget(
-                game: _gameWorld,
-                backgroundBuilder: (_) => Container(
-                  color: const Color(0xFF1a1a2e),
+              backgroundBuilder: (_) => Container(color: const Color(0xFF87CEEB)),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 88,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0),
+                      Colors.black.withValues(alpha: 0.55),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
           const Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
+            top: 8,
+            left: 8,
+            right: 8,
             child: PlayerStatsBar(),
           ),
           Positioned(
-            top: 44,
-            right: 10,
+            top: 8,
+            right: 8,
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.menu, color: Colors.white),
-              onSelected: (route) => Navigator.pushNamed(context, route),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: Routes.inventory, child: Text('背包')),
-                PopupMenuItem(value: Routes.skills, child: Text('技能')),
-                PopupMenuItem(value: Routes.chat, child: Text('聊天')),
-                PopupMenuItem(value: Routes.combat, child: Text('战斗测试')),
-                PopupMenuItem(value: Routes.social, child: Text('社交')),
+              icon: const Icon(Icons.settings, color: Color(0xFFFFD54F), size: 22),
+              color: const Color(0xFF1a1208),
+              onSelected: (value) {
+                if (value == 'keys') {
+                  KeyConfigDialog.show(context);
+                } else {
+                  _openMenu(value);
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'keys', child: Text('键盘设置')),
+                const PopupMenuItem(value: Routes.inventory, child: Text('背包 (I)')),
+                const PopupMenuItem(value: Routes.skills, child: Text('技能')),
+                const PopupMenuItem(value: Routes.chat, child: Text('聊天')),
+                const PopupMenuItem(value: Routes.social, child: Text('社交')),
               ],
             ),
           ),
           Positioned(
-            top: 80,
-            right: 10,
+            top: 72,
+            right: 8,
             child: MiniMapWidget(
               mapWidth: widget.mapWidth.toInt(),
               mapHeight: widget.mapHeight.toInt(),
@@ -280,67 +340,16 @@ class _GameScenePageState extends State<GameScenePage> {
             ),
           ),
           Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _onAttack,
-                    icon: const Icon(Icons.bolt),
-                    label: const Text('攻击 [J]'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFe94560),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _gameWorld.playerUseSkill(1);
-                    },
-                    icon: const Icon(Icons.auto_fix_high),
-                    label: const Text('技能 1'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFe94560)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 4,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                ),
-                child: Text(
-                  widget.mapName,
-                  style: const TextStyle(
-                    color: Colors.amberAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
+            bottom: 12,
+            left: 12,
+            right: 12,
+            child: Text(
+              GameControls.hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 11,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
               ),
             ),
           ),

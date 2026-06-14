@@ -1,429 +1,509 @@
-# 冒险岛079复刻项目技术方案
-
-## 项目概述
-
-本项目旨在完整复刻国服冒险岛Online 079版本，包括登录界面音乐、游戏贴图、所有功能玩法，实现一比一还原。
-
-## 技术栈架构
-
-### 后端服务 (Golang + Gin)
-
-#### 核心框架
-- **Web框架**: Gin (高性能HTTP框架)
-- **ORM框架**: GORM (类似Hibernate的自动建表功能)
-- **数据库**: MySQL 8.0+
-- **缓存**: Redis 6.0+
-- **消息队列**: RabbitMQ (可选，用于异步任务处理)
-
-#### 数据库设计原则
-采用GORM的AutoMigrate功能，实现：
-- 启动时自动检测表结构
-- 自动创建不存在的表
-- 自动添加缺失的字段
-- 自动修正字段类型
-- 保留现有数据，不删除字段
-
-#### 服务架构
-```
-mapleStory079/
-├── cmd/                    # 应用入口
-│   └── server/
-│       └── main.go
-├── internal/               # 私有应用代码
-│   ├── handler/           # HTTP处理器
-│   ├── service/           # 业务逻辑层
-│   ├── repository/        # 数据访问层
-│   ├── model/             # 数据模型
-│   └── middleware/        # 中间件
-├── pkg/                    # 公共库
-│   ├── database/          # 数据库连接
-│   ├── cache/             # 缓存封装
-│   └── utils/             # 工具函数
-├── config/                 # 配置文件
-├── scripts/                # 脚本文件
-└── sql/                     # SQL文件
-```
-
-#### 核心模块
-1. **登录服务器** (Login Server)
-   - 账号验证
-   - 角色选择
-   - 服务器列表
-
-2. **游戏服务器** (Game Server)
-   - 角色管理
-   - 地图系统
-   - 战斗系统
-   - 物品系统
-   - 技能系统
-   - 任务系统
-   - 交易系统
-   - 社交系统
-
-3. **聊天服务器** (Chat Server)
-   - 世界频道
-   - 私聊
-   - 组队聊天
-   - 公会聊天
-
-### 客户端 (Flutter)
-
-#### 核心技术
-- **框架**: Flutter 3.x
-- **语言**: Dart
-- **状态管理**: Riverpod/Provider
-- **网络请求**: Dio
-- **本地存储**: Hive/SQLite
-- **游戏引擎**: Flame (2D游戏引擎)
-
-#### 支持平台
-- Android
-- iOS
-- Web
-- Windows
-- macOS
-- Linux
-
-#### 客户端架构
-```
-maple_client/
-├── lib/
-│   ├── main.dart
-│   ├── app/
-│   │   ├── app.dart
-│   │   └── routes.dart
-│   ├── core/
-│   │   ├── network/
-│   │   ├── storage/
-│   │   └── constants/
-│   ├── features/
-│   │   ├── login/
-│   │   ├── character/
-│   │   ├── game/
-│   │   └── social/
-│   ├── shared/
-│   │   ├── widgets/
-│   │   └── utils/
-│   └── data/
-│       ├── models/
-│       ├── repositories/
-│       └── datasources/
-├── assets/
-│   ├── images/
-│   ├── audio/
-│   └── fonts/
-└── pubspec.yaml
-```
-
-#### 核心功能模块
-1. **登录模块**
-   - 账号登录
-   - 角色创建/选择
-   - 服务器选择
-
-2. **游戏场景**
-   - 地图渲染
-   - 角色移动
-   - NPC交互
-   - 怪物AI
-   - 技能特效
-
-3. **UI系统**
-   - 主界面
-   - 背包系统
-   - 技能栏
-   - 任务追踪
-   - 聊天窗口
-
-4. **音效系统**
-   - BGM播放
-   - 音效播放
-   - 语音聊天
-
-## 游戏资源
-
-### WZ文件结构
-冒险岛的游戏资源存储在WZ文件中，主要包括：
-
-1. **Base.wz** - 基础资源
-2. **Character.wz** - 角色相关资源
-3. **Effect.wz** - 特效资源
-4. **Item.wz** - 物品资源
-5. **Map.wz** - 地图资源
-6. **Mob.wz** - 怪物资源
-7. **Npc.wz** - NPC资源
-8. **Quest.wz** - 任务资源
-9. **Skill.wz** - 技能资源
-10. **Sound.wz** - 音效资源
-11. **String.wz** - 字符串资源
-12. **UI.wz** - 界面资源
-
-### 资源解析
-需要开发WZ文件解析器，支持：
-- 读取WZ文件格式
-- 解析图片资源
-- 解析音频资源
-- 解析配置数据
-
-## 数据库设计
-
-### 核心表结构
-
-#### 账号相关
-- `accounts` - 账号表
-- `characters` - 角色表
-- `character_stats` - 角色属性表
-- `character_inventory` - 角色背包表
-
-#### 游戏数据
-- `items` - 物品表
-- `skills` - 技能表
-- `quests` - 任务表
-- `maps` - 地图表
-- `npcs` - NPC表
-- `mobs` - 怪物表
-
-#### 社交系统
-- `guilds` - 公会表
-- `parties` - 组队表
-- `friends` - 好友表
-
-#### 日志系统
-- `login_logs` - 登录日志
-- `trade_logs` - 交易日志
-- `chat_logs` - 聊天日志
-
-## 网络协议
-
-### 数据包格式
-```
-[Header][Length][Opcode][Data]
-- Header: 2字节 (0x00 0x00)
-- Length: 2字节
-- Opcode: 2字节
-- Data: 变长数据
-```
-
-### 加密方式
-- AES加密
-- 自定义加密算法
-- 数据包混淆
-
-### 核心操作码
-- 登录相关: 0x0001 - 0x0010
-- 角色操作: 0x0011 - 0x0020
-- 移动相关: 0x0021 - 0x0030
-- 战斗相关: 0x0031 - 0x0040
-- 物品相关: 0x0041 - 0x0050
-- 技能相关: 0x0051 - 0x0060
-
-## 开发计划
-
-### 第一阶段：基础架构 (2周)
-- [ ] 搭建Gin后端框架
-- [ ] 配置GORM自动建表
-- [ ] 实现基础数据库模型
-- [ ] 搭建Flutter客户端框架
-- [ ] 实现网络通信模块
-
-### 第二阶段：登录系统 (2周)
-- [ ] 实现账号注册/登录
-- [ ] 实现角色创建/选择
-- [ ] 实现服务器列表
-- [ ] 客户端登录界面开发
-
-### 第三阶段：游戏核心 (4周)
-- [ ] 地图系统
-- [ ] 角色移动
-- [ ] NPC交互
-- [ ] 物品系统
-- [ ] 背包系统
-
-### 第四阶段：战斗系统 (3周)
-- [ ] 怪物AI
-- [ ] 战斗逻辑
-- [ ] 技能系统
-- [ ] 伤害计算
-
-### 第五阶段：社交系统 (2周)
-- [ ] 聊天系统
-- [ ] 组队系统
-- [ ] 公会系统
-- [ ] 好友系统
-
-### 第六阶段：任务系统 (2周)
-- [ ] 任务框架
-- [ ] 任务脚本
-- [ ] 任务追踪
-- [ ] 任务奖励
-
-### 第七阶段：优化与测试 (2周)
-- [ ] 性能优化
-- [ ] 内存优化
-- [ ] 网络优化
-- [ ] 全面测试
-
-## 开源资源参考
-
-### 服务端项目
-1. **HeavenMS** (Java)
-   - GitHub: https://github.com/ronancpl/HeavenMS
-   - 描述: MapleStory v83服务器模拟器，功能完整
-   - 特点: 代码结构清晰，文档完善
-
-2. **ZLHSS2** (Java)
-   - GitHub: https://github.com/huangshushu/ZLHSS2
-   - 描述: 冒险岛079服务端，中文项目
-   - 特点: 包含客户端和工具包
-
-3. **cc-079-ms** (Java)
-   - Gitee: https://gitee.com/mmchichi/cc-079-ms
-   - 描述: 完全开源的079冒险岛模拟器
-   - 特点: 基于Java17，使用Graal-Js引擎
-
-4. **Cosmic** (Java)
-   - GitHub: https://github.com/P0nk/Cosmic
-   - 描述: MapleStory Global v83服务器模拟器
-   - 特点: 继承了OdinMS和HeavenMS的代码
-
-### 客户端项目
-1. **HeavenClient**
-   - GitHub: https://github.com/ryantpayton/HeavenClient
-   - 描述: HeavenMS配套客户端源码
-
-### 资源文件
-- WZ文件解析器
-- 客户端资源提取工具
-- 地图编辑器
-- NPC脚本编辑器
-
-## 技术难点
-
-### 1. WZ文件解析
-- 需要理解WZ文件格式
-- 图片解码（多种格式）
-- 音频解码
-- 数据结构解析
-
-### 2. 游戏逻辑
-- 复杂的战斗系统
-- 技能效果实现
-- 怪物AI逻辑
-- 任务脚本系统
-
-### 3. 网络同步
-- 实时游戏状态同步
-- 延迟优化
-- 防作弊机制
-
-### 4. 性能优化
-- 大量玩家在线
-- 地图数据加载
-- 资源内存管理
-
-## 风险评估
-
-### 法律风险
-⚠️ **重要提示**: 本项目仅供学习研究使用
-- 冒险岛是Nexon公司的注册商标
-- 游戏资源受版权保护
-- 不得用于商业用途
-- 不得侵犯原作版权
-
-### 技术风险
-- 协议逆向难度大
-- 游戏逻辑复杂
-- 资源文件庞大
-- 性能要求高
-
-## 开发环境
-
-### 后端环境
-- Go 1.21+
-- MySQL 8.0+
-- Redis 6.0+
-- Docker (可选)
-
-### 客户端环境
-- Flutter 3.x
-- Dart 3.x
-- Android Studio / VS Code
-
-### 开发工具
-- Git
-- Postman (API测试)
-- MySQL Workbench
-- Redis Desktop Manager
-
-## 部署方案
-
-### Docker部署
-```yaml
-version: '3.8'
-services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: maplestory
-    ports:
-      - "3306:3306"
-  
-  redis:
-    image: redis:6.0
-    ports:
-      - "6379:6379"
-  
-  login-server:
-    build: ./login-server
-    ports:
-      - "8484:8484"
-  
-  game-server:
-    build: ./game-server
-    ports:
-      - "7575:7575"
-```
-
-### Kubernetes部署
-- 使用K8s进行容器编排
-- 支持水平扩展
-- 负载均衡
-- 服务发现
-
-## 后续规划
-
-### 功能扩展
-- [ ] 更多职业支持
-- [ ] 更多地图开放
-- [ ] 活动系统
-- [ ] 商城系统
-- [ ] 排行榜
-
-### 性能优化
-- [ ] 数据库分库分表
-- [ ] 缓存优化
-- [ ] 网络优化
-- [ ] 资源预加载
-
-### 运维监控
-- [ ] 日志系统
-- [ ] 监控告警
-- [ ] 自动化部署
-- [ ] 性能分析
-
-## 贡献指南
-
-欢迎开发者贡献代码，但请遵守以下原则：
-1. 仅供学习研究使用
-2. 不得用于商业用途
-3. 尊重原作版权
-4. 遵守开源协议
-
-## 许可证
-
-本项目采用 MIT 许可证，仅供学习和研究使用。
+# MapleStory 079 复刻项目计划
+
+> **用途**：以官方 079 客户端 WZ 资源 + `ms079-main` 服务端逻辑为基准，指导后续所有客户端/服务端/资源改动。  
+> **原则**：业务规则跟 Java 源码，画面跟 WZ，**不手搓假 UI**（禁止再用 `build_login_scene` 生成街机框背景）。  
+> **最后更新**：2026-06-14
 
 ---
 
-**注意**: 本文档会随着项目进展持续更新。
+## 1. 项目目标
+
+| 维度 | 目标 |
+|------|------|
+| 视觉 | 登录 MapLogin2 视差、选角 WZ UI、进图 WZ 地图 back / 精灵 |
+| 操作 | 079 键位：←→ 移动、Ctrl 攻击、Z 拾取、Alt 跳跃（跳跃待实现） |
+| 逻辑 | 创角白名单、禁名、初始 MP=50、出生图、装备 seed 与 ms079 一致 |
+| 传输 | HTTP JSON REST + WebSocket（**非**原版 TCP Opcode，规则仍对照原版） |
+
+**不做的事**：反编译 `MapleStory.exe` 还原 C++ 源码；100% 复刻 TCP 封包与频道服分离架构。
+
+---
+
+## 2. 官方基准客户端
+
+### 2.1 主客户端（资源提取源）
+
+| 项 | 路径 |
+|----|------|
+| 安装包 | `~/Downloads/冒险岛079/079客户端.exe`（NSIS） |
+| 解压目录 | `~/Downloads/冒险岛079/extracted_client` |
+| 外部副本 | `../mapleStory079-external/03-★maple-client-ingest工作目录-WZ副本-脚本自动复制`（ingest 时复制 WZ） |
+
+详见仓库内 `EXTERNAL_REF.md` 与 `../mapleStory079-external/README.md`。
+
+**验证特征**：`MapleStory.exe` 含 `NEXON Corp.`；WZ 日期约 2010-01；含完整 `Map.wz`（664MB）、`Character.wz`、`Mob.wz`、`UI.wz`、`Sound.wz`。
+
+### 2.2 补充客户端（缺项回填）
+
+| 用途 | 路径 |
+|------|------|
+| `grassySoil` 地图 back | `../mapleStory079-external/01-MAX3怀旧岛-…` 或 `03-★maple-client/extracted/max3/…/Data/Map/Back/grassySoil.img` |
+| Logo / Obj 等（若主客户端缺） | 同上 MAX3 Data 目录 |
+
+> 官方 `extracted_client/Map.wz/Back/` **不含** `grassySoil.img`，但 `Map/Map0/000010000.img` 的 back 层仍引用 `bS=grassySoil`，必须用 MAX3 Data 补 PNG。
+
+### 2.3 逻辑与 XML 参照（不提取贴图，只对照规则）
+
+| 用途 | 路径 |
+|------|------|
+| Java 服务端逻辑 | `../mapleStory079-external/02-★ms079-main-…/src/main/java/` |
+| WZ XML（坐标/禁名/布局） | `../mapleStory079-external/02-★ms079-main-…/wz/` |
+| 登录管线详解 | `docs/MS079_LOGIN_PIPELINE.md` |
+| 架构说明 | `docs/ARCHITECTURE.md` |
+| 对齐清单（简表） | `docs/MS079_OFFICIAL_ALIGNMENT.md` |
+
+---
+
+## 3. 技术栈（当前实现）
+
+```
+Flutter Web (Flame)  ←HTTP/WS→  Go + Gin  ←→  MySQL + Redis
+     :5173                        :8080
+```
+
+| 层 | 技术 |
+|----|------|
+| 客户端 | Flutter 3.x、Flame、Provider、audioplayers |
+| 服务端 | Go 1.21+、GORM AutoMigrate、Gin |
+| 资源提取 | Python wz-python（`.cache/wz-python`）、Go wzexplorer 脚本 |
+
+---
+
+## 4. 官方流程 vs 本项目流程
+
+### 4.1 原版 TCP 流程（ms079-main）
+
+```
+HELLO → 登录 → [性别] → 服务器列表 → 频道 → 角色列表
+  → [RaceSelect] → [NewChar] → 选角 → 进频道 TCP → 进图
+```
+
+### 4.2 本项目 REST + Flutter 流程
+
+```
+/login          LoginPage           账号密码 → POST /auth/login
+/gender         GenderPage          未设性别 → POST /auth/gender
+/world-select   WorldSelectPage     选世界/频道（简化 UI）
+/character-select CharacterSelectPage GET /characters → 选/删/进游戏
+/race-select    RaceSelectPage      创建角色前置（仅冒险家可用）
+/new-char       NewCharPage         POST /characters
+/game-scene     GameSceneLoader     WS + Flame GameWorld
+```
+
+**路由定义**：`client/lib/main.dart` → `Routes.*`
+
+### 4.3 登录场景与 MapLogin2 镜头
+
+所有登录屏统一 **800×600**，背景用 `MapLoginParallax` + `client/assets/scenes/maplogin2_layers.json`，**不用**合成 PNG 整屏背景。
+
+| 场景 JSON | 页面 | use_parallax | parallax_camera (x, y) | 说明 |
+|-----------|------|--------------|------------------------|------|
+| `login_title.json` | 标题 | true | (22, -1785) | Logo 动画 + 登录/离开按钮 |
+| `login_gender.json` | 性别 | true | (22, -1785) | Gender 面板叠加 |
+| `login_worldselect.json` | 选世界 | true | (22, -1785) | chBackgrn 装饰 |
+| `login_charselect.json` | 选角 | true | (290, -1220) | 3 槽 + 选择/建立/删除 |
+| `login_raceselect.json` | 选种族 | true | (290, -1220) | 创建流程 |
+| `login_newchar.json` | 创建 | true | (290, -1431) | NewChar WZ 面板 |
+
+Manifest 由 `scripts/export_login_manifest/main.go` 生成；**勿运行** `scripts/build_login_scene/main.go`。
+
+**核心客户端文件**：
+
+| 文件 | 职责 |
+|------|------|
+| `client/lib/features/maple/wz_scene.dart` | 加载 JSON manifest、按钮、槽位、BGM |
+| `client/lib/features/maple/maplogin_parallax.dart` | MapLogin2 视差绘制 + camera 偏移 |
+| `client/lib/core/resources/login_ui_assets.dart` | Login.img 资源路径 |
+
+---
+
+## 5. 进游戏流程
+
+```
+CharacterSelectPage → GameProvider.loadCharacterState
+  → GameSceneLoader（读 MapMeta）
+  → GameScenePage → GameWorld (Flame)
+```
+
+| 步骤 | 官方 | 本项目 |
+|------|------|--------|
+| 地图 ID | 000010000 → 逻辑 1000000 | `pkg/utils/constants.go` `MapTutorialStart=0` 或 seed 彩虹村 |
+| 视口 | 800×600 卷轴 | 横版 750 高，相机仅跟 X |
+| 背景 | Map.wz back 层 + tile + obj | `WzMapLayer` 渲染 back PNG（**无 tile/obj**） |
+| 地面 | foothold 碰撞 | `1000000.json` 83 条 foothold → `MapFootholds.groundYAt(x)` |
+| 操作 | ←→ / Ctrl / Z | `game_controls.dart` |
+| 怪物 | WZ life + 服务端 AI | `data/maplife/*.json` + `mob_sync_service` + WS |
+| 精灵 | Character/Mob WZ | `assets/sprites/{player,mob,npc}/` |
+
+**核心客户端文件**：
+
+| 文件 | 职责 |
+|------|------|
+| `client/lib/game/engine/game_world.dart` | 横版移动、攻击、WS、foothold Y |
+| `client/lib/game/engine/wz_map_layer.dart` | 地图视差 back 层 |
+| `client/lib/game/engine/map_foothold.dart` | foothold 求 Y |
+| `client/lib/game/engine/sprite_loader.dart` | Mob/Npc/Player PNG 加载 |
+| `client/lib/features/maple/maple_avatar_view.dart` | 选角/角色 WZ 部件预览 |
+
+---
+
+## 6. 资源目录总览
+
+```
+client/assets/
+├── audio/
+│   ├── title.mp3              ← Sound.wz BgmUI/Title
+│   ├── title.wav              ← 回退
+│   └── char_select.mp3        ← UI.img CharSelect（可选）
+│
+├── scenes/
+│   ├── login_*.json           ← 登录各屏 manifest（export_login_manifest）
+│   ├── maplogin2_layers.json  ← MapLogin2 视差层（export_maplogin_layers）
+│   └── login_*.png            ← ⚠️ 旧合成图，已弃用，可删
+│
+├── images/ui/login/
+│   ├── btn_*_{normal,over,pressed}.png   ← Login.img 按钮三态
+│   ├── back/00..37.png                   ← Map.wz Back/login.img
+│   ├── logo_0.png, logo_1.png
+│   ├── newchar_*.png, worldselect_*.png
+│   └── panel_backgrnd.png
+│
+├── maps/
+│   ├── 1000000.json           ← 彩虹村：layers + footholds + spawn
+│   └── back/grassySoil/{0,1,2,3,5,6}.png  ← MAX3 补全
+│
+├── sprites/
+│   ├── mob/                   ← Mob.wz stand 帧（ingest 约 5800+）
+│   ├── npc/                   ← Npc.wz
+│   ├── player/                ← Character.wz 组合 avatar（按需/少量）
+│   └── item/                  ← 部分 Item 图标
+│
+├── characters/
+│   ├── parts/                 ← 部件 PNG（extract_parts / avatars）
+│   └── avatars/               ← 预烘焙全身图
+│
+└── images/tiles/              ← 预留，当前几乎为空
+```
+
+**Flutter 注册**：`client/pubspec.yaml` — 子目录必须**逐条**声明（如 `assets/sprites/mob/`），否则 Web 打包后 manifest 为空。
+
+**服务端数据（非 Flutter assets）**：
+
+```
+data/maplife/
+├── 1000000.json    ← 彩虹村 mob spawn（export_map_life）
+├── 1000001.json
+└── 101010000.json
+```
+
+---
+
+## 7. 资源提取管线
+
+### 7.1 一键全量（推荐）
+
+```bash
+# 默认主客户端：~/Downloads/冒险岛079/extracted_client
+./scripts/ingest_full.sh
+
+# 指定路径
+MXD079_CLIENT=/path/to/extracted_client ./scripts/ingest_full.sh
+```
+
+**ingest_full 步骤**：
+
+1. 复制 WZ → `../mapleStory079-external/03-★maple-client-…`
+2. `extract_wz_py/run.sh --full` — 登录 UI、BGM、back/00..37
+3. MAX3 补登录缺项（若有 Data 客户端）
+4. `export_map_from_wz.py` — 彩虹村 JSON + grassySoil PNG（`--back-client MAX3`）
+5. `export_maplogin_layers` / `export_map_life`
+6. Mob/Npc 精灵批量提取
+7. `export_login_manifest` — **不**跑 build_login_scene
+8. `check_assets` 自检
+
+### 7.2 常用单步命令
+
+```bash
+# 仅登录 UI + BGM
+MAPLE_WZ_ROOT=~/Downloads/冒险岛079/extracted_client \
+  scripts/extract_wz_py/run.sh --client "$MAPLE_WZ_ROOT" --full --force
+
+# 彩虹村地图 + foothold + back
+PYTHONPATH=.cache/wz-python .cache/wz-python/.venv/bin/python \
+  scripts/extract_wz_py/export_map_from_wz.py \
+  --client ~/Downloads/冒险岛079/extracted_client \
+  --back-client ../mapleStory079-external/03-★maple-client-…/extracted/max3/…/怀旧岛079MAX3_客户端 \
+  --map 000010000 --map-id 1000000 --force
+
+# 登录 manifest
+go run scripts/export_login_manifest/main.go
+
+# Mob/Npc
+scripts/extract_wz_py/run.sh --client "$MAPLE_WZ_ROOT" --mobs-npcs --all --force
+
+# 资源自检
+go run scripts/check_assets/main.go
+```
+
+### 7.3 脚本索引
+
+| 脚本 | 作用 |
+|------|------|
+| `scripts/ingest_full.sh` | 全量 ingest（主入口） |
+| `scripts/ingest_client.sh` | 扫描本机客户端路径 |
+| `scripts/setup_maple_wz.sh` | 单客户端 WZ 提取 |
+| `scripts/replica.sh` | 轻量复刻（无 WZ 时程序化回退） |
+| `scripts/extract_wz_py/extract.py` | Login/BGM/Back 主提取 |
+| `scripts/extract_wz_py/export_map_from_wz.py` | 地图 JSON + foothold + back PNG |
+| `scripts/extract_wz_py/extract_mobs_npcs.py` | Mob/Npc 精灵 |
+| `scripts/extract_wz_py/extract_avatars.py` | 角色 avatar 烘焙 |
+| `scripts/export_login_manifest/main.go` | 登录 JSON manifest |
+| `scripts/export_maplogin_layers/main.go` | MapLogin2 视差 JSON |
+| `scripts/export_map_life/main.go` | `data/maplife/*.json` |
+| `scripts/export_rainbow_map/main.go` | 从 XML 导出地图（无 WZ 时回退） |
+| `scripts/check_assets/main.go` | 占位/真实/缺失统计 |
+| ~~`scripts/build_login_scene/main.go`~~ | **已弃用** — 假街机框 |
+
+---
+
+## 8. 服务端规则要点（必须对照 ms079）
+
+| 规则 | 位置 |
+|------|------|
+| JobType / 出生图 | `pkg/utils/constants.go` |
+| 创角白名单 | `pkg/utils/beginner_look.go` |
+| 禁名 | `pkg/utils/forbidden_names.go` ← `Etc.wz/ForbiddenName.img.xml` |
+| 创角逻辑 | `internal/service/character_service.go` |
+| 初始装备 seed | `seedBeginnerEquipment` |
+| 演示账号 | `pkg/database/seed_079_accounts.go` — `test` / `test123456` |
+
+**演示角色**（account_id=1）：
+
+| 名字 | class | level | 说明 |
+|------|-------|-------|------|
+| 冒险者一号 | 0 新手 | 1 | 默认 |
+| 见习法师 | 200 法师 | 15 | 女角 face/hair |
+| 剑士试炼 | 100 战士 | 20 | |
+
+**API 基址**：`http://localhost:8080/api/v1`（`client/lib/config/app_config.dart`）  
+**WebSocket**：`ws://localhost:8080/ws`
+
+---
+
+## 9. 当前完成度
+
+### 9.1 资源
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 登录 BGM | ✅ | title.mp3 |
+| Login.img 按钮 | ✅ | 三态 PNG |
+| MapLogin2 back 38 层 | ✅ | images/ui/login/back/ |
+| 登录各屏视差 | ✅ | 6 个 login_*.json |
+| 彩虹村 map JSON | ✅ | layers + 83 footholds |
+| grassySoil back PNG | ✅ | MAX3 补 6 层 |
+| Mob 精灵 | ✅ | ~5800 PNG |
+| Npc 精灵 | ⚠️ | 部分 |
+| Player 部件/avatar | ⚠️ | 少量，按 ID 按需提取 |
+| 地图 Tile | ❌ | 未提取未渲染 |
+| 地图 Obj（房屋树） | ❌ | 未提取未渲染 |
+| 技能/物品/Effect 精灵 | ❌ | 未做 |
+| UI.img 音效 | ⚠️ | 部分 |
+
+### 9.2 客户端功能
+
+| 功能 | 状态 |
+|------|------|
+| 登录→性别→世界→选角→创建 | ✅ |
+| MapLogin2 视差背景 | ✅ |
+| 079 键位 | ✅ |
+| 横版移动（仅 X） | ✅ |
+| WZ 地图 back 视差 | ✅ |
+| foothold 地面 Y | ⚠️ 贴地无跳跃/多层 |
+| WZ 角色预览（选角） | ⚠️ 依赖装备 API + 部件 PNG |
+| WZ Mob 显示 | ✅ |
+| 本地/WS 怪物同步 | ✅ |
+| 背包/技能/社交 UI 页 | ⚠️ 框架有，未对齐 WZ UI |
+
+### 9.3 服务端
+
+| 功能 | 状态 |
+|------|------|
+| 登录/创角/禁名 | ✅ |
+| FindEquipped (`is_equipped`) | ✅ 已修 |
+| Mob spawn from maplife | ✅ |
+| Mob AI + WS 广播 | ✅ |
+| 完整伤害/技能/任务 | ⚠️ 简化 |
+
+---
+
+## 10. 缺失内容与优先级
+
+### P0 — 视觉与玩法核心
+
+| # | 缺失 | 做法 |
+|---|------|------|
+| 1 | 地图 **Tile 层** | 从 `Map.wz/Map/Map0/000010000.img` 导出 tile + `Tile/grassySoil.img`，Flame 渲染 |
+| 2 | 地图 **Obj 层** | 导出 `Map.wz/Obj/*.img` 物件 PNG + 坐标，叠加到 `WzMapLayer` 之上 |
+| 3 | **跳跃 + 多层 foothold** | 读 foothold 图结构，Alt 跳、落点检测 |
+| 4 | 角色 **walk/attack 动画** | Character.wz 多帧 + Flame SpriteAnimation |
+
+### P1 — 登录与角色
+
+| # | 缺失 | 做法 |
+|---|------|------|
+| 5 | MapLogin2 **卷轴动画** | 标题→选角镜头平滑滚动（非硬切 camera） |
+| 6 | Logo 从 WZ Obj 提取 | Map/Obj/login.img Title/logo（MAX3 Data 或补丁 WZ） |
+| 7 | 全量 **Character 部件** | `extract_avatars.py --all` 或按需缓存策略 |
+| 8 | 选角 **charInfo 面板** | Login.img CharSelect/charInfo1 叠加 |
+
+### P2 — 体验补齐
+
+| # | 缺失 | 做法 |
+|---|------|------|
+| 9 | UI.img 音效 | CharSelect/WorldSelect/BtMouseClick |
+| 10 | 地图 BGM 逐图 | Sound.wz Bgm00/* → assets/audio/bgm/ |
+| 11 | 背包/装备 UI | UIWindow.img 贴图 |
+| 12 | 更多地图 | 按 mapId 批量跑 export_map_from_wz |
+
+### 已知 WZ 缺口
+
+| 缺口 | 说明 | 解决 |
+|------|------|------|
+| 主客户端无 grassySoil.img | Map.wz/Back 不含 | MAX3 Data 客户端 |
+| 主客户端无 Obj/login.img | Map.wz/Obj 无 login | UI 层用 Login.img；Obj 用 MAX3 |
+| 补丁 1.5m.exe | RAR 自解压，Mac 难解压 | Windows 解压后合并 WZ |
+
+---
+
+## 11. 标准修改流程（后续按此执行）
+
+### 11.1 改登录/UI 画面
+
+1. 查 `../mapleStory079-external/02-★ms079-main-…/wz/UI.wz/Login.img.xml` 节点坐标  
+2. 查 `MapLogin2.img.xml` 对应屏 signboard 的 x,y → `parallax_camera`  
+3. 缺 PNG → `extract.py` 或 HaRepacker 导出到 `client/assets/images/ui/login/`  
+4. 改 `scripts/export_login_manifest/main.go` → `go run ...`  regenerate JSON  
+5. 改 `client/lib/features/.../*_page.dart` 交互  
+6. **不要**跑 `build_login_scene`  
+7. `flutter run -d chrome --web-port=5173` 硬刷新验证  
+
+### 11.2 改地图/进游戏画面
+
+1. 确定 WZ 地图文件：`Map/Map0/000010000.img` ↔ 逻辑 mapId `1000000`  
+2. `export_map_from_wz.py --map 000010000 --map-id 1000000 --back-client MAX3`  
+3. 缺 back set → `extract_map_backs.py` 或 MAX3 Data  
+4. 改 `wz_map_layer.dart` / `game_world.dart` 渲染或碰撞  
+5. 更新 `pubspec.yaml` 若新增 assets 子目录  
+6. 服务端 `data/maplife/` + spawn 坐标与 WZ life 一致  
+
+### 11.3 改服务端规则
+
+1. 先读 `../mapleStory079-external/02-★ms079-main-…` 对应 Handler/Service  
+2. 改 `pkg/utils/constants.go` 或 `internal/service/*`  
+3. 禁名/白名单改 XML 或 Go 常量  
+4. `go run cmd/server/main.go` 重启  
+5. 演示账号：`pkg/database/seed_079_accounts.go`  
+
+### 11.4 改角色/Mob 贴图
+
+1. `scripts/extract_wz_py/extract_mobs_npcs.py --id <mobId>` 或 `--all`  
+2. 角色：`extract_avatars.py` / `extract_parts.py`  
+3. 确认 `pubspec.yaml` 包含对应 sprites 目录  
+4. `sprite_loader.dart` / `avatar_assets.dart` 路径候选  
+
+---
+
+## 12. 本地开发
+
+### 12.1 环境
+
+- Go 1.21+、MySQL 8、Flutter 3.x  
+- Python 3 + wz-python：首次 ingest 自动克隆到 `.cache/wz-python`  
+
+### 12.2 启动
+
+```bash
+# 1. 数据库 + 配置 config/config.yaml
+
+# 2. 服务端（AutoMigrate + seed）
+go run cmd/server/main.go          # :8080
+
+# 3. 客户端
+cd client && flutter run -d chrome --web-port=5173
+```
+
+### 12.3 测试账号
+
+| 字段 | 值 |
+|------|-----|
+| 账号 | `test` |
+| 密码 | `test123456` |
+
+### 12.4 自检
+
+```bash
+go run scripts/check_assets/main.go
+cd client && flutter analyze
+curl http://localhost:8080/health
+```
+
+---
+
+## 13. 仓库目录结构（精简）
+
+```
+mapleStory079/
+├── cmd/server/              # Go 入口
+├── client/                  # Flutter + Flame
+│   ├── assets/              # ★ 所有游戏资源
+│   └── lib/
+│       ├── features/        # login / character / game / maple
+│       └── game/engine/     # GameWorld / WzMapLayer / controls
+├── internal/                # handler / service / repository
+├── pkg/                     # database / utils / maplife
+├── data/maplife/            # 地图刷怪 JSON
+├── scripts/                 # ★ 资源提取与 ingest
+├── docs/                    # 详细手册
+│   ├── MS079_LOGIN_PIPELINE.md
+│   ├── MS079_OFFICIAL_ALIGNMENT.md
+│   └── ARCHITECTURE.md
+└── EXTERNAL_REF.md        # 外部参考目录说明（同级 mapleStory079-external/）
+```
+
+**外部参考**（不纳入本仓库 git）：
+
+```
+../mapleStory079-external/
+├── 00-官方客户端-冒险岛079-…     # ★ WZ 提取主源（链到 Downloads）
+├── 01-MAX3怀旧岛-…               # ★ 补 grassySoil / Obj
+├── 02-★ms079-main-…              # ★ Java 逻辑 + WZ XML
+├── 03-★maple-client-…            # ★ ingest 工作副本
+└── 04–12 …                       # 其他开源参考（见 README）
+```
+
+---
+
+## 14. 相关文档
+
+| 文档 | 内容 |
+|------|------|
+| `docs/MS079_LOGIN_PIPELINE.md` | 登录→创角完整对照、API、排错 |
+| `docs/MS079_OFFICIAL_ALIGNMENT.md` | 官方对齐简表（随改动更新） |
+| `docs/ARCHITECTURE.md` | 分层架构、模块说明 |
+| `docs/DATABASE.md` | 表结构 |
+| `scripts/README.md` | init_data、旧版脚本说明 |
+
+---
+
+## 15. 法律声明
+
+本项目仅供**学习研究**，不得商业使用。冒险岛为 Nexon 注册商标，WZ 资源受版权保护。使用官方客户端资源仅限本地私服开发，请勿公开分发 WZ 文件。
+
+---
+
+## 16. 变更记录
+
+| 日期 | 摘要 |
+|------|------|
+| 2026-06-14 | 重写本文档：以官方 extracted_client + MAX3 为资源基准；MapLogin2 视差登录；彩虹村 foothold/back；弃用 build_login_scene |

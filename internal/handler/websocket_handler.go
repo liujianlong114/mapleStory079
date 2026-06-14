@@ -58,6 +58,16 @@ type WSMessage struct {
 	Quantity    int                    `json:"quantity,omitempty"`
 	RespawnAt   int64                  `json:"respawn_at,omitempty"`
 	MapID       int                    `json:"map_id,omitempty"`
+	InstanceID  int                    `json:"instance_id,omitempty"`
+	TemplateID  int                    `json:"template_id,omitempty"`
+	Facing      int                    `json:"facing,omitempty"`
+	Moving      bool                   `json:"moving,omitempty"`
+	HP          int                    `json:"hp,omitempty"`
+	MaxHP       int                    `json:"max_hp,omitempty"`
+	MobLevel    int                    `json:"mob_level,omitempty"`
+	Rx0         float64                `json:"rx0,omitempty"`
+	Rx1         float64                `json:"rx1,omitempty"`
+	Speed       int                    `json:"speed,omitempty"`
 	Level       string                 `json:"level,omitempty"`  // 系统公告等级
 	Action      string                 `json:"action,omitempty"` // loot: spawn | pickup
 	DropID      string                 `json:"drop_id,omitempty"`
@@ -143,6 +153,11 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 		Content:   "欢迎来到 " + channel + "！共有 " + strconv.Itoa(h.channelCount(channel)) + " 个玩家在线",
 		Timestamp: time.Now().Unix(),
 	})
+	if mapID := parseMapChannelID(channel); mapID > 0 {
+		service.BroadcastMobSnapshot(mapID, func(msgType string, fields map[string]interface{}) {
+			h.sendMobFields(conn, msgType, fields)
+		})
+	}
 	h.broadcastChannel(channel, &WSMessage{
 		Type:        utils.WSMessageTypeSystem,
 		Level:       utils.SystemLevelInfo,
@@ -362,6 +377,92 @@ func (h *WebSocketHandler) BroadcastLoot(channel string, msg *WSMessage) {
 		msg.Timestamp = time.Now().Unix()
 	}
 	h.broadcastChannel(channel, msg)
+}
+
+// BroadcastMobFields 向地图频道广播怪物 WS 消息。
+func (h *WebSocketHandler) BroadcastMobFields(channel, msgType string, fields map[string]interface{}) {
+	msg := mobFieldsToMessage(msgType, fields)
+	h.broadcastChannel(channel, msg)
+}
+
+func (h *WebSocketHandler) sendMobFields(conn *websocket.Conn, msgType string, fields map[string]interface{}) {
+	_ = h.send(conn, mobFieldsToMessage(msgType, fields))
+}
+
+func mobFieldsToMessage(msgType string, fields map[string]interface{}) *WSMessage {
+	msg := &WSMessage{Type: msgType, Timestamp: time.Now().Unix()}
+	if fields == nil {
+		return msg
+	}
+	if v, ok := fields["map_id"].(uint); ok {
+		msg.MapID = int(v)
+	} else if v, ok := fields["map_id"].(int); ok {
+		msg.MapID = v
+	} else if v, ok := fields["map_id"].(float64); ok {
+		msg.MapID = int(v)
+	}
+	if v, ok := fields["instance_id"].(uint); ok {
+		msg.InstanceID = int(v)
+	} else if v, ok := fields["instance_id"].(int); ok {
+		msg.InstanceID = v
+	} else if v, ok := fields["instance_id"].(float64); ok {
+		msg.InstanceID = int(v)
+	}
+	if v, ok := fields["template_id"].(uint); ok {
+		msg.TemplateID = int(v)
+	} else if v, ok := fields["template_id"].(int); ok {
+		msg.TemplateID = v
+	} else if v, ok := fields["template_id"].(float64); ok {
+		msg.TemplateID = int(v)
+	}
+	if v, ok := fields["x"].(float64); ok {
+		msg.X = v
+	}
+	if v, ok := fields["y"].(float64); ok {
+		msg.Y = v
+	}
+	if v, ok := fields["facing"].(int); ok {
+		msg.Facing = v
+	} else if v, ok := fields["facing"].(float64); ok {
+		msg.Facing = int(v)
+	}
+	if v, ok := fields["moving"].(bool); ok {
+		msg.Moving = v
+	}
+	if v, ok := fields["name"].(string); ok {
+		msg.Name = v
+	}
+	if v, ok := fields["hp"].(int); ok {
+		msg.HP = v
+	}
+	if v, ok := fields["max_hp"].(int); ok {
+		msg.MaxHP = v
+	}
+	if v, ok := fields["level"].(int); ok {
+		msg.MobLevel = v
+	}
+	if v, ok := fields["rx0"].(float64); ok {
+		msg.Rx0 = v
+	}
+	if v, ok := fields["rx1"].(float64); ok {
+		msg.Rx1 = v
+	}
+	if v, ok := fields["speed"].(int); ok {
+		msg.Speed = v
+	}
+	return msg
+}
+
+func parseMapChannelID(channel string) uint {
+	const prefix = "map_"
+	if !strings.HasPrefix(channel, prefix) {
+		return 0
+	}
+	n, err := strconv.ParseUint(channel[len(prefix):], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(n)
 }
 
 func (h *WebSocketHandler) handleLootPickup(ref *clientRef, msg *WSMessage, now time.Time) {

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/game_provider.dart';
 import '../../core/resources/assets.dart';
+import '../../core/resources/map_meta.dart';
 import 'game_scene_page.dart';
 
 /// 从 GameProvider 读取角色/地图信息后进入 Flame 场景（079 风格加载屏）
@@ -16,6 +17,7 @@ class GameSceneLoader extends StatefulWidget {
 class _GameSceneLoaderState extends State<GameSceneLoader>
     with SingleTickerProviderStateMixin {
   late final AnimationController _fadeCtrl;
+  MapMeta? _mapMeta;
 
   @override
   void initState() {
@@ -24,6 +26,23 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadMapMetaOnce();
+  }
+
+  bool _metaLoaded = false;
+
+  Future<void> _loadMapMetaOnce() async {
+    if (_metaLoaded) return;
+    _metaLoaded = true;
+    final gp = context.read<GameProvider>();
+    final mapId = gp.currentMap?.id ?? gp.currentCharacter?.mapId ?? 1000000;
+    final meta = await MapMeta.loadForMap(mapId);
+    if (mounted && meta != null) setState(() => _mapMeta = meta);
   }
 
   @override
@@ -84,9 +103,10 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
         final char = gp.currentCharacter!;
         final map = gp.currentMap;
         final mapId = map?.id ?? char.mapId;
-        final mapName = map?.name ?? '彩虹村';
-        final mapW = (map?.width ?? 1600).toDouble();
-        final mapH = (map?.height ?? 900).toDouble();
+        final mapName = map?.name ?? _mapMeta?.name ?? '彩虹村';
+        final mapW = (_mapMeta?.width ?? map?.width ?? 1705).toDouble();
+        final mapH = MapMeta.officialViewportH;
+        final groundY = (_mapMeta?.spawnY ?? 605).toDouble();
 
         return FadeTransition(
           opacity: _fadeCtrl,
@@ -95,6 +115,7 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
             mapName: mapName,
             mapWidth: mapW,
             mapHeight: mapH,
+            groundY: groundY,
             characterId: char.id,
             jobId: char.characterClass,
             initialHp: char.hp,
@@ -107,7 +128,16 @@ class _GameSceneLoaderState extends State<GameSceneLoader>
             initialDex: char.dex,
             initialIntl: char.intl,
             initialLuk: char.luk,
+            initialPosX: char.positionX.toDouble(),
+            initialPosY: groundY,
             bgmAsset: BgmAssets.byMapId(mapId),
+            playerGender: char.gender,
+            playerFace: char.face,
+            playerHair: char.hair,
+            playerTop: char.top,
+            playerBottom: char.bottom,
+            playerShoes: char.shoes,
+            playerWeapon: char.weapon,
           ),
         );
       },

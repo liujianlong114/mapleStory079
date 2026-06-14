@@ -21,6 +21,10 @@ class WsMessageType {
   static const String system = 'system';
   static const String ping = 'ping';
   static const String pong = 'pong';
+  static const String mobSpawn = 'mob_spawn';
+  static const String mobMove = 'mob_move';
+  static const String mobDead = 'mob_dead';
+  static const String mobRespawn = 'mob_respawn';
 }
 
 /// WebSocket 消息包装器
@@ -47,6 +51,8 @@ class WsMessage {
       'action', 'drop_id', 'item_id', 'quantity', 'mesos', 'x', 'y',
       'character_id', 'map_id', 'content', 'damage', 'critical',
       'exp_gained', 'level_up', 'target_id', 'skill_id', 'name',
+      'instance_id', 'template_id', 'facing', 'moving', 'hp', 'max_hp',
+      'mob_level', 'rx0', 'rx1', 'speed',
     ]) {
       if (json.containsKey(key) && !payload.containsKey(key)) {
         payload[key] = json[key];

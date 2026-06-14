@@ -93,7 +93,7 @@ mapleStory079/
 │   └── README.md
 ├── scripts/                # 辅助脚本
 │   └── init_data.go        # 地图/NPC/怪物/物品/技能/任务批量入库
-├── examples/               # 参考项目
+├── EXTERNAL_REF.md  # 外部参考见 ../mapleStory079-external/               # 参考项目
 │   ├── HeavenMS/           # Java v83服务端参考
 │   ├── ZLHSS2/             # Java v079服务端参考
 │   └── OPEN_SOURCE_RESOURCES.md
@@ -259,7 +259,7 @@ mapleStory079/
 - ✅ 音频资源清单（client/assets/audio/README.md）
 - ✅ 贴图资源清单（client/assets/images/README.md）
 - ✅ 精灵资源清单（client/assets/sprites/README.md）
-- ✅ 开源替代资源指引（examples/OPEN_SOURCE_RESOURCES.md）
+- ✅ 开源替代资源指引（../mapleStory079-external/docs-OPEN_SOURCE_RESOURCES.md）
 
 ### 17. 业务错误码 & 分页响应 ⭐⭐⭐⭐⭐
 - ✅ pkg/utils/response.go: CodeOK / CodeBadRequest / CodeUnauthorized / CodeForbidden / CodeNotFound / CodeInternalError / CodeInvalidParameter / CodeCharacterBanned / CodeInventoryFull / CodeSkillOnCooldown / CodeChatSensitive
@@ -481,8 +481,8 @@ GET    /health                      # 健康检查（含缓存命中 / 数据库
 | 项目说明 | `README.md` |
 | 客户端说明 | `client/README.md` |
 | 开发状态报告 | `DEVELOPMENT_STATUS.md`（本文件） |
-| 参考源码 | `examples/HeavenMS/`、`examples/ZLHSS2/` |
-| 开源资源指引 | `examples/OPEN_SOURCE_RESOURCES.md` |
+| 参考源码 | `../mapleStory079-external/05-HeavenMS-v83参考-服务端架构-已归档/`、`../mapleStory079-external/06-ZLHSS2-079参考-中文全栈私服/` |
+| 开源资源指引 | `../mapleStory079-external/docs-OPEN_SOURCE_RESOURCES.md` |
 
 ---
 

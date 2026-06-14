@@ -96,7 +96,7 @@ func (r *InventoryRepository) FindByItemID(characterID uint, itemID int) (*datab
 
 func (r *InventoryRepository) FindEquipped(characterID uint) ([]database.CharacterInventory, error) {
 	var items []database.CharacterInventory
-	err := database.DB.Where("character_id = ? AND equipped = ?", characterID, true).Find(&items).Error
+	err := database.DB.Where("character_id = ? AND is_equipped = ?", characterID, true).Find(&items).Error
 	return items, err
 }
 

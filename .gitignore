@@ -1,0 +1,17 @@
+# IDE / OS
+.idea/
+.DS_Store
+*.iml
+
+# Build / cache
+.cache/
+client/build/
+client/.dart_tool/
+*.exe
+*.dll
+
+# 外部参考资源已迁至仓库同级 mapleStory079-external，禁止误提交
+examples/
+
+# 本地配置（含密钥时勿提交）
+config/config.local.yaml

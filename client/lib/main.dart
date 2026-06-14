@@ -36,7 +36,7 @@ class MapleStoryApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => GameProvider()),
-        ChangeNotifierProvider(create: (_) => CombatProvider(context.read<GameProvider>())),
+        ChangeNotifierProvider(create: (context) => CombatProvider(context.read<GameProvider>())),
         ChangeNotifierProvider(create: (_) => InventoryProvider()),
         ChangeNotifierProvider(create: (_) => SkillProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
@@ -46,7 +46,11 @@ class MapleStoryApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.mapleStory079,
         initialRoute: Routes.login,
+        onUnknownRoute: (settings) => MaterialPageRoute(
+          builder: (_) => const LoginPage(),
+        ),
         routes: {
+          '/': (context) => const LoginPage(),
           Routes.login: (context) => const LoginPage(),
           Routes.gender: (context) => const GenderPage(),
           Routes.worldSelect: (context) => const WorldSelectPage(),

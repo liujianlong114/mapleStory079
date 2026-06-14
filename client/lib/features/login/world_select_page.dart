@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/resources/assets.dart';
-import '../../core/resources/login_ui_assets.dart';
 import '../maple/wz_scene.dart';
-import '../maple/wz_widgets.dart';
 
-/// ms079 Login.img/WorldSelect — 选区选频道（简化单区）
+/// ms079 Login.img/WorldSelect — 选区选频道
 class WorldSelectPage extends StatefulWidget {
   const WorldSelectPage({super.key});
 
@@ -15,6 +12,7 @@ class WorldSelectPage extends StatefulWidget {
 
 class _WorldSelectPageState extends State<WorldSelectPage> {
   WzSceneManifest? _scene;
+  int _world = 0;
   int _channel = 1;
 
   @override
@@ -26,9 +24,30 @@ class _WorldSelectPageState extends State<WorldSelectPage> {
   }
 
   void _enter() {
-    AudioManager().playSfx(SfxAssets.click);
     Navigator.of(context).pushReplacementNamed('/character-select');
   }
+
+  void _onButton(String id) {
+    if (id.startsWith('world_')) {
+      setState(() => _world = int.tryParse(id.substring(6)) ?? 0);
+      return;
+    }
+    if (id.startsWith('ch_')) {
+      setState(() => _channel = int.tryParse(id.substring(3)) ?? 1);
+      return;
+    }
+    switch (id) {
+      case 'enter':
+        _enter();
+      case 'cancel':
+        Navigator.of(context).pushReplacementNamed('/login');
+    }
+  }
+
+  Set<String> get _selectedIds => {
+        'world_$_world',
+        'ch_$_channel',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -39,50 +58,11 @@ class _WorldSelectPageState extends State<WorldSelectPage> {
       );
     }
     return Scaffold(
-      body: Stack(
-        children: [
-          WzSceneScreen(manifest: _scene!, onButton: (_) {}, playBgm: true),
-          Center(
-            child: Container(
-              width: 420,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B2414).withValues(alpha: 0.92),
-                border: Border.all(color: const Color(0xFFD4A373), width: 2),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '蓝蜗牛',
-                    style: TextStyle(color: Color(0xFFFFE082), fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  for (var ch = 1; ch <= 3; ch++)
-                    ListTile(
-                      dense: true,
-                      title: Text('频道 $ch', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                      leading: Radio<int>(
-                        value: ch,
-                        groupValue: _channel,
-                        activeColor: const Color(0xFFFFD700),
-                        onChanged: (v) => setState(() => _channel = v ?? 1),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  WzSpriteButton(
-                    normal: LoginUiAssets.buttonStates('btn_yes').first,
-                    hover: LoginUiAssets.buttonOverStates('btn_yes').first,
-                    width: 85,
-                    height: 29,
-                    onPressed: _enter,
-                    fallbackLabel: '进入',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+      body: WzSceneScreen(
+        manifest: _scene!,
+        onButton: _onButton,
+        selectedButtonIds: _selectedIds,
+        playBgm: true,
       ),
     );
   }

@@ -1,6 +1,6 @@
 # ms079-main 登录→音乐→选角→创建 完整复刻手册
 
-> **用途**：本文档记录本项目如何把 `examples/ms079-main`（079 Java 私服源码 + WZ XML）「照搬」到 **Go REST 后端 + Flutter Web 客户端** 的整条登录管线。  
+> **用途**：本文档记录本项目如何把 `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML`（079 Java 私服源码 + WZ XML）「照搬」到 **Go REST 后端 + Flutter Web 客户端** 的整条登录管线。  
 > **读者**：你自己手搓时，按本文从源码定位 → 改服务端 → 改客户端 → 跑资源脚本 → 验证。
 
 ---
@@ -46,18 +46,18 @@
 
 | 文件 | 作用 |
 |------|------|
-| `examples/ms079-main/src/main/java/handling/MapleServerHandler.java` | Opcode 分发（登录服） |
-| `examples/ms079-main/src/main/java/handling/login/handler/CharLoginHandler.java` | 登录/性别/选角/创建/删除 |
-| `examples/ms079-main/src/main/java/handling/login/LoginWorker.java` | 登录成功后分支（性别/服务器列表） |
-| `examples/ms079-main/src/main/java/tools/packet/LoginPacket.java` | 发包结构 |
-| `examples/ms079-main/src/main/java/client/MapleCharacter.java` | `getDefault()`、`saveNewCharToDB()` |
-| `examples/ms079-main/src/main/java/handling/login/LoginInformationProvider.java` | 禁名 |
-| `examples/ms079-main/src/main/java/client/MapleCharacterUtil.java` | 角色名规则 |
-| `examples/ms079-main/wz/UI.wz/Login.img.xml` | 各屏 UI 节点尺寸 |
-| `examples/ms079-main/wz/UI.wz/MapLogin2.img.xml` | 登录地图卷轴 + BGM |
-| `examples/ms079-main/wz/Etc.wz/ForbiddenName.img.xml` | 禁名列表 |
-| `examples/ms079-main/wz/Sound.wz/BgmUI.img.xml` | Title 等 BGM |
-| `examples/ms079-main/src/main/resources/recvops.properties` | 客户端→服务端 Opcode |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/handling/MapleServerHandler.java` | Opcode 分发（登录服） |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/handling/login/handler/CharLoginHandler.java` | 登录/性别/选角/创建/删除 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/handling/login/LoginWorker.java` | 登录成功后分支（性别/服务器列表） |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/tools/packet/LoginPacket.java` | 发包结构 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/client/MapleCharacter.java` | `getDefault()`、`saveNewCharToDB()` |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/handling/login/LoginInformationProvider.java` | 禁名 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/java/client/MapleCharacterUtil.java` | 角色名规则 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/UI.wz/Login.img.xml` | 各屏 UI 节点尺寸 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/UI.wz/MapLogin2.img.xml` | 登录地图卷轴 + BGM |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/Etc.wz/ForbiddenName.img.xml` | 禁名列表 |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/Sound.wz/BgmUI.img.xml` | Title 等 BGM |
+| `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/resources/recvops.properties` | 客户端→服务端 Opcode |
 
 ### 2.2 原版时序（简化）
 
@@ -257,7 +257,7 @@ Knight/Aran 的 NewCharKnight/NewCharAran 尺寸不同（见 Login.img.xml ~L837
 
 ### 4.1 Login.img 屏幕节点
 
-路径：`examples/ms079-main/wz/UI.wz/Login.img.xml`
+路径：`../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/UI.wz/Login.img.xml`
 
 | imgdir | 用途 |
 |--------|------|
@@ -271,7 +271,7 @@ Knight/Aran 的 NewCharKnight/NewCharAran 尺寸不同（见 Login.img.xml ~L837
 
 ### 4.2 MapLogin2 卷轴地图
 
-路径：`examples/ms079-main/wz/UI.wz/MapLogin2.img.xml`
+路径：`../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/UI.wz/MapLogin2.img.xml`
 
 - 画布：**800×600**
 - **bgm**: `BgmUI/Title`
@@ -806,7 +806,7 @@ curl -s 'http://localhost:8080/api/v1/characters/check-name?name=测试'
 
 ## 附录 A：Opcode 速查（仅供对照 Java）
 
-见 `examples/ms079-main/src/main/resources/recvops.properties`：
+见 `../mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/src/main/resources/recvops.properties`：
 
 | Hex | 名称 | Handler |
 |-----|------|---------|

@@ -2,12 +2,124 @@
   "width": 800,
   "height": 600,
   "bgm": "audio/title.mp3",
-  "background": "scenes/login_worldselect.png",
-  "buttons": null,
-  "login_panel": {
-    "x": 0,
-    "y": 0,
-    "w": 0,
-    "h": 0
-  }
+  "use_parallax": true,
+  "parallax_camera": {
+    "x": 22,
+    "y": -1785
+  },
+  "buttons": [
+    {
+      "id": "world_0",
+      "label": "蓝蜗牛",
+      "rect": {
+        "x": 220,
+        "y": 248,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_0_normal.png",
+      "hover": "images/ui/login/btn_world_0_over.png",
+      "pressed": "images/ui/login/btn_world_0_pressed.png"
+    },
+    {
+      "id": "world_1",
+      "label": "蘑菇仔",
+      "rect": {
+        "x": 352,
+        "y": 248,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_1_normal.png",
+      "hover": "images/ui/login/btn_world_1_over.png",
+      "pressed": "images/ui/login/btn_world_1_pressed.png"
+    },
+    {
+      "id": "world_2",
+      "label": "绿水灵",
+      "rect": {
+        "x": 484,
+        "y": 248,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_2_normal.png",
+      "hover": "images/ui/login/btn_world_2_over.png",
+      "pressed": "images/ui/login/btn_world_2_pressed.png"
+    },
+    {
+      "id": "ch_1",
+      "label": "频道1",
+      "rect": {
+        "x": 260,
+        "y": 310,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_0_normal.png",
+      "hover": "images/ui/login/btn_world_0_over.png",
+      "pressed": "images/ui/login/btn_world_0_pressed.png"
+    },
+    {
+      "id": "ch_2",
+      "label": "频道2",
+      "rect": {
+        "x": 352,
+        "y": 310,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_1_normal.png",
+      "hover": "images/ui/login/btn_world_1_over.png",
+      "pressed": "images/ui/login/btn_world_1_pressed.png"
+    },
+    {
+      "id": "ch_3",
+      "label": "频道3",
+      "rect": {
+        "x": 444,
+        "y": 310,
+        "w": 97,
+        "h": 23
+      },
+      "normal": "images/ui/login/btn_world_2_normal.png",
+      "hover": "images/ui/login/btn_world_2_over.png",
+      "pressed": "images/ui/login/btn_world_2_pressed.png"
+    },
+    {
+      "id": "enter",
+      "label": "确认",
+      "rect": {
+        "x": 310,
+        "y": 420,
+        "w": 94,
+        "h": 43
+      },
+      "normal": "images/ui/login/btn_yes_normal.png",
+      "hover": "images/ui/login/btn_yes_over.png",
+      "pressed": "images/ui/login/btn_yes_pressed.png"
+    },
+    {
+      "id": "cancel",
+      "label": "取消",
+      "rect": {
+        "x": 410,
+        "y": 420,
+        "w": 94,
+        "h": 43
+      },
+      "normal": "images/ui/login/btn_no_normal.png",
+      "hover": "images/ui/login/btn_no_over.png",
+      "pressed": "images/ui/login/btn_no_pressed.png"
+    }
+  ],
+  "decorations": [
+    {
+      "path": "images/ui/login/worldselect_chback.png",
+      "x": 176,
+      "y": 184,
+      "w": 520,
+      "h": 262
+    }
+  ]
 }

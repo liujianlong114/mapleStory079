@@ -22,7 +22,7 @@ import (
 var (
 	wzRoot = flag.String("wz-root", os.Getenv("MAPLE_WZ_ROOT"), "MapleStory 客户端根目录（含 Base.wz）")
 	outDir = flag.String("out", "client/assets", "输出目录")
-	force  = flag.Bool("force", false, "覆盖占位资源（小于 512B 的 PNG / 小于 8KB 的音频）")
+	force  = flag.Bool("force", false, "覆盖占位资源（小于 2KB 的 PNG / 小于 8KB 的音频）")
 )
 
 type extractJob struct {
@@ -192,7 +192,7 @@ func isRealAsset(path, kind string) bool {
 	}
 	switch kind {
 	case "png":
-		return st.Size() >= 512
+		return st.Size() >= 2048
 	case "sound":
 		return st.Size() >= 8192
 	default:

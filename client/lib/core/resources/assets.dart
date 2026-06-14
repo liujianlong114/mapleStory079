@@ -1,5 +1,19 @@
 import 'package:audioplayers/audioplayers.dart';
 
+/// Flutter bundle 键必须以 `assets/` 开头；manifest / WZ 路径省略此前缀。
+class AssetPaths {
+  AssetPaths._();
+
+  static String bundle(String path) {
+    if (path.isEmpty) return path;
+    if (path.startsWith('assets/')) return path;
+    return 'assets/$path';
+  }
+
+  static List<String> bundleAll(Iterable<String> paths) =>
+      paths.map(bundle).toList();
+}
+
 /// ms079 MapLogin2 — 全登录流程统一 BGM: BgmUI/Title
 class BgmAssets {
   static const String login = 'audio/title.mp3';
@@ -58,6 +72,7 @@ class SpriteDirs {
   static const String tiles  = 'images/tiles/';
 
   static String mobPath(int mobId) => '$mob$mobId.png';
+  static String mobMovePath(int mobId) => '$mob${mobId}_move.png';
   static String npcPath(int npcId) => '$npc$npcId.png';
   static String playerStand() => '${player}stand.png';
   static String playerWalk() => '${player}walk.png';
@@ -83,24 +98,20 @@ class AudioManager {
   bool   get muted     => _muted;
 
   Future<void> playBgm(String asset) async {
-    if (_muted) return;
-    if (_currentBgm == asset) return;
-    try {
-      await _bgm.setVolume(_bgmVolume);
-      await _bgm.play(AssetSource(asset));
-      _currentBgm = asset;
-    } catch (_) {}
+    await playBgmAsset(asset);
   }
 
   Future<void> playBgmAsset(String primary) async {
     if (_muted) return;
-    if (_currentBgm == primary) return;
-    final fallbacks = <String>[primary];
-    if (primary.endsWith('.mp3')) {
-      fallbacks.add(primary.replaceAll('.mp3', '.wav'));
-    } else if (primary.endsWith('.wav')) {
+    final fallbacks = <String>[];
+    if (primary.endsWith('.wav')) {
       fallbacks.add(primary.replaceAll('.wav', '.mp3'));
     }
+    fallbacks.add(primary);
+    if (primary.endsWith('.mp3')) {
+      fallbacks.add(primary.replaceAll('.mp3', '.wav'));
+    }
+    if (_currentBgm != null && fallbacks.contains(_currentBgm)) return;
     for (final path in fallbacks) {
       try {
         await _bgm.setVolume(_bgmVolume);

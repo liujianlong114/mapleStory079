@@ -7,7 +7,7 @@
 //
 // 用法:
 //
-//	go run scripts/extract_wz_harepacker/main.go --wz-root examples/ms079-main/wz
+//	go run scripts/extract_wz_harepacker/main.go
 //	WZ_HAREPACKER_ROOT=/path/to/png-dump go run scripts/extract_wz_harepacker/main.go
 package main
 
@@ -18,10 +18,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	ext "mapleStory079/scripts/lib"
 )
 
 var (
-	wzRoot = flag.String("wz-root", envOr("WZ_HAREPACKER_ROOT", envOr("MAPLE_WZ_ROOT", "examples/ms079-main/wz")), "HaRepacker PNG/MP3 导出根目录")
+	wzRoot = flag.String("wz-root", "", "HaRepacker PNG/MP3 导出根目录")
 	outDir = flag.String("out", "client/assets", "输出目录")
 	force  = flag.Bool("force", false, "覆盖已有占位文件")
 )
@@ -37,6 +39,15 @@ type copyJob struct {
 func main() {
 	flag.Parse()
 	root := *wzRoot
+	if root == "" {
+		if v := os.Getenv("WZ_HAREPACKER_ROOT"); v != "" {
+			root = v
+		} else if v := os.Getenv("MAPLE_WZ_ROOT"); v != "" {
+			root = v
+		} else {
+			root = ext.Ms079WzDir()
+		}
+	}
 	if !dirExists(root) {
 		fmt.Printf("❌ 目录不存在: %s\n", root)
 		os.Exit(1)

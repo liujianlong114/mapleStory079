@@ -2,11 +2,15 @@
   "width": 800,
   "height": 600,
   "bgm": "audio/title.mp3",
-  "background": "scenes/login_title.png",
+  "use_parallax": true,
+  "parallax_camera": {
+    "x": 22,
+    "y": -1785
+  },
   "logo": {
     "path": "images/ui/login/logo_0.png",
-    "x": 200,
-    "y": 55,
+    "x": 201,
+    "y": 48,
     "w": 397,
     "h": 219,
     "frames": [
@@ -20,33 +24,27 @@
       "id": "login",
       "label": "登录",
       "rect": {
-        "x": 355,
-        "y": 468,
-        "w": 89,
-        "h": 42
+        "x": 352,
+        "y": 462,
+        "w": 97,
+        "h": 68
       },
-      "normal": "images/ui/login/btn_login.png",
+      "normal": "images/ui/login/btn_login_normal.png",
       "hover": "images/ui/login/btn_login_over.png",
       "pressed": "images/ui/login/btn_login_pressed.png"
     },
     {
       "id": "quit",
-      "label": "退出",
+      "label": "离开",
       "rect": {
-        "x": 620,
-        "y": 555,
-        "w": 84,
-        "h": 38
+        "x": 667,
+        "y": 568,
+        "w": 94,
+        "h": 29
       },
-      "normal": "images/ui/login/btn_quit.png",
+      "normal": "images/ui/login/btn_quit_normal.png",
       "hover": "images/ui/login/btn_quit_over.png",
       "pressed": "images/ui/login/btn_quit_pressed.png"
     }
-  ],
-  "login_panel": {
-    "x": 268,
-    "y": 320,
-    "w": 263,
-    "h": 179
-  }
+  ]
 }

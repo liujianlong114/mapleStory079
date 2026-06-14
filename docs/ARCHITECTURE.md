@@ -188,7 +188,7 @@ mapleStory079/
 ├── docs/                 # 文档（新增）
 ├── test/                 # 测试（新增）
 ├── deploy/               # 部署（新增）
-├── examples/             # 参考项目
+├── EXTERNAL_REF.md  # 外部参考见 ../mapleStory079-external/             # 参考项目
 ├── bin/                  # 编译输出
 ├── Makefile              # 构建工具
 ├── Dockerfile            # Docker镜像

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"mapleStory079/internal/middleware"
+	"mapleStory079/internal/service"
 	"mapleStory079/pkg/cache"
 	"mapleStory079/pkg/database"
 )
@@ -39,6 +40,10 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	wsHandler := NewWebSocketHandler()
 	gameHandler := NewGameHandler()
 	gameHandler.SetWebSocketHandler(wsHandler)
+	service.SetMobEventNotifier(service.MobEventNotifier{
+		Broadcast: wsHandler.BroadcastMobFields,
+	})
+	service.StartMobSimulation(service.DefaultMobInstanceService)
 	npcHandler := NewNPCHandler()
 	invHandler := NewInventoryHandler()
 	skillHandler := NewSkillHandler()

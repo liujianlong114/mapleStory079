@@ -80,21 +80,30 @@ func buildItems(defs []itemSeed) []Item {
 }
 
 type mapSeed struct {
-	ID    int
-	Name  string
-	Desc  string
-	Music string
+	ID     int
+	Name   string
+	Desc   string
+	Music  string
+	Width  int
+	Height int
 }
 
 func buildMaps(defs []mapSeed) []Map {
 	out := make([]Map, 0, len(defs))
 	for _, d := range defs {
+		w, h := d.Width, d.Height
+		if w <= 0 {
+			w = 1600
+		}
+		if h <= 0 {
+			h = 900
+		}
 		out = append(out, Map{
 			ID:          uint(d.ID),
 			Name:        d.Name,
 			Description: d.Desc,
-			Width:       1600,
-			Height:      900,
+			Width:       w,
+			Height:      h,
 			Music:       d.Music,
 			CreatedAt:   seedNow(),
 		})

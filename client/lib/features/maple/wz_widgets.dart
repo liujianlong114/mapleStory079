@@ -63,13 +63,43 @@ class _WzSpriteButtonState extends State<WzSpriteButton> {
         child: SizedBox(
           width: widget.width,
           height: widget.height,
-          child: WzAssetImage(
-            candidates: LoginUiAssets.resolve(_asset),
-            width: widget.width,
-            height: widget.height,
-            fallback: (_) => _fallback(),
-          ),
+          child: Stack(
+          fit: StackFit.expand,
+          children: [
+            WzAssetImage(
+              candidates: LoginUiAssets.resolve(_asset),
+              width: widget.width,
+              height: widget.height,
+              fallback: (_) => _fallbackBox(),
+            ),
+            if (widget.fallbackLabel != null && widget.fallbackLabel!.isNotEmpty)
+              Center(
+                child: Text(
+                  widget.fallbackLabel!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(color: Colors.black, blurRadius: 2, offset: Offset(1, 1)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackBox() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF8B6914),
+        border: Border.all(color: const Color(0xFF3B2414)),
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }
@@ -117,11 +147,10 @@ class WzPanelFrame extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           if (assetPath != null)
-            Image.asset(
-              assetPath!,
+            WzAssetImage(
+              candidates: LoginUiAssets.resolve(assetPath!),
               fit: BoxFit.fill,
-              filterQuality: FilterQuality.none,
-              errorBuilder: (_, __, ___) => _woodBox(),
+              fallback: (_) => _woodBox(),
             )
           else
             _woodBox(),

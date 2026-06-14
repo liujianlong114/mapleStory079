@@ -9,7 +9,7 @@ class PlayerStatsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gp = Provider.of<GameProvider>(context);
+    final gp = context.watch<GameProvider>();
     final level = gp.level;
     final hp = gp.hp;
     final maxHp = gp.maxHp;

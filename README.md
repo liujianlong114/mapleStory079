@@ -62,7 +62,7 @@ mapleStory079/
 │       ├── game/           # Flame 游戏引擎层
 │       ├── services/       # 网络服务
 │       └── widgets/        # 组件库
-├── examples/                 # 开源项目参考
+├── EXTERNAL_REF.md  # 外部参考见 ../mapleStory079-external/                 # 开源项目参考
 │   ├── HeavenMS/           # v83服务端
 │   ├── ZLHSS2/             # v079服务端
 │   └── OPEN_SOURCE_RESOURCES.md
@@ -580,7 +580,7 @@ flutter run -d chrome
 - 请求/响应格式详解
 - 测试用例
 
-### [examples/OPEN_SOURCE_RESOURCES.md](examples/OPEN_SOURCE_RESOURCES.md)
+### [../mapleStory079-external/docs-OPEN_SOURCE_RESOURCES.md](../mapleStory079-external/docs-OPEN_SOURCE_RESOURCES.md)
 全网开源资源汇总：
 - 服务端项目参考 (HeavenMS, ZLHSS2, cc-079-ms)
 - 客户端项目
@@ -706,7 +706,7 @@ UI -> Provider -> API Service -> Backend Server
 4. 优化性能，添加Redis缓存
 
 ### 高级开发者
-1. 参考 examples/ 目录下的开源项目，研究原版游戏协议
+1. 参考 `../mapleStory079-external/` 下的开源项目（见 `EXTERNAL_REF.md`），研究原版游戏协议
 2. 实现完整的地图渲染系统
 3. 添加多人在线同步功能
 4. 实现完整的战斗系统（PVE/PVP）

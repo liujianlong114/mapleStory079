@@ -116,20 +116,16 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  InputDecoration _input(String hint) => InputDecoration(
+  InputDecoration _bareInput(String hint) => InputDecoration(
+        isDense: true,
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+        hintStyle: const TextStyle(color: Color(0xFF666666), fontSize: 12),
         filled: true,
-        fillColor: const Color(0xFFF5F0E0),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        border: OutlineInputBorder(
-          borderSide: const BorderSide(color: Color(0xFF5D3A1A), width: 2),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Color(0xFF5D3A1A), width: 2),
-          borderRadius: BorderRadius.circular(3),
-        ),
+        fillColor: const Color(0xFFE8E0D0),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
       );
 
   @override
@@ -141,6 +137,8 @@ class _LoginPageState extends State<LoginPage> {
       );
     }
 
+    final panel = _scene!.loginPanel ?? const WzRect(x: 279, y: 352, w: 200, h: 80);
+
     return Scaffold(
       body: Stack(
         children: [
@@ -150,75 +148,73 @@ class _LoginPageState extends State<LoginPage> {
             overlay: Stack(
               children: [
                 WzLoginPanel(
-                  panel: _scene!.loginPanel,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
+                  panel: panel,
+                  panelImage: _scene!.panelImage,
+                  child: Stack(
                     children: [
-                      Text(
-                        _isLogin ? '账号登录' : '注册账号',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFFFE082),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          letterSpacing: 2,
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        height: 22,
+                        child: TextField(
+                          controller: _isLogin ? _usernameController : _registerUsernameController,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF1A1A1A), height: 1.1),
+                          decoration: _bareInput(_isLogin ? '账号' : '新账号'),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      if (_isLogin) ...[
-                        TextField(
-                          controller: _usernameController,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1C1C1C)),
-                          decoration: _input('账号'),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _passwordController,
+                      Positioned(
+                        left: 0,
+                        top: 30,
+                        right: 0,
+                        height: 22,
+                        child: TextField(
+                          controller: _isLogin ? _passwordController : _registerPasswordController,
                           obscureText: true,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1C1C1C)),
-                          decoration: _input('密码'),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF1A1A1A), height: 1.1),
+                          decoration: _bareInput('密码'),
                           onSubmitted: (_) => _submit(),
                         ),
-                      ] else ...[
-                        TextField(
-                          controller: _registerUsernameController,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1C1C1C)),
-                          decoration: _input('新账号'),
+                      ),
+                      if (!_isLogin)
+                        Positioned(
+                          left: 0,
+                          top: 60,
+                          right: 0,
+                          height: 22,
+                          child: TextField(
+                            controller: _confirmPasswordController,
+                            obscureText: true,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF1A1A1A), height: 1.1),
+                            decoration: _bareInput('确认密码'),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _registerPasswordController,
-                          obscureText: true,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1C1C1C)),
-                          decoration: _input('密码'),
+                      if (_errorMessage != null)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 28,
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Color(0xFFFF5252), fontSize: 10),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _confirmPasswordController,
-                          obscureText: true,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF1C1C1C)),
-                          decoration: _input('确认密码'),
-                        ),
-                      ],
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 11),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      GestureDetector(
-                        onTap: _isLoading ? null : () => setState(() => _isLogin = !_isLogin),
-                        child: Text(
-                          _isLogin ? '注册新账号' : '返回登录',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 11,
-                            decoration: TextDecoration.underline,
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 8,
+                        child: GestureDetector(
+                          onTap: _isLoading ? null : () => setState(() => _isLogin = !_isLogin),
+                          child: Text(
+                            _isLogin ? '注册新账号' : '返回登录',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 10,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ),
@@ -226,9 +222,10 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 if (_isLoading)
-                  Container(color: Colors.black26, child: const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFFFB13A)),
-                  )),
+                  const ColoredBox(
+                    color: Colors.black26,
+                    child: Center(child: CircularProgressIndicator(color: Color(0xFFFFB13A))),
+                  ),
               ],
             ),
           ),

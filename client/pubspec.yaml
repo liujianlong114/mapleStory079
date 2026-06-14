@@ -29,7 +29,32 @@ flutter:
   assets:
     - assets/images/
     - assets/images/ui/login/
+    - assets/images/ui/login/back/
     - assets/scenes/
+    - assets/maps/
+    - assets/maps/back/
+    - assets/maps/back/grassySoil/
+    - assets/maps/tiles/
+    - assets/maps/tiles/grassySoil/
+    - assets/maps/obj/
+    - assets/maps/obj/acc1/
+    - assets/maps/obj/acc8/
+    - assets/maps/obj/connect/
+    - assets/maps/obj/door/
+    - assets/maps/obj/guide/
+    - assets/maps/obj/house/
+    - assets/maps/obj/houseGS/
+    - assets/maps/obj/innSystemTW/
+    - assets/maps/obj/signboard/
+    - assets/maps/tiles/grassySoil/
+    - assets/maps/tiles/woodMarble/
     - assets/audio/
-    - assets/sprites/
+    # Flutter 目录声明不含子目录，必须分别列出
+    - assets/sprites/mob/
+    - assets/sprites/npc/
+    - assets/sprites/player/
+    - assets/sprites/item/
+    - assets/sprites/portal/
+    - assets/images/tiles/
     - assets/characters/parts/
+    - assets/characters/avatars/

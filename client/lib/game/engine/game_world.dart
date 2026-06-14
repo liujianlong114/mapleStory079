@@ -1,30 +1,35 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
+import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/resources/avatar_assets.dart';
 import '../../core/resources/assets.dart';
+import '../../core/resources/map_meta.dart';
 import '../../models/mob.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
+import 'game_controls.dart';
+import 'map_foothold.dart';
+import 'maple_island_map_layer.dart';
+import 'wz_map_layer.dart';
+import 'wz_map_foreground.dart';
+import 'character_part_composer.dart';
 import 'sprite_loader.dart';
 
 /// Flame 游戏世界 —— 负责 Canvas 渲染循环、实体管理、输入处理
 ///
 /// 主要特性：
 /// - 相机跟随玩家 (camera.follow)
-/// - 键盘输入 WASD / 方向键 / 攻击 J / 攻击 Space
-/// - 程序化 TileMap 背景层（无需外部图片，不同 mapId 不同配色）
-/// - 玩家/怪物/NPC/远程玩家 Canvas 组件（阴影 + 血条 + 名字 + 朝向）
-/// - 怪物 AI：近距离追击玩家、远距离随机巡逻
-/// - 伤害飘字 DamagePopup（暴击黄字 + 向上淡出）
-/// - WebSocket 集成：sendPosition / sendAttack / sendDamage / sendDead / sendRevive
-/// - AudioManager：按 mapId 自动播放 BGM；攻击/升级/死亡音效
-/// - 角色属性：HP/MP/EXP/STR/DEX/INT/LUK/AP/SP
-/// - 死亡与复活：HP/回生点（死亡状态机）
-class GameWorld extends FlameGame with HasCollisionDetection {
+/// - 键盘：079 方向键移动 / Ctrl 攻击 / Z 拾取
+class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   GameWorld({
     this.mapId = 1,
     this.mapName = '未知地图',
@@ -41,7 +46,28 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     this.luk = 4,
     this.exp = 0,
     this.bgmAsset,
-  });
+    this.playerGender = 0,
+    this.playerFace = 20100,
+    this.playerHair = 30000,
+    this.playerTop = 0,
+    this.playerBottom = 0,
+    this.playerShoes = 0,
+    this.playerWeapon = 0,
+  })  : _defaultGroundY = playerInitial?.y ?? 605,
+        player = PlayerComponent(
+          position: Vector2(
+            playerInitial?.x ?? mapWidth / 2,
+            playerInitial?.y ?? 605,
+          ),
+          size: Vector2(48, 64),
+          gender: playerGender,
+          face: playerFace,
+          hair: playerHair,
+          top: playerTop,
+          bottom: playerBottom,
+          shoes: playerShoes,
+          weapon: playerWeapon,
+        );
 
   // ===== 地图属性 =====
   final int mapId;
@@ -51,6 +77,37 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   final double tileSize;
   final Vector2? playerInitial;
   final String? bgmAsset;
+  final int playerGender;
+  final int playerFace;
+  final int playerHair;
+  final int playerTop;
+  final int playerBottom;
+  final int playerShoes;
+  final int playerWeapon;
+
+  /// 079 默认地面 Y（无 foothold 数据时的回退）
+  final double _defaultGroundY;
+  MapFootholds? _footholds;
+  double _vrLeft = 0;
+  double _vrRight = 1600;
+  double _vrTop = 0;
+  double _vrBottom = 600;
+
+  // 垂直运动（079：Alt 跳跃 + 重力）
+  double _vy = 0;
+  bool _onGround = true;
+  bool _jumpHeldLast = false;
+  static const double _gravity = 2000;
+  static const double _jumpSpeed = -640;
+  static const double _cameraFootOffset = 520;
+
+  void Function()? onOpenKeyConfig;
+
+  /// 当前玩家所在 x 的可走 foothold Y
+  double get groundY => groundAt(player.position.x, feetY: player.position.y);
+
+  double groundAt(double x, {double? feetY}) =>
+      _footholds?.groundYAt(x, feetY: feetY ?? player.position.y) ?? _defaultGroundY;
 
   // ===== 角色属性 =====
   final int characterId;
@@ -100,48 +157,111 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   })? onStatChange;
 
   // ===== 实体集合 =====
-  late final PlayerComponent player;
+  final PlayerComponent player;
   final List<MobComponent> mobs = [];
   final List<NPCComponent> npcs = [];
+  final _mapReady = Completer<void>();
+
+  /// 地图 foothold / 图层加载完成（供外部 spawn 实体前等待）
+  Future<void> get mapReady => _mapReady.future;
   final Map<int, RemotePlayerComponent> remotePlayers = {};
   final Map<String, GroundLootComponent> _groundLoots = {};
 
   // ===== 节流器 =====
   double _positionThrottle = 0;
-  double _moveApiThrottle = 0;
   static const double _positionThrottleMs = 50 / 1000;
-  static const double _moveApiThrottleMs = 500 / 1000;
+  static const double _moveApiThrottleMs = 1500 / 1000;
+  bool _serverMobSync = false;
+  bool _moveApiInFlight = false;
+  double _moveApiCooldown = 0;
 
-  // 输入状态
-  final Set<LogicalKeyboardKey> _keysDown = {};
+  // 输入状态（由 Flame KeyboardEvents 同步）
+  Set<LogicalKeyboardKey> _keysPressed = {};
+
+  @override
+  KeyEventResult onKeyEvent(
+    KeyEvent event,
+    Set<LogicalKeyboardKey> keysPressed,
+  ) {
+    _keysPressed = Set<LogicalKeyboardKey>.from(keysPressed);
+
+    if (event is KeyDownEvent && !isDead) {
+      if (GameControls.isKeyConfig(event.logicalKey)) {
+        onOpenKeyConfig?.call();
+      } else if (GameControls.isAttack(event.logicalKey)) {
+        _performAttack();
+      } else if (GameControls.isPickup(event.logicalKey)) {
+        _tryAutoPickup(force: true);
+      }
+    }
+    return KeyEventResult.handled;
+  }
+
+  // ============ 键盘输入（兼容旧调用）============
+
+  void handleKeyDown(LogicalKeyboardKey key, bool isDown) {
+    if (isDown) {
+      _keysPressed.add(key);
+      if (GameControls.isAttack(key)) {
+        _performAttack();
+      } else if (GameControls.isPickup(key)) {
+        _tryAutoPickup(force: true);
+      }
+    } else {
+      _keysPressed.remove(key);
+    }
+  }
+
+  bool get _useIslandMap =>
+      mapId == 0 ||
+      mapId == 10000 ||
+      mapId == 1000000 ||
+      mapId == 1000001 ||
+      mapId == 1000002 ||
+      (mapId >= 10000 && mapId < 20000);
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    await GameControls.ensureLoaded();
 
-    // ===== 程序化 TileMap 背景层 =====
-    add(TileMapLayer(
-      width: mapWidth,
-      height: mapHeight,
-      tileSize: tileSize,
-      mapId: mapId,
-    ));
+    final mapFull = await MapMetaFull.load(mapId);
+    _footholds = mapFull?.footholds;
+    if (mapFull != null) {
+      _vrLeft = mapFull.meta.vrLeft.toDouble();
+      _vrRight = mapFull.meta.vrRight.toDouble();
+      _vrTop = mapFull.meta.vrTop.toDouble();
+      _vrBottom = mapFull.meta.vrBottom.toDouble();
+      add(WzMapLayer(mapId: mapId, width: mapWidth, height: mapHeight));
+      if (mapFull.mapLayers.isNotEmpty) {
+        add(WzMapForegroundLayer(mapId: mapId, basePriority: -4));
+      }
+    } else if (_useIslandMap) {
+      add(MapleIslandMapLayer(mapId: mapId, width: mapWidth, height: mapHeight));
+    } else {
+      add(TileMapLayer(
+        width: mapWidth,
+        height: mapHeight,
+        tileSize: tileSize,
+        mapId: mapId,
+      ));
+      add(_WorldBackground(width: mapWidth, height: mapHeight));
+    }
 
-    // ===== 世界背景 (渐变 + 网格) =====
-    add(_WorldBackground(width: mapWidth, height: mapHeight));
+    // 脚点对齐 foothold 主地面
+    final sx = playerInitial?.x ?? mapWidth / 2;
+    final sy = groundAt(sx);
+    player.position = Vector2(sx, sy);
+    _onGround = true;
+    _vy = 0;
 
-    // ===== 玩家 =====
-    player = PlayerComponent(
-      position: playerInitial ?? Vector2(mapWidth / 2, mapHeight / 2),
-      size: Vector2(48, 64),
-    );
     await add(player);
 
-    // ===== 相机 =====
-    camera.follow(
-      player,
-      snap: true,
-      maxSpeed: 600,
+    camera.viewfinder.anchor = Anchor.topLeft;
+    _syncCamera();
+    camera.setBounds(
+      Rect.fromLTWH(_vrLeft, _vrTop, mapWidth, mapHeight).toFlameRectangle(),
+      considerViewport: true,
     );
 
     // ===== 音频：优先服务端 music 字段，否则按 mapId 匹配 =====
@@ -159,7 +279,15 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     ws?.addListener(WsMessageType.revive, _onServerRevive);
     ws?.addListener(WsMessageType.position, _onServerRemotePosition);
     ws?.addListener(WsMessageType.loot, _onServerLoot);
+    ws?.addListener(WsMessageType.mobSpawn, _onServerMobSpawn);
+    ws?.addListener(WsMessageType.mobMove, _onServerMobMove);
+    ws?.addListener(WsMessageType.mobDead, _onServerMobDead);
+    ws?.addListener(WsMessageType.mobRespawn, _onServerMobRespawn);
+    if (ws?.isConnected == true) {
+      _serverMobSync = true;
+    }
     _loadExistingGroundLoot();
+    if (!_mapReady.isCompleted) _mapReady.complete();
   }
 
   Future<void> _loadExistingGroundLoot() async {
@@ -178,20 +306,14 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     ws?.removeListener(WsMessageType.revive, _onServerRevive);
     ws?.removeListener(WsMessageType.position, _onServerRemotePosition);
     ws?.removeListener(WsMessageType.loot, _onServerLoot);
+    ws?.removeListener(WsMessageType.mobSpawn, _onServerMobSpawn);
+    ws?.removeListener(WsMessageType.mobMove, _onServerMobMove);
+    ws?.removeListener(WsMessageType.mobDead, _onServerMobDead);
+    ws?.removeListener(WsMessageType.mobRespawn, _onServerMobRespawn);
     try {
       AudioManager().stopBgm();
     } catch (_) {}
     super.onRemove();
-  }
-
-  // ============ 键盘输入（由 GameScenePage KeyboardListener 驱动）============
-
-  void handleKeyDown(LogicalKeyboardKey key, bool isDown) {
-    if (isDown) {
-      _keysDown.add(key);
-    } else {
-      _keysDown.remove(key);
-    }
   }
 
   // ============ 主循环 ============
@@ -200,6 +322,9 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   void update(double dt) {
     super.update(dt);
     uptime += dt;
+    if (_moveApiCooldown > 0) {
+      _moveApiCooldown -= dt;
+    }
 
     // --- 死亡状态机：暂停移动与攻击，等待复活 ---
     if (isDead) {
@@ -210,36 +335,51 @@ class GameWorld extends FlameGame with HasCollisionDetection {
       return;
     }
 
-    // --- 键盘移动 ---
+    // --- 079 移动 + 跳跃 + foothold ---
     bool moved = false;
-    final move = Vector2.zero();
-    if (_keysDown.contains(LogicalKeyboardKey.keyA) ||
-        _keysDown.contains(LogicalKeyboardKey.arrowLeft)) {
-      move.x -= 1;
+    final left = GameControls.anyMoveLeft(_keysPressed);
+    final right = GameControls.anyMoveRight(_keysPressed);
+    if (left && !right) {
+      player.moveHorizontal(-1, dt);
+      moved = true;
+    } else if (right && !left) {
+      player.moveHorizontal(1, dt);
       moved = true;
     }
-    if (_keysDown.contains(LogicalKeyboardKey.keyD) ||
-        _keysDown.contains(LogicalKeyboardKey.arrowRight)) {
-      move.x += 1;
-      moved = true;
-    }
-    if (_keysDown.contains(LogicalKeyboardKey.keyW) ||
-        _keysDown.contains(LogicalKeyboardKey.arrowUp)) {
-      move.y -= 1;
-      moved = true;
-    }
-    if (_keysDown.contains(LogicalKeyboardKey.keyS) ||
-        _keysDown.contains(LogicalKeyboardKey.arrowDown)) {
-      move.y += 1;
-      moved = true;
-    }
-    if (moved) {
-      player.move(move.normalized(), dt);
-      // 防止角色飘出地图边界
-      player.position.x = player.position.x.clamp(16.0, mapWidth - 16);
-      player.position.y = player.position.y.clamp(16.0, mapHeight - 16);
+    player.position.x = player.position.x.clamp(_vrLeft + 16, _vrRight - 16);
 
-      // 节流发送位置（50ms）
+    final jumpNow = GameControls.anyJump(_keysPressed);
+    if (jumpNow && !_jumpHeldLast && _onGround) {
+      _vy = _jumpSpeed;
+      _onGround = false;
+      player.animationState = 'jump';
+    }
+    _jumpHeldLast = jumpNow;
+
+    if (!_onGround) {
+      _vy += _gravity * dt;
+      player.position.y += _vy * dt;
+      final landing = _footholds?.landingYAt(player.position.x, player.position.y);
+      if (landing != null && player.position.y >= landing && _vy >= 0) {
+        player.position.y = landing;
+        _vy = 0;
+        _onGround = true;
+        player.animationState = moved ? 'walk' : 'idle';
+      }
+    } else {
+      final gy = groundAt(player.position.x, feetY: player.position.y);
+      if (gy > player.position.y + 18) {
+        _onGround = false;
+        _vy = 0;
+      } else {
+        player.position.y = gy;
+        if (!moved) player.animationState = 'idle';
+      }
+    }
+
+    _syncCamera();
+
+    if (moved) {
       _positionThrottle -= dt;
       if (_positionThrottle <= 0) {
         _positionThrottle = _positionThrottleMs;
@@ -249,47 +389,27 @@ class GameWorld extends FlameGame with HasCollisionDetection {
           y: player.position.y,
         );
       }
-      _moveApiThrottle -= dt;
-      if (_moveApiThrottle <= 0 && api != null) {
-        _moveApiThrottle = _moveApiThrottleMs;
-        api!.moveCharacter(characterId, player.position.x, player.position.y);
-        onStatChange?.call(
-          posX: player.position.x,
-          posY: player.position.y,
-        );
-      }
+      _scheduleMoveApiSave();
+      if (_onGround) player.animationState = 'walk';
     }
 
-    // --- 攻击键 (J / Space) ---
-    if (_keysDown.contains(LogicalKeyboardKey.keyJ) ||
-        _keysDown.contains(LogicalKeyboardKey.space)) {
-      if (player.attack()) {
-        attackCount += 1;
-        _doMeleeHit(range: 160);
-        ws?.sendAttack(
-          characterId: characterId,
-          skillId: null,
-          targetId: _lastTargetMobId,
-          x: player.position.x,
-          y: player.position.y,
-        );
-        try {
-          AudioManager().playSfx(SfxAssets.hit);
-        } catch (_) {}
+    // --- 怪物 AI（无 WS 同步时本地模拟）---
+    if (!_serverMobSync) {
+      for (final mob in mobs) {
+        mob.updateAI(dt, player, onDealDamage: (dmg) {
+          if (!mob.mob.isAlive) return;
+          hp -= dmg;
+          if (hp < 0) hp = 0;
+          onStatChange?.call(hp: hp);
+          if (hp <= 0) {
+            _doDead();
+          }
+        });
       }
-    }
-
-    // --- 怪物 AI ---
-    for (final mob in mobs) {
-      mob.updateAI(dt, player, onDealDamage: (dmg) {
-        if (!mob.mob.isAlive) return;
-        hp -= dmg;
-        if (hp < 0) hp = 0;
-        onStatChange?.call(hp: hp);
-        if (hp <= 0) {
-          _doDead();
-        }
-      });
+    } else {
+      for (final mob in mobs) {
+        mob.applyServerTick(dt);
+      }
     }
 
     // --- 自动拾取附近掉落 ---
@@ -301,7 +421,40 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     }
   }
 
+  void _syncCamera() {
+    final viewW = size.x > 0 ? size.x : 800;
+    final viewH = size.y > 0 ? size.y : MapMeta.officialViewportH;
+    var camX = player.position.x - viewW / 2;
+    var camY = player.position.y - _cameraFootOffset;
+    camX = camX.clamp(_vrLeft, math.max(_vrLeft, _vrRight - viewW));
+    camY = camY.clamp(_vrTop, math.max(_vrTop, _vrBottom - viewH));
+    camera.viewfinder.position = Vector2(camX, camY);
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    _syncCamera();
+  }
+
   int? _lastTargetMobId;
+
+  void _performAttack() {
+    if (isDead) return;
+    if (!player.attack()) return;
+    attackCount += 1;
+    _doMeleeHit(range: 160);
+    ws?.sendAttack(
+      characterId: characterId,
+      skillId: null,
+      targetId: _lastTargetMobId,
+      x: player.position.x,
+      y: player.position.y,
+    );
+    try {
+      AudioManager().playSfx(SfxAssets.hit);
+    } catch (_) {}
+  }
 
   void _doMeleeHit({required double range}) {
     final r2 = range * range;
@@ -459,14 +612,15 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     _groundLoots.remove(dropId)?.removeFromParent();
   }
 
-  void _tryAutoPickup() {
+  void _tryAutoPickup({bool force = false}) {
     const pickupRange = 70.0;
     const r2 = pickupRange * pickupRange;
     for (final entry in _groundLoots.entries.toList()) {
       final loot = entry.value;
       final dx = loot.position.x - player.position.x;
       final dy = loot.position.y - player.position.y;
-      if (dx * dx + dy * dy > r2) continue;
+      if (!force && dx * dx + dy * dy > r2) continue;
+      if (force && dx * dx + dy * dy > r2 * 2.25) continue;
       _pickupLoot(entry.key);
       break;
     }
@@ -565,7 +719,8 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   void _doRevive() {
     hp = maxHp;
     mp = maxMp;
-    player.position = playerInitial ?? Vector2(mapWidth / 2, mapHeight / 2);
+    final rx = playerInitial?.x ?? mapWidth / 2;
+    player.position = Vector2(rx, groundAt(rx));
     try {
       AudioManager().playSfx(SfxAssets.revive);
     } catch (_) {}
@@ -581,10 +736,16 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   // ============ 外部 API ============
 
   void movePlayer(Vector2 direction) {
-    player.move(direction, 1 / 60);
+    if (direction.x != 0) {
+      player.moveHorizontal(direction.x > 0 ? 1 : -1, 1 / 60);
+      player.position.y = groundAt(player.position.x);
+    }
   }
 
-  void playerAttack() => player.attack();
+  /// 横版：所有实体 Y 锁定地面
+  double get entityGroundY => groundY;
+
+  void playerAttack() => _performAttack();
 
   void playerUseSkill(int skillId) => player.useSkill(skillId);
 
@@ -670,14 +831,109 @@ class GameWorld extends FlameGame with HasCollisionDetection {
     final payload = msg.payload;
     final cid = payload['character_id'] as int?;
     if (cid == null || cid == characterId) return;
-    final x = payload['x'] as double? ?? 0.0;
-    final y = payload['y'] as double? ?? 0.0;
+    final x = (payload['x'] as num?)?.toDouble() ?? 0.0;
     final name = payload['name'] as String? ?? '玩家$cid';
     updateRemotePlayer(
       characterId: cid,
       name: name,
-      position: Vector2(x, y),
+      position: Vector2(x, groundAt(x)),
     );
+  }
+
+  void _scheduleMoveApiSave() {
+    if (api == null || _moveApiInFlight || _moveApiCooldown > 0) return;
+    _moveApiCooldown = _moveApiThrottleMs;
+    _moveApiInFlight = true;
+    final x = player.position.x;
+    final y = player.position.y;
+    api!
+        .moveCharacter(characterId, x, y)
+        .whenComplete(() {
+          _moveApiInFlight = false;
+        });
+  }
+
+  MobComponent? _mobByInstanceId(int instanceId) {
+    for (final mob in mobs) {
+      if (mob.mob.id == instanceId) return mob;
+    }
+    return null;
+  }
+
+  void _onServerMobSpawn(WsMessage msg) {
+    _serverMobSync = true;
+    final p = msg.payload;
+    final instanceId = (p['instance_id'] as num?)?.toInt() ?? 0;
+    if (instanceId == 0) return;
+    final existing = _mobByInstanceId(instanceId);
+    if (existing != null) {
+      existing.applyServerState(p);
+      return;
+    }
+    final templateId = (p['template_id'] as num?)?.toInt() ?? 0;
+    final x = (p['x'] as num?)?.toDouble() ?? 0;
+    final y = groundAt(x);
+    final rx0 = (p['rx0'] as num?)?.toDouble() ?? (x - 100);
+    final rx1 = (p['rx1'] as num?)?.toDouble() ?? (x + 100);
+    final mob = Mob(
+      id: instanceId,
+      mobId: templateId,
+      name: p['name'] as String? ?? '怪物',
+      level: (p['mob_level'] as num?)?.toInt() ?? (p['level'] as num?)?.toInt() ?? 1,
+      hp: (p['hp'] as num?)?.toInt() ?? 50,
+      maxHp: (p['max_hp'] as num?)?.toInt() ?? 50,
+      attack: 10,
+      defense: 0,
+      expReward: 0,
+      mesoReward: 0,
+      posX: x,
+      posY: y,
+      rx0: rx0,
+      rx1: rx1,
+      spawnY: y,
+      speed: (p['speed'] as num?)?.toInt() ?? 60,
+    );
+    final component = MobComponent(mob: mob, position: Vector2(x, y), planeY: y);
+    component.applyServerState(p);
+    mobs.add(component);
+    add(component);
+  }
+
+  void _onServerMobMove(WsMessage msg) {
+    _serverMobSync = true;
+    final p = msg.payload;
+    final instanceId = (p['instance_id'] as num?)?.toInt() ?? 0;
+    if (instanceId == 0) return;
+    final mob = _mobByInstanceId(instanceId);
+    if (mob == null) {
+      final templateId = (p['template_id'] as num?)?.toInt() ?? 0;
+      if (templateId > 0) {
+        _onServerMobSpawn(msg);
+      }
+      return;
+    }
+    mob.applyServerState(p, minDelta: 1.0);
+  }
+
+  void _onServerMobDead(WsMessage msg) {
+    final instanceId = (msg.payload['instance_id'] as num?)?.toInt() ?? 0;
+    final mob = _mobByInstanceId(instanceId);
+    if (mob == null) return;
+    mob.setHp(0);
+  }
+
+  void _onServerMobRespawn(WsMessage msg) {
+    final p = msg.payload;
+    final instanceId = (p['instance_id'] as num?)?.toInt() ?? 0;
+    var mob = _mobByInstanceId(instanceId);
+    if (mob == null) {
+      _onServerMobSpawn(msg);
+      mob = _mobByInstanceId(instanceId);
+    }
+    if (mob == null) return;
+    final hp = (p['hp'] as num?)?.toInt() ?? mob.mob.maxHp;
+    mob.setHp(hp);
+    mob.applyServerState(p);
   }
 
   /// 添加/更新远程玩家的位置信息（由 WebSocket 消息驱动）
@@ -706,19 +962,25 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   }
 
   void addMob(Mob mob, {Vector2? position}) {
+    if (_mobByInstanceId(mob.id) != null) return;
+    final x = position?.x ?? mob.posX;
+    final y = groundAt(x);
+    mob.posY = y;
     final component = MobComponent(
       mob: mob,
-      position: position ?? Vector2(mob.posX, mob.posY),
+      position: Vector2(x, y),
+      planeY: y,
     );
     mobs.add(component);
     add(component);
   }
 
   void addNPC({required int id, required String name, Vector2? position}) {
+    final x = position?.x ?? mapWidth / 2;
     final npc = NPCComponent(
       npcId: id,
       npcName: name,
-      position: position ?? Vector2(mapWidth / 2, mapHeight / 2),
+      position: Vector2(x, groundAt(x)),
     );
     npcs.add(npc);
     add(npc);
@@ -737,7 +999,7 @@ class GameWorld extends FlameGame with HasCollisionDetection {
   }
 
   @override
-  Color backgroundColor() => const Color(0xFF1a1a2e);
+  Color backgroundColor() => const Color(0xFF87CEEB);
 }
 
 /// ==================== 世界背景 ====================
@@ -779,17 +1041,60 @@ class PlayerComponent extends PositionComponent {
   double attackCooldown = 0.45;
   double _attackTimer = 0.0;
   Sprite? _sprite;
+  final int gender;
+  final int face;
+  final int hair;
+  final int top;
+  final int bottom;
+  final int shoes;
+  final int weapon;
 
-  PlayerComponent({required Vector2 position, Vector2? size})
-      : super(
+  PlayerComponent({
+    required Vector2 position,
+    Vector2? size,
+    this.gender = 0,
+    this.face = 20100,
+    this.hair = 30000,
+    this.top = 0,
+    this.bottom = 0,
+    this.shoes = 0,
+    this.weapon = 0,
+  }) : super(
           position: position,
           size: size ?? Vector2(48, 64),
-          anchor: Anchor.center,
+          anchor: Anchor.bottomCenter,
         );
 
   @override
   Future<void> onLoad() async {
-    _sprite = await SpriteLoader.tryLoad(SpriteDirs.playerStand());
+    final paths = AvatarAssets.candidatePaths(
+      gender: gender,
+      face: face,
+      hair: hair,
+      top: top,
+      bottom: bottom,
+      shoes: shoes,
+      weapon: weapon,
+    );
+    _sprite = await SpriteLoader.tryLoadFirst(paths);
+    _sprite ??= await CharacterPartComposer.composeStand(
+      gender: gender,
+      face: face,
+      hair: hair,
+      top: top,
+      bottom: bottom,
+      shoes: shoes,
+      weapon: weapon,
+    );
+    if (_sprite == null) {
+      _sprite = await SpriteLoader.tryLoad(SpriteDirs.playerStand());
+    }
+    if (_sprite != null) {
+      final sw = _sprite!.image.width.toDouble();
+      final sh = _sprite!.image.height.toDouble();
+      const scale = 1.85;
+      size = Vector2(sw * scale + 4, sh * scale + 4);
+    }
   }
 
   @override
@@ -801,12 +1106,18 @@ class PlayerComponent extends PositionComponent {
     }
   }
 
+  void moveHorizontal(int dir, double dt) {
+    if (dir != 0) {
+      direction = dir > 0 ? 1 : -1;
+      position.x += direction * moveSpeed * dt;
+      animationState = 'walk';
+    }
+  }
+
   void move(Vector2 dir, double dt) {
     if (dir.x != 0) {
-      direction = dir.x > 0 ? 1 : -1;
+      moveHorizontal(dir.x > 0 ? 1 : -1, dt);
     }
-    position.add(dir * moveSpeed * dt);
-    animationState = 'walk';
   }
 
   bool attack() {
@@ -831,7 +1142,8 @@ class PlayerComponent extends PositionComponent {
         canvas.translate(size.x, 0);
         canvas.scale(-1, 1);
       }
-      _sprite!.render(canvas, size: size);
+      final paint = Paint()..filterQuality = FilterQuality.none;
+      _sprite!.render(canvas, size: size, overridePaint: paint);
       canvas.restore();
       _renderAttackGlow(canvas);
       return;
@@ -922,7 +1234,7 @@ class NPCComponent extends PositionComponent {
   }) : super(
           position: position,
           size: Vector2(48, 64),
-          anchor: Anchor.center,
+          anchor: Anchor.bottomCenter,
         );
 
   Sprite? _sprite;
@@ -930,12 +1242,19 @@ class NPCComponent extends PositionComponent {
   @override
   Future<void> onLoad() async {
     _sprite = await SpriteLoader.tryLoad(SpriteDirs.npcPath(npcId));
+    if (_sprite != null) {
+      final sw = _sprite!.image.width.toDouble();
+      final sh = _sprite!.image.height.toDouble();
+      const scale = 1.85;
+      size = Vector2(sw * scale + 4, sh * scale + 4);
+    }
   }
 
   @override
   void render(Canvas canvas) {
     if (_sprite != null) {
-      _sprite!.render(canvas, size: size);
+      final paint = Paint()..filterQuality = FilterQuality.none;
+      _sprite!.render(canvas, size: size, overridePaint: paint);
       _renderNpcName(canvas);
       return;
     }
@@ -993,56 +1312,132 @@ class NPCComponent extends PositionComponent {
   }
 }
 
-/// ==================== 怪物组件 ====================
+/// ==================== 怪物组件（079：水平巡逻 rx0–rx1，近距追击） ====================
 class MobComponent extends PositionComponent {
   final Mob mob;
-  double _aiTimer = 0.0;
   double _attackCooldown = 0.0;
-  Sprite? _sprite;
+  int _facing = 1;
+  Sprite? _standSprite;
+  SpriteAnimation? _moveAnim;
+  SpriteAnimationTicker? _moveTicker;
+  double _targetX = 0;
+  double _targetY = 0;
+  bool _serverMoving = false;
 
-  MobComponent({required this.mob, required Vector2 position})
+  MobComponent({required this.mob, required Vector2 position, this.planeY})
       : super(
           position: position,
-          size: Vector2(60, 60),
-          anchor: Anchor.center,
-        );
+          size: Vector2(64, 64),
+          anchor: Anchor.bottomCenter,
+        ) {
+    _targetX = position.x;
+    _targetY = planeY ?? position.y;
+  }
+
+  /// 横版地面 Y；服务端 Y 忽略，统一锁在此高度
+  final double? planeY;
+
+  double get _rx0 => mob.rx0 > 0 || mob.rx1 > 0 ? mob.rx0 : mob.posX - 100;
+  double get _rx1 => mob.rx0 > 0 || mob.rx1 > 0 ? mob.rx1 : mob.posX + 100;
 
   @override
   Future<void> onLoad() async {
-    _sprite = await SpriteLoader.tryLoad(SpriteDirs.mobPath(mob.mobId));
+    final id = mob.mobId;
+    _standSprite = await SpriteLoader.tryLoad(SpriteDirs.mobPath(id));
+    final movePath = SpriteDirs.mobMovePath(id);
+    for (var frames = 6; frames >= 2; frames--) {
+      final anim = await SpriteLoader.tryLoadAnimation(movePath, frames: frames, stepTime: 0.14);
+      if (anim != null) {
+        _moveAnim = anim;
+        _moveTicker = SpriteAnimationTicker(anim);
+        break;
+      }
+    }
+    if (_standSprite != null) {
+      final sw = _standSprite!.image.width.toDouble();
+      final sh = _standSprite!.image.height.toDouble();
+      const scale = 2.5;
+      size = Vector2(sw * scale + 8, sh * scale + 8);
+    }
+  }
+
+  void applyServerState(Map<String, dynamic> p, {double minDelta = 0}) {
+    final x = (p['x'] as num?)?.toDouble();
+    final lockY = planeY ?? _targetY;
+    if (x != null && (minDelta <= 0 || (x - _targetX).abs() >= minDelta)) {
+      _targetX = x;
+      mob.posX = x;
+    }
+    _targetY = lockY;
+    mob.posY = lockY;
+    final facing = (p['facing'] as num?)?.toInt();
+    if (facing != null && facing != 0) {
+      _facing = facing;
+    }
+    _serverMoving = p['moving'] == true;
+    if (_serverMoving) {
+      mob.status = MobStatus.moving;
+    } else if (mob.isAlive) {
+      mob.status = MobStatus.idle;
+    }
+  }
+
+  void applyServerTick(double dt) {
+    if (!mob.isAlive) return;
+    final lerp = (dt * 12).clamp(0.0, 1.0);
+    final lockY = planeY ?? _targetY;
+    position.y = lockY;
+    mob.posY = lockY;
+    _targetY = lockY;
+    position.x += (_targetX - position.x) * lerp;
+    mob.posX = position.x;
+    if (_serverMoving) {
+      mob.status = MobStatus.moving;
+      _moveTicker?.update(dt);
+    }
   }
 
   void updateAI(double dt, PlayerComponent player, {void Function(int dmg)? onDealDamage}) {
     if (!mob.isAlive) return;
 
-    _aiTimer += dt;
     _attackCooldown -= dt;
+    final lockY = planeY ?? mob.spawnY;
+    position.y = lockY;
+    mob.posY = lockY;
 
-    // 简单 AI：当玩家距离 < 200 时朝玩家移动；距离 < 60 时发起攻击
     final dx = player.position.x - position.x;
     final dy = player.position.y - position.y;
-    final distSq = dx * dx + dy * dy;
+    final horizDist = dx.abs();
+    const aggroRange = 220.0;
+    const vertTolerance = 72.0;
+    final attackRange = mob.attackRange > 0 ? mob.attackRange : 55.0;
+    final speed = mob.moveSpeedPx;
 
-    if (distSq < 200 * 200 && distSq > 50 * 50) {
-      final dist = math.sqrt(distSq);
-      final dirX = dx / dist;
-      final dirY = dy / dist;
-      position.x += dirX * mob.speed * dt * 30;
-      position.y += dirY * mob.speed * dt * 30;
-      mob.posX = position.x;
-      mob.posY = position.y;
-    } else if (_aiTimer > 3) {
-      position.x += (math.Random().nextDouble() - 0.5) * mob.speed * dt * 30;
-      position.y += (math.Random().nextDouble() - 0.5) * mob.speed * dt * 30;
-      _aiTimer = 0;
+    if (horizDist <= attackRange && dy.abs() <= vertTolerance) {
+      mob.status = MobStatus.attacking;
+      if (_attackCooldown <= 0) {
+        _attackCooldown = mob.attackCooldown / 1000.0;
+        if (_attackCooldown <= 0) _attackCooldown = 1.0;
+        final dmg = (mob.attack > 0 ? mob.attack : 1) + math.Random().nextInt(3);
+        onDealDamage?.call(dmg);
+      }
+      return;
     }
 
-    // 近身攻击：玩家距离 < 60 时造成伤害
-    if (distSq < 60 * 60 && _attackCooldown <= 0) {
-      _attackCooldown = 1.2;
-      final dmg = (mob.attack > 0 ? mob.attack : 1) + math.Random().nextInt(3);
-      onDealDamage?.call(dmg);
+    if (horizDist < aggroRange && horizDist > attackRange && dy.abs() <= vertTolerance) {
+      mob.status = MobStatus.moving;
+      _facing = dx > 0 ? 1 : -1;
+      position.x += _facing * speed * dt;
+    } else {
+      mob.status = MobStatus.moving;
+      if (position.x >= _rx1 - 4) _facing = -1;
+      if (position.x <= _rx0 + 4) _facing = 1;
+      position.x += _facing * speed * dt * 0.55;
     }
+
+    position.x = position.x.clamp(_rx0, _rx1);
+    mob.posX = position.x;
+    _moveTicker?.update(dt);
   }
 
   void takeDamage(int damage) {
@@ -1064,8 +1459,17 @@ class MobComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    if (_sprite != null && mob.isAlive) {
-      _sprite!.render(canvas, size: size);
+    final moving = mob.status == MobStatus.moving && _moveTicker != null;
+    final sprite = moving ? _moveTicker!.getSprite() : _standSprite;
+    if (mob.isAlive && sprite != null) {
+      canvas.save();
+      if (_facing < 0) {
+        canvas.translate(size.x, 0);
+        canvas.scale(-1, 1);
+      }
+      final paint = Paint()..filterQuality = FilterQuality.none;
+      sprite.render(canvas, size: size, overridePaint: paint);
+      canvas.restore();
       _renderMobHud(canvas);
       return;
     }

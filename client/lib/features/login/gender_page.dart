@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../core/resources/login_ui_assets.dart';
 import '../../providers/auth_provider.dart';
 import '../maple/wz_scene.dart';
-import '../maple/wz_widgets.dart';
-import 'package:provider/provider.dart';
 
 /// ms079 Login.img/Title/Gender — SetGenderRequest
 class GenderPage extends StatefulWidget {
@@ -39,6 +37,12 @@ class _GenderPageState extends State<GenderPage> {
     }
   }
 
+  void _onButton(String id) {
+    if (_busy) return;
+    if (id == 'male') _pick(0);
+    if (id == 'female') _pick(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_scene == null) {
@@ -50,39 +54,35 @@ class _GenderPageState extends State<GenderPage> {
     return Scaffold(
       body: Stack(
         children: [
-          WzSceneScreen(manifest: _scene!, onButton: (_) {}, playBgm: true),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  '选择性别',
-                  style: TextStyle(color: Color(0xFFFFE082), fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    WzSpriteButton(
-                      normal: LoginUiAssets.buttonStates('btn_yes').first,
-                      hover: LoginUiAssets.buttonOverStates('btn_yes').first,
-                      width: 100,
-                      height: 36,
-                      onPressed: _busy ? null : () => _pick(0),
-                      fallbackLabel: '男生',
+          WzSceneScreen(
+            manifest: _scene!,
+            onButton: _onButton,
+            playBgm: true,
+            overlay: WzLoginPanel(
+              panel: _scene!.loginPanel,
+              panelImage: _scene!.panelImage,
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '选择性别',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFFFE082),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      letterSpacing: 2,
                     ),
-                    const SizedBox(width: 32),
-                    WzSpriteButton(
-                      normal: LoginUiAssets.buttonStates('btn_yes').first,
-                      hover: LoginUiAssets.buttonOverStates('btn_yes').first,
-                      width: 100,
-                      height: 36,
-                      onPressed: _busy ? null : () => _pick(1),
-                      fallbackLabel: '女生',
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '请选择角色性别',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ),
           if (_busy)

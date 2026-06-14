@@ -128,6 +128,12 @@ class Character {
 
   String get className {
     if (characterClass == 0) return '新手';
+    // 079 一转职业编号
+    if (characterClass >= 100 && characterClass < 200) return '战士';
+    if (characterClass >= 200 && characterClass < 300) return '法师';
+    if (characterClass >= 300 && characterClass < 400) return '弓箭手';
+    if (characterClass >= 400 && characterClass < 500) return '飞侠';
+    if (characterClass >= 500 && characterClass < 600) return '海盗';
     switch (characterClass) {
       case 100:
         return '战士';

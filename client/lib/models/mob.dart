@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 enum MobStatus { idle, moving, attacking, hit, dead }
 
@@ -15,6 +14,9 @@ class Mob {
   final int mesoReward;
   double posX;
   double posY;
+  final double rx0;
+  final double rx1;
+  final double spawnY;
   MobStatus status;
   final int speed;
   final double attackRange;
@@ -35,12 +37,18 @@ class Mob {
     required this.mesoReward,
     required this.posX,
     required this.posY,
+    this.rx0 = 0,
+    this.rx1 = 0,
+    double? spawnY,
     this.status = MobStatus.idle,
-    this.speed = 2,
+    this.speed = 60,
     this.attackRange = 50.0,
     this.attackCooldown = 1500,
     this.sprite = '',
-  });
+  }) : spawnY = spawnY ?? posY;
+
+  /// 079 Mob.Speed → 像素/秒（与 ms079 体感接近）
+  double get moveSpeedPx => (speed > 0 ? speed : 60) * 0.045;
 
   bool canAttack() {
     if (_lastAttack == null) return true;
@@ -68,7 +76,12 @@ class Mob {
       mesoReward: (json['meso_reward'] ?? json['mesos'] ?? 5) as int,
       posX: ((json['position_x'] ?? json['x'] ?? 0) as num).toDouble(),
       posY: ((json['position_y'] ?? json['y'] ?? 0) as num).toDouble(),
-      speed: (json['speed'] ?? 2) as int,
+      rx0: (json['rx0'] as num?)?.toDouble() ??
+          (((json['x'] ?? json['position_x'] ?? 0) as num).toDouble() - 100),
+      rx1: (json['rx1'] as num?)?.toDouble() ??
+          (((json['x'] ?? json['position_x'] ?? 0) as num).toDouble() + 100),
+      spawnY: ((json['y'] ?? json['position_y'] ?? 0) as num).toDouble(),
+      speed: (json['speed'] ?? 60) as int,
       attackRange: ((json['attack_range'] ?? 50.0) as num).toDouble(),
       attackCooldown: (json['attack_cooldown'] ?? 1500) as int,
       sprite: (json['sprite'] ?? '') as String,

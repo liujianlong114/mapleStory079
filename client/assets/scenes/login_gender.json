@@ -2,12 +2,44 @@
   "width": 800,
   "height": 600,
   "bgm": "audio/title.mp3",
-  "background": "scenes/login_gender.png",
-  "buttons": null,
+  "use_parallax": true,
+  "parallax_camera": {
+    "x": 22,
+    "y": -1785
+  },
+  "buttons": [
+    {
+      "id": "male",
+      "label": "男生",
+      "rect": {
+        "x": 290,
+        "y": 380,
+        "w": 94,
+        "h": 43
+      },
+      "normal": "images/ui/login/btn_yes_normal.png",
+      "hover": "images/ui/login/btn_yes_over.png",
+      "pressed": "images/ui/login/btn_yes_pressed.png"
+    },
+    {
+      "id": "female",
+      "label": "女生",
+      "rect": {
+        "x": 416,
+        "y": 380,
+        "w": 94,
+        "h": 43
+      },
+      "normal": "images/ui/login/btn_no_normal.png",
+      "hover": "images/ui/login/btn_no_over.png",
+      "pressed": "images/ui/login/btn_no_pressed.png"
+    }
+  ],
   "login_panel": {
-    "x": 0,
-    "y": 0,
-    "w": 0,
-    "h": 0
-  }
+    "x": 268,
+    "y": 320,
+    "w": 263,
+    "h": 179
+  },
+  "panel_image": "images/ui/login/panel_backgrnd.png"
 }

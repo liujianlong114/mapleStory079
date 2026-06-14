@@ -2,12 +2,10 @@
   "width": 800,
   "height": 600,
   "bgm": "audio/title.mp3",
-  "background": "scenes/login_raceselect.png",
-  "buttons": null,
-  "login_panel": {
-    "x": 0,
-    "y": 0,
-    "w": 0,
-    "h": 0
-  }
+  "use_parallax": true,
+  "parallax_camera": {
+    "x": 290,
+    "y": -1220
+  },
+  "buttons": null
 }

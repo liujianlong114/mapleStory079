@@ -675,6 +675,10 @@ const (
 	WSMessageTypeLoot     = "loot"     // 拾取
 	WSMessageTypeDead     = "dead"     // 玩家/怪物死亡
 	WSMessageTypeRevive   = "revive"   // 复活
+	WSMessageTypeMobSpawn   = "mob_spawn"   // 怪物刷出/快照
+	WSMessageTypeMobMove    = "mob_move"    // 怪物位置同步
+	WSMessageTypeMobDead    = "mob_dead"    // 怪物死亡
+	WSMessageTypeMobRespawn = "mob_respawn" // 怪物重生
 	WSMessageTypeSystem   = "system"   // 系统公告
 	WSMessageTypePing     = "ping"     // 心跳
 	WSMessageTypePong     = "pong"     // 心跳响应
@@ -690,6 +694,10 @@ var WSMessageTypes = map[string]bool{
 	WSMessageTypeLoot:     true,
 	WSMessageTypeDead:     true,
 	WSMessageTypeRevive:   true,
+	WSMessageTypeMobSpawn:   true,
+	WSMessageTypeMobMove:    true,
+	WSMessageTypeMobDead:    true,
+	WSMessageTypeMobRespawn: true,
 	WSMessageTypeSystem:   true,
 	WSMessageTypePing:     true,
 	WSMessageTypePong:     true,
