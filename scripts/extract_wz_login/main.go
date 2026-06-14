@@ -22,6 +22,7 @@ import (
 var (
 	wzRoot = flag.String("wz-root", os.Getenv("MAPLE_WZ_ROOT"), "MapleStory 客户端根目录（含 Base.wz）")
 	outDir = flag.String("out", "client/assets", "输出目录")
+	force  = flag.Bool("force", false, "覆盖占位资源（小于 512B 的 PNG / 小于 8KB 的音频）")
 )
 
 type extractJob struct {
@@ -114,6 +115,11 @@ func main() {
 
 	ok, skip, fail := 0, 0, 0
 	for _, job := range jobs {
+		dst := filepath.Join(*outDir, job.OutFile)
+		if !*force && isRealAsset(dst, job.Kind) {
+			skip++
+			continue
+		}
 		paths := []string{job.WzPath, strings.Replace(job.WzPath, "/Map/", "/Map/Map/", 1)}
 		var lastErr error
 		done := false
@@ -176,5 +182,20 @@ func extractOne(archive wzexplorer.File, wzPath, outPath, kind string) error {
 		return os.WriteFile(outPath, data, 0o644)
 	default:
 		return fmt.Errorf("unknown kind %s", kind)
+	}
+}
+
+func isRealAsset(path, kind string) bool {
+	st, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	switch kind {
+	case "png":
+		return st.Size() >= 512
+	case "sound":
+		return st.Size() >= 8192
+	default:
+		return st.Size() > 1024
 	}
 }

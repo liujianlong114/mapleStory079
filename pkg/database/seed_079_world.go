@@ -3,6 +3,7 @@ package database
 // default079Maps 079 经典地图（含原版 MapID + 兼容旧 ID）
 func default079Maps() []Map {
 	legacy := buildMaps([]mapSeed{
+		{0, "冒险的起点", "彩虹岛新手教程", "Bgm00/GoPicnic"},
 		{10000, "彩虹村", "冒险开始的村庄", "Bgm00.mapleisland"},
 		{10100, "彩虹村海滩", "通往明珠港的海滩", "Bgm00.mapleisland"},
 		{10200, "蘑菇森林", "蜗牛与蘑菇出没", "Bgm00.mapleisland"},

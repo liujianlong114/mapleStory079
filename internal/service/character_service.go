@@ -84,8 +84,8 @@ func (s *CharacterService) CreateCharacter(accountID uint, name string, jobType 
 		Level:     1,
 		Exp:       0,
 		MapID:     mapID,
-		PositionX: 0,
-		PositionY: 0,
+		PositionX: spawnXForMap(mapID),
+		PositionY: spawnYForMap(mapID),
 		HP:        baseStats.HP,
 		MaxHP:     baseStats.HP,
 		MP:        baseStats.MP,
@@ -107,6 +107,23 @@ func (s *CharacterService) CreateCharacter(accountID uint, name string, jobType 
 		return nil, fmt.Errorf("seed starter inventory: %w", err)
 	}
 	return character, nil
+}
+
+func spawnXForMap(mapID uint) int {
+	if mapID == 0 || mapID == 10000 || mapID == 1000000 {
+		return 400
+	}
+	return 400
+}
+
+func spawnYForMap(mapID uint) int {
+	if mapID == 0 {
+		return 450
+	}
+	if mapID == 10000 || mapID == 1000000 {
+		return 470
+	}
+	return 450
 }
 
 func jobTypeToSpawn(jobType int) (classID int, mapID uint, ok bool) {

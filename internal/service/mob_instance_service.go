@@ -202,19 +202,37 @@ func (s *MobInstanceService) scheduleRespawn(instanceID uint) {
 }
 
 func defaultSpawns(mapID uint) []spawnDef {
-	baseX, baseY := 800.0, 450.0
-	pool := []uint{100100, 100101, 100200, 100400, 100800}
-	if mapID >= 200000000 {
-		pool = []uint{100401, 100700, 100900, 101000, 109000}
-		baseX, baseY = 700, 400
+	switch {
+	case mapID == 0:
+		return nil
+	case mapID == 10000 || mapID == 1000000 || mapID == 1000001 || mapID == 1000002:
+		pool := []uint{100100, 100101, 100102}
+		out := make([]spawnDef, 0, len(pool)*2)
+		for i, id := range pool {
+			for j := 0; j < 2; j++ {
+				out = append(out, spawnDef{
+					templateID: id,
+					x:          280 + float64(i)*180 + float64(j)*60,
+					y:          470 + float64((i+j)%2)*20,
+				})
+			}
+		}
+		return out
+	default:
+		baseX, baseY := 800.0, 450.0
+		pool := []uint{100100, 100101, 100200, 100400, 100800}
+		if mapID >= 200000000 {
+			pool = []uint{100401, 100700, 100900, 101000, 109000}
+			baseX, baseY = 700, 400
+		}
+		out := make([]spawnDef, 0, len(pool))
+		for i, id := range pool {
+			out = append(out, spawnDef{
+				templateID: id,
+				x:          baseX + float64(i-2)*140 + rand.Float64()*20,
+				y:          baseY + float64((i%2)*2-1)*60,
+			})
+		}
+		return out
 	}
-	out := make([]spawnDef, 0, len(pool))
-	for i, id := range pool {
-		out = append(out, spawnDef{
-			templateID: id,
-			x:          baseX + float64(i-2)*140 + rand.Float64()*20,
-			y:          baseY + float64((i%2)*2-1)*60,
-		})
-	}
-	return out
 }

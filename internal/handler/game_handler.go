@@ -214,9 +214,13 @@ func characterJSON(ch *database.Character) gin.H {
 
 func (h *GameHandler) ListMapMobInstances(c *gin.Context) {
 	mapIDStr := c.Query("map_id")
-	mapID, err := strconv.ParseUint(mapIDStr, 10, 64)
-	if err != nil || mapID == 0 {
+	if mapIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "map_id required"})
+		return
+	}
+	mapID, err := strconv.ParseUint(mapIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid map_id"})
 		return
 	}
 	instances := h.instances.EnsureMap(uint(mapID))
@@ -718,9 +722,13 @@ func (h *GameHandler) PickupLoot(c *gin.Context) {
 
 func (h *GameHandler) ListGroundLoot(c *gin.Context) {
 	mapIDStr := c.Query("map_id")
-	mapID, err := strconv.ParseUint(mapIDStr, 10, 64)
-	if err != nil || mapID == 0 {
+	if mapIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "map_id required"})
+		return
+	}
+	mapID, err := strconv.ParseUint(mapIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid map_id"})
 		return
 	}
 	loots := h.lootSvc.ListByMap(uint(mapID))

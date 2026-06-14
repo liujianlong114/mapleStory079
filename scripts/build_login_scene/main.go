@@ -60,6 +60,11 @@ type buttonDef struct {
 }
 
 func main() {
+	force := false
+	if len(os.Args) > 1 && os.Args[1] == "--force" {
+		force = true
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	}
 	outRoot := filepath.Join("client", "assets")
 	uiDir := filepath.Join(outRoot, "images", "ui", "login")
 	sceneDir := filepath.Join(outRoot, "scenes")
@@ -67,20 +72,20 @@ func main() {
 	mustMkdir(filepath.Join(uiDir, "back"))
 	mustMkdir(sceneDir)
 
-	btnLogin := ensureButton(uiDir, "btn_login", 89, 42)
-	btnSelect := ensureButton(uiDir, "btn_select", 101, 30)
-	btnNew := ensureButton(uiDir, "btn_new", 101, 35)
-	btnDelete := ensureButton(uiDir, "btn_delete", 101, 43)
-	btnQuit := ensureButton(uiDir, "btn_quit", 84, 38)
-	btnPageL := ensureButton(uiDir, "btn_page_l", 86, 74)
-	btnPageR := ensureButton(uiDir, "btn_page_r", 89, 74)
-	ensureButton(uiDir, "btn_yes", 85, 29)
-	ensureButton(uiDir, "btn_no", 85, 29)
-	ensureButton(uiDir, "btn_left", 15, 16)
-	ensureButton(uiDir, "btn_right", 15, 16)
+	btnLogin := ensureButton(uiDir, "btn_login", 89, 42, force)
+	btnSelect := ensureButton(uiDir, "btn_select", 101, 30, force)
+	btnNew := ensureButton(uiDir, "btn_new", 101, 35, force)
+	btnDelete := ensureButton(uiDir, "btn_delete", 101, 43, force)
+	btnQuit := ensureButton(uiDir, "btn_quit", 84, 38, force)
+	btnPageL := ensureButton(uiDir, "btn_page_l", 86, 74, force)
+	btnPageR := ensureButton(uiDir, "btn_page_r", 89, 74, force)
+	ensureButton(uiDir, "btn_yes", 85, 29, force)
+	ensureButton(uiDir, "btn_no", 85, 29, force)
+	ensureButton(uiDir, "btn_left", 15, 16, force)
+	ensureButton(uiDir, "btn_right", 15, 16, force)
 	ensureButtonAliases(uiDir)
-	ensureNewCharPanels(uiDir, true)
-	logoFrames := ensureLogo(uiDir)
+	ensureNewCharPanels(uiDir, force)
+	logoFrames := ensureLogo(uiDir, force)
 
 	savePNG(filepath.Join(sceneDir, "login_title.png"), composeTitleScene(uiDir, logoFrames))
 	savePNG(filepath.Join(sceneDir, "login_charselect.png"), composeCharSelectScene(uiDir))
@@ -196,25 +201,48 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-func ensureButton(dir, name string, w, h int) string {
+const minRealPNGSize = 512
+
+func isRealAsset(p string) bool {
+	st, err := os.Stat(p)
+	if err != nil {
+		return false
+	}
+	return st.Size() >= minRealPNGSize
+}
+
+func ensureButton(dir, name string, w, h int, force bool) string {
 	base := filepath.Join(dir, name)
-	if fileExists(base + ".png") {
+	if !force && isRealAsset(base+".png") {
+		return base
+	}
+	if force && fileExists(base+".png") && !isRealAsset(base+".png") {
+		// 占位文件，允许覆盖
+	} else if fileExists(base+".png") {
 		return base
 	}
 	drawWoodButton(base+".png", w, h, color.RGBA{210, 170, 90, 255}, color.RGBA{160, 110, 50, 255})
-	drawWoodButton(base+"_over.png", w, h, color.RGBA{255, 210, 110, 255}, color.RGBA{190, 130, 60, 255})
-	drawWoodButton(base+"_pressed.png", w, h, color.RGBA{140, 100, 45, 255}, color.RGBA{100, 70, 30, 255})
+	if !isRealAsset(base+"_over.png") {
+		drawWoodButton(base+"_over.png", w, h, color.RGBA{255, 210, 110, 255}, color.RGBA{190, 130, 60, 255})
+	}
+	if !isRealAsset(base+"_pressed.png") {
+		drawWoodButton(base+"_pressed.png", w, h, color.RGBA{140, 100, 45, 255}, color.RGBA{100, 70, 30, 255})
+	}
 	return base
 }
 
-func ensureLogo(dir string) []string {
+func ensureLogo(dir string, force bool) []string {
 	f0 := filepath.Join(dir, "logo_0.png")
 	f1 := filepath.Join(dir, "logo_1.png")
-	if fileExists(f0) && fileExists(f1) {
+	if !force && isRealAsset(f0) && isRealAsset(f1) {
 		return []string{f0, f1}
 	}
-	drawMapleLogo(f0, false)
-	drawMapleLogo(f1, true)
+	if force || !isRealAsset(f0) {
+		drawMapleLogo(f0, false)
+	}
+	if force || !isRealAsset(f1) {
+		drawMapleLogo(f1, true)
+	}
 	return []string{f0, f1}
 }
 
@@ -458,7 +486,7 @@ func ensureNewCharPanels(uiDir string, force bool) {
 }
 
 func drawCharSetPanel(path string, w, h int, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -498,7 +526,7 @@ func drawCharSetPanel(path string, w, h int, force bool) {
 }
 
 func drawCharNamePanel(path string, w, h int, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -516,7 +544,7 @@ func drawCharNamePanel(path string, w, h int, force bool) {
 }
 
 func drawScrollPanel(path string, w, h int, open bool, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -567,7 +595,7 @@ func scrollBorder(img *image.RGBA, w, h int) {
 }
 
 func drawAvatarTab(path string, selected bool, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	// ms079 avatarSel 160×17
@@ -590,7 +618,7 @@ func drawAvatarTab(path string, selected bool, force bool) {
 }
 
 func drawNewCharBannerPNG(path string, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	w, h := 360, 44
@@ -641,7 +669,7 @@ func drawScroll(path string, w, h int, open bool) {
 }
 
 func drawDice(path string, force bool) {
-	if !force && fileExists(path) {
+	if !force && isRealAsset(path) {
 		return
 	}
 	img := image.NewRGBA(image.Rect(0, 0, 37, 26))

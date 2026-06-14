@@ -62,10 +62,41 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	token := middleware.GenerateAuthToken(acc.ID, acc.Username, sessionID, 24*3600)
 
 	utils.OK(c, gin.H{
-		"account":    acc,
+		"account": gin.H{
+			"id":       acc.ID,
+			"username": acc.Username,
+			"email":    acc.Email,
+			"gender":   acc.Gender,
+			"status":   acc.Status,
+		},
 		"token":      token,
 		"session_id": sessionID,
 		"expires_in": 24 * 3600,
+	})
+}
+
+type setGenderRequest struct {
+	AccountID uint `json:"accountId" binding:"required,min=1"`
+	Gender    int  `json:"gender" binding:"required"`
+}
+
+func (h *AuthHandler) SetGender(c *gin.Context) {
+	var req setGenderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	acc, err := h.svc.SetGender(req.AccountID, req.Gender)
+	if err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+	utils.OK(c, gin.H{
+		"account": gin.H{
+			"id":       acc.ID,
+			"username": acc.Username,
+			"gender":   acc.Gender,
+		},
 	})
 }
 

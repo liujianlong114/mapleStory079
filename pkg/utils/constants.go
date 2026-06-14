@@ -14,7 +14,16 @@ package utils
 //
 // 保持十进制的"以 10 为进位"结构，便于通过取模判断转阶。
 const (
-	JobBeginner = 0 // 新手
+	JobBeginner       = 0    // 冒险家新手
+	JobKnightBeginner = 1000 // 骑士团初心者 ms079
+	JobAranBeginner   = 2000 // 战神 ms079
+
+	// ms079 CreateChar JobType 封包字段
+	JobTypeKnight     = 0
+	JobTypeAdventurer = 1
+	JobTypeAran       = 2
+
+	AccountGenderUnset = 10 // ms079 账号未设置性别
 
 	// 1 转
 	JobSwordsman = 100 // 战士（1转）
@@ -172,7 +181,7 @@ type JobInitialStats struct {
 }
 
 var JobInitialStatsMap = map[int]JobInitialStats{
-	JobBeginner:  {HP: 50, MP: 5, STR: 12, DEX: 5, INT: 4, LUK: 4},
+	JobBeginner:  {HP: 50, MP: 50, STR: 12, DEX: 5, INT: 4, LUK: 4},
 	JobSwordsman: {HP: 200, MP: 15, STR: 35, DEX: 10, INT: 4, LUK: 4},
 	JobMagician:  {HP: 100, MP: 50, STR: 4, DEX: 4, INT: 35, LUK: 4},
 	JobBowman:    {HP: 150, MP: 25, STR: 4, DEX: 35, INT: 4, LUK: 4},
@@ -371,7 +380,12 @@ const (
 // ==================== 经典地图 ID ====================
 // 参考经典冒险岛命名，使用与原版相近的整数 ID
 const (
-	// 新手村（彩虹村）
+	// ms079 创建角色出生地图（MapleCharacter.saveNewCharToDB L876）
+	MapTutorialStart = 1000000     // 冒险家 — 彩虹村（Maple Island Amherst）；原版 DB 写入 0 为教程房，进游戏后在彩虹村
+	MapKnightStart   = 130030000 // 骑士团
+	MapAranStart     = 914000000 // 战神
+
+	// 新手村（彩虹村）— 冒险家 returnMap
 	MapMapleIsland         = 10000 // 彩虹村中心
 	MapMapleIslandBeach    = 10100 // 明珠港沙滩
 	MapMapleIslandTraining = 10200 // 新手训练场
