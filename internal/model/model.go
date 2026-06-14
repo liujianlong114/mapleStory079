@@ -14,6 +14,7 @@ type (
 	Item               = database.Item
 	Skill              = database.Skill
 	Quest              = database.Quest
+	CharacterQuest     = database.CharacterQuest
 	Map                = database.Map
 	GameMap            = database.Map
 	NPC                = database.NPC
