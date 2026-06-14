@@ -136,6 +136,9 @@ func registerGameRoutes(r *gin.RouterGroup, h *GameHandler) {
 	quests := r.Group("/quests")
 	{
 		quests.GET("/", h.ListQuests)
+		quests.GET("/character/:characterId", NewQuestHandler().ListCharacterQuests)
+		quests.POST("/accept", NewQuestHandler().AcceptQuest)
+		quests.POST("/complete", NewQuestHandler().CompleteQuest)
 	}
 
 	game := r.Group("/game")

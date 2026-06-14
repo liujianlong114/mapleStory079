@@ -43,12 +43,15 @@ type DialogueResult struct {
 
 // DialogueEffect 对话执行的副作用
 type DialogueEffect struct {
-	NewClass   int    `json:"new_class,omitempty"`
-	NewMapID   int    `json:"new_map_id,omitempty"`
-	NewHP      int    `json:"new_hp,omitempty"`
-	NewMP      int    `json:"new_mp,omitempty"`
-	NewMesos   int64  `json:"new_mesos,omitempty"`
-	ItemGained string `json:"item_gained,omitempty"`
+	NewClass       int    `json:"new_class,omitempty"`
+	NewMapID       int    `json:"new_map_id,omitempty"`
+	NewHP          int    `json:"new_hp,omitempty"`
+	NewMP          int    `json:"new_mp,omitempty"`
+	NewMesos       int64  `json:"new_mesos,omitempty"`
+	ItemGained     string `json:"item_gained,omitempty"`
+	QuestAccepted  uint   `json:"quest_accepted,omitempty"`
+	QuestCompleted uint   `json:"quest_completed,omitempty"`
+	ExpGained      int    `json:"exp_gained,omitempty"`
 }
 
 // NPCScript 已注册的NPC脚本接口
@@ -69,6 +72,7 @@ func NewNPCService() *NPCService {
 	svc := &NPCService{scripts: make(map[int]NPCScript)}
 	svc.registerDefaultScripts()
 	registerWZDialogueScripts(svc)
+	registerBeginnerQuestScripts(svc) // 覆盖彩虹岛任务 NPC
 	return svc
 }
 

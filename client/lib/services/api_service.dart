@@ -629,6 +629,42 @@ class ApiService {
   }
 
   // ============= NPC APIs =============
+  Future<Map<String, dynamic>> startNpcDialogue({
+    required int npcId,
+    required int characterId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/npc/dialogue'),
+      headers: _headers(),
+      body: jsonEncode({
+        'npcId': npcId,
+        'characterId': characterId,
+      }),
+    );
+    final data = await _handleResponse(response);
+    return data['data'] as Map<String, dynamic>? ?? data;
+  }
+
+  Future<Map<String, dynamic>> continueNpcDialogue({
+    required int npcId,
+    required int characterId,
+    required String nodeId,
+    required int choiceIndex,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/npc/dialogue/continue'),
+      headers: _headers(),
+      body: jsonEncode({
+        'npcId': npcId,
+        'characterId': characterId,
+        'nodeId': nodeId,
+        'choiceIndex': choiceIndex,
+      }),
+    );
+    final data = await _handleResponse(response);
+    return data['data'] as Map<String, dynamic>? ?? data;
+  }
+
   Future<Map<String, dynamic>> interactWithNPC({
     required int npcId,
     int? characterId,
