@@ -34,6 +34,11 @@ def _item_spec(item_id: int) -> tuple:
     prefix4 = s[:4]
     if 2000000 <= item_id < 3000000:
         return ("Item.wz", f"Consume/{prefix4}.img"), (s, "info", "icon")
+    if 1000000 <= item_id < 2000000:
+        # 079 装备在 Item.wz/Equip 或 Install 分卷
+        return ("Item.wz", f"Equip/{prefix4}.img"), (s, "info", "icon")
+    if 1300000 <= item_id < 1400000 or 1370000 <= item_id < 1380000:
+        return ("Item.wz", f"Weapon/{prefix4}.img"), (s, "info", "icon")
     if 4000000 <= item_id < 5000000:
         return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
     if 4030000 <= item_id < 4040000:
