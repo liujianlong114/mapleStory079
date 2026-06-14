@@ -131,6 +131,19 @@ type Quest struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// CharacterQuest 角色任务进度（status: 1=进行中 2=已完成）
+type CharacterQuest struct {
+	ID          uint       `gorm:"primary_key" json:"id"`
+	CharacterID uint       `gorm:"index;not null" json:"character_id"`
+	QuestID     uint       `gorm:"index;not null" json:"quest_id"`
+	Status      int        `gorm:"not null;default:1" json:"status"`
+	Progress    int        `gorm:"not null;default:0" json:"progress"`
+	AcceptedAt  time.Time  `json:"accepted_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
 // Map 地图表
 type Map struct {
 	ID          uint      `gorm:"primary_key" json:"id"`

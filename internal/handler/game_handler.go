@@ -16,6 +16,7 @@ type GameHandler struct {
 	combatSvc *service.CombatService
 	lootSvc   *service.LootService
 	instances *service.MobInstanceService
+	questSvc  *service.QuestService
 	wsHandler *WebSocketHandler
 }
 
@@ -25,6 +26,7 @@ func NewGameHandler() *GameHandler {
 		combatSvc: service.NewCombatService(),
 		lootSvc:   service.DefaultLootService,
 		instances: service.DefaultMobInstanceService,
+		questSvc:  service.NewQuestService(),
 	}
 }
 
@@ -593,6 +595,10 @@ func (h *GameHandler) PlayerAttackMob(c *gin.Context) {
 	}
 
 	groundLoots := []service.GroundLoot(nil)
+	questReady := []uint(nil)
+	if result.TargetDead {
+		questReady = h.questSvc.RecordMobKill(ch.ID, req.MobID)
+	}
 	if result.TargetDead && len(result.ItemsDropped) > 0 {
 		mapID := req.MapID
 		if mapID == 0 {
@@ -618,6 +624,7 @@ func (h *GameHandler) PlayerAttackMob(c *gin.Context) {
 		"message":      result.Message,
 		"ground_loots": groundLoots,
 		"instance_id":  req.InstanceID,
+		"quest_ready":  questReady,
 	})
 }
 
