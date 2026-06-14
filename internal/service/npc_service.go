@@ -7,6 +7,7 @@ import (
 
 	"mapleStory079/internal/repository"
 	"mapleStory079/pkg/database"
+	"mapleStory079/pkg/utils"
 )
 
 // ================ NPC 对话系统 ================
@@ -236,7 +237,7 @@ func (s *JobChangeScript) GetNPCID() int { return 1010000 }
 func (s *JobChangeScript) GetNode(nodeID string, character *database.Character) (*DialogueNode, error) {
 	switch nodeID {
 	case "start":
-		if character.Class != 0 {
+		if character.Class != 0 && character.Class != utils.JobBeginner {
 			return &DialogueNode{
 				ID:       "already_job",
 				Speaker:  "转职官",
@@ -264,24 +265,24 @@ func (s *JobChangeScript) GetNode(nodeID string, character *database.Character) 
 			Text:     "欢迎，年轻的冒险者！你想要选择哪个职业开启你的冒险之旅？",
 			NodeType: "choice",
 			Choices: []DialogueChoice{
-				{Text: "战士（崇尚力量）", NextID: "confirm_warrior", Action: "job_change", Data: "1"},
-				{Text: "法师（掌控魔法）", NextID: "confirm_mage", Action: "job_change", Data: "2"},
-				{Text: "弓箭手（精准射击）", NextID: "confirm_archer", Action: "job_change", Data: "3"},
-				{Text: "飞侠（敏捷与幸运）", NextID: "confirm_thief", Action: "job_change", Data: "4"},
-				{Text: "海盗（力量与敏捷）", NextID: "confirm_pirate", Action: "job_change", Data: "5"},
+				{Text: "战士（崇尚力量）", NextID: "confirm_warrior", Action: "job_change", Data: fmt.Sprintf("%d", utils.JobWarrior)},
+				{Text: "法师（掌控魔法）", NextID: "confirm_mage", Action: "job_change", Data: fmt.Sprintf("%d", utils.JobMagician)},
+				{Text: "弓箭手（精准射击）", NextID: "confirm_archer", Action: "job_change", Data: fmt.Sprintf("%d", utils.JobBowman)},
+				{Text: "飞侠（敏捷与幸运）", NextID: "confirm_thief", Action: "job_change", Data: fmt.Sprintf("%d", utils.JobThief)},
+				{Text: "海盗（力量与敏捷）", NextID: "confirm_pirate", Action: "job_change", Data: fmt.Sprintf("%d", utils.JobPirate)},
 				{Text: "再想想…", NextID: "end", Action: "close"},
 			},
 		}, nil
 	case "confirm_warrior":
-		return simpleConfirmNode("你确定要成为战士吗？", "1"), nil
+		return simpleConfirmNode("你确定要成为战士吗？", utils.JobWarrior), nil
 	case "confirm_mage":
-		return simpleConfirmNode("你确定要成为法师吗？", "2"), nil
+		return simpleConfirmNode("你确定要成为法师吗？", utils.JobMagician), nil
 	case "confirm_archer":
-		return simpleConfirmNode("你确定要成为弓箭手吗？", "3"), nil
+		return simpleConfirmNode("你确定要成为弓箭手吗？", utils.JobBowman), nil
 	case "confirm_thief":
-		return simpleConfirmNode("你确定要成为飞侠吗？", "4"), nil
+		return simpleConfirmNode("你确定要成为飞侠吗？", utils.JobThief), nil
 	case "confirm_pirate":
-		return simpleConfirmNode("你确定要成为海盗吗？", "5"), nil
+		return simpleConfirmNode("你确定要成为海盗吗？", utils.JobPirate), nil
 	case "success":
 		return &DialogueNode{
 			ID:       "success",
@@ -317,7 +318,7 @@ func (s *JobChangeScript) ExecuteAction(action string, data string, character *d
 		if err != nil {
 			return nil, errors.New("invalid job data")
 		}
-		if newClass < 1 || newClass > 5 {
+		if _, ok := utils.JobNames[newClass]; !ok {
 			return nil, errors.New("invalid job class")
 		}
 		character.Class = newClass
@@ -327,39 +328,32 @@ func (s *JobChangeScript) ExecuteAction(action string, data string, character *d
 	return nil, nil
 }
 
-func simpleConfirmNode(text string, classData string) *DialogueNode {
+func simpleConfirmNode(text string, classData int) *DialogueNode {
 	return &DialogueNode{
 		ID:       "confirm",
 		Speaker:  "转职官",
 		Text:     text,
 		NodeType: "choice",
 		Choices: []DialogueChoice{
-			{Text: "是的，我确定", NextID: "success", Action: "job_change", Data: classData},
+			{Text: "是的，我确定", NextID: "success", Action: "job_change", Data: fmt.Sprintf("%d", classData)},
 			{Text: "不，我再想想", NextID: "decline", Action: "close"},
 		},
 	}
 }
 
 func applyJobInitialStats(character *database.Character, class int) {
-	// 转职时给予职业初始属性微调（仅示例）
-	switch class {
-	case 1: // 战士
-		character.STR += 5
-		character.MaxHP += 50
-	case 2: // 法师
-		character.INT += 5
-		character.MaxMP += 50
-	case 3: // 弓箭手
-		character.DEX += 5
-	case 4: // 飞侠
-		character.LUK += 5
-		character.DEX += 3
-	case 5: // 海盗
-		character.STR += 3
-		character.DEX += 3
+	stats, ok := utils.JobInitialStatsMap[class]
+	if !ok {
+		return
 	}
-	character.HP = character.MaxHP
-	character.MP = character.MaxMP
+	character.STR = stats.STR
+	character.DEX = stats.DEX
+	character.INT = stats.INT
+	character.LUK = stats.LUK
+	character.MaxHP = stats.HP
+	character.MaxMP = stats.MP
+	character.HP = stats.HP
+	character.MP = stats.MP
 }
 
 // --------- 传送门脚本 ---------
@@ -376,10 +370,10 @@ func (s *PortalScript) GetNode(nodeID string, character *database.Character) (*D
 			Text:     fmt.Sprintf("你现在位于地图 %d，选择要前往的目的地：", character.MapID),
 			NodeType: "choice",
 			Choices: []DialogueChoice{
-				{Text: "前往新手村 (10000)", NextID: "teleport", Action: "teleport", Data: "10000"},
-				{Text: "前往勇士部落 (1020000)", NextID: "teleport", Action: "teleport", Data: "1020000"},
-				{Text: "前往魔法密林 (1030000)", NextID: "teleport", Action: "teleport", Data: "1030000"},
-				{Text: "前往射手村 (1040000)", NextID: "teleport", Action: "teleport", Data: "1040000"},
+				{Text: "前往新手村", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapMapleIsland)},
+				{Text: "前往明珠港", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapSouthPerry)},
+				{Text: "前往魔法密林", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapEllinia)},
+				{Text: "前往射手村", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapHenesys)},
 				{Text: "不去了", NextID: "end", Action: "close"},
 			},
 		}, nil
@@ -472,22 +466,10 @@ func (s *MerchantScript) ExecuteAction(action string, data string, character *da
 
 // classNameByClass 将职业 ID 映射为中文名称。
 func classNameByClass(class int) string {
-	switch class {
-	case 0:
-		return "新手"
-	case 1:
-		return "战士"
-	case 2:
-		return "法师"
-	case 3:
-		return "弓箭手"
-	case 4:
-		return "飞侠"
-	case 5:
-		return "海盗"
-	default:
-		return "未知"
+	if name, ok := utils.JobNames[class]; ok {
+		return name
 	}
+	return "未知"
 }
 
 // GetAvailableNPCs 返回可用的NPC列表（便于前端展示）。

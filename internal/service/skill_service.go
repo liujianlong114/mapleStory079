@@ -142,14 +142,23 @@ func (s *SkillService) UseSkill(character *database.Character, skillID uint, tar
 // primaryStat 根据技能所属职业选择主要属性（用于伤害计算）。
 func (s *SkillService) primaryStat(character *database.Character, skill *database.Skill) int {
 	switch skill.JobClass {
-	case utils.JobWarrior, utils.JobPirate:
+	case utils.JobSwordsman, utils.JobFighter,
+		utils.JobPage, utils.JobSpearman, utils.JobCrusader,
+		utils.JobWhiteKnight, utils.JobDragonKnight:
 		return character.STR
-	case utils.JobMagician:
+	case utils.JobMagician, utils.JobFirePoison, utils.JobIceLightning,
+		utils.JobCleric, utils.JobFirePoisonWizard, utils.JobIceLightningWizard,
+		utils.JobPriest:
 		return character.INT
-	case utils.JobBowman:
+	case utils.JobBowman, utils.JobHunter, utils.JobCrossbow,
+		utils.JobRanger, utils.JobSniper:
 		return character.DEX
-	case utils.JobThief:
+	case utils.JobThief, utils.JobAssassin, utils.JobBandit,
+		utils.JobHermit, utils.JobChiefBandit:
 		return character.LUK
+	case utils.JobPirate, utils.JobBrawler, utils.JobGunslinger,
+		utils.JobMarauder, utils.JobOutlaw:
+		return character.STR
 	default:
 		return character.STR
 	}
@@ -221,7 +230,7 @@ func (s *SkillService) RemainingCoolDownMs(characterID, skillID uint) int {
 }
 
 func coolDownKey(characterID, skillID uint) string {
-	return string(rune(characterID)) + ":" + string(rune(skillID))
+	return fmt.Sprintf("%d:%d", characterID, skillID)
 }
 
 // AssignSkillPoint 将技能点分配到指定技能（仅当角色拥有该技能且还未达到最大等级时）。
