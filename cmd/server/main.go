@@ -41,6 +41,7 @@ func main() {
 		&database.Item{},
 		&database.Skill{},
 		&database.Quest{},
+		&database.CharacterQuest{},
 		&database.Map{},
 		&database.NPC{},
 		&database.Mob{},

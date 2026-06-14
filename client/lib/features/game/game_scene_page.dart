@@ -317,13 +317,104 @@ class _GameScenePageState extends State<GameScenePage> {
       });
       return;
     }
-    showNPCDialogue(
-      context,
-      npcName: npc.npcName,
-      dialogue: npc.dialogue.isNotEmpty
-          ? npc.dialogue
-          : '你好，冒险者！',
-      options: const ['再见'],
+    _runNpcDialogue(npc.npcId, npc.npcName, npc.dialogue);
+  }
+
+  Future<void> _runNpcDialogue(int npcId, String fallbackName, String fallbackText) async {
+    final api = ApiService();
+    final charId = widget.characterId;
+    try {
+      var result = await api.startNpcDialogue(npcId: npcId, characterId: charId);
+      if (!mounted) return;
+      await _showDialogueNode(result, npcId, charId, fallbackName, fallbackText);
+    } catch (e) {
+      if (!mounted) return;
+      showNPCDialogue(
+        context,
+        npcName: fallbackName,
+        dialogue: fallbackText.isNotEmpty ? fallbackText : '你好，冒险者！',
+        options: const ['再见'],
+      );
+    }
+  }
+
+  Future<void> _showDialogueNode(
+    Map<String, dynamic> result,
+    int npcId,
+    int charId,
+    String fallbackName,
+    String fallbackText,
+  ) async {
+    final node = result['node'] as Map<String, dynamic>?;
+    if (node == null || !mounted) return;
+
+    final npcName = result['npc_name'] as String? ?? fallbackName;
+    final text = node['text'] as String? ?? fallbackText;
+    final nodeId = node['id'] as String? ?? 'start';
+    final nodeType = node['node_type'] as String? ?? 'choice';
+    final choices = (node['choices'] as List?)
+            ?.map((c) => c as Map<String, dynamic>)
+            .toList() ??
+        [];
+
+    final options = choices.map((c) => c['text'] as String? ?? '').where((t) => t.isNotEmpty).toList();
+    if (options.isEmpty) {
+      options.add('继续');
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => NPCDialogueWidget(
+        npcName: npcName,
+        dialogue: text,
+        options: options,
+        onOptionSelected: (option) async {
+          Navigator.of(ctx).pop();
+          final idx = options.indexOf(option);
+          if (nodeType == 'end' || idx < 0) return;
+
+          try {
+            final api = ApiService();
+            final next = await api.continueNpcDialogue(
+              npcId: npcId,
+              characterId: charId,
+              nodeId: nodeId,
+              choiceIndex: idx,
+            );
+            final effects = next['effects'] as Map<String, dynamic>?;
+            if (effects != null && mounted) {
+              await context.read<GameProvider>().loadCharacterState(charId);
+              final exp = effects['exp_gained'] as int? ?? 0;
+              if (exp > 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('获得 $exp 经验！')),
+                );
+              }
+            }
+            if (!mounted) return;
+            final nextNode = next['node'] as Map<String, dynamic>?;
+            if (nextNode != null && nextNode['node_type'] != 'end') {
+              await _showDialogueNode(next, npcId, charId, fallbackName, fallbackText);
+            } else if (nextNode != null) {
+              await showDialog<void>(
+                context: context,
+                builder: (ctx2) => NPCDialogueWidget(
+                  npcName: npcName,
+                  dialogue: nextNode['text'] as String? ?? '再见！',
+                  options: const ['再见'],
+                  onOptionSelected: (_) => Navigator.of(ctx2).pop(),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('对话失败: $e')),
+              );
+            }
+          }
+        },
+      ),
     );
   }
 

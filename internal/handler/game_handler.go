@@ -593,6 +593,10 @@ func (h *GameHandler) PlayerAttackMob(c *gin.Context) {
 	}
 
 	groundLoots := []service.GroundLoot(nil)
+	if result.TargetDead {
+		questSvc := service.NewQuestService()
+		_ = questSvc.OnMobKilled(ch.ID, req.MobID)
+	}
 	if result.TargetDead && len(result.ItemsDropped) > 0 {
 		mapID := req.MapID
 		if mapID == 0 {

@@ -29,16 +29,17 @@ BEGINNER_ITEMS = [
 
 
 def _item_spec(item_id: int) -> tuple:
-    """079 Item.wz 分 Consume/Etc/Install 等子目录，条目在 .img 内按 8 位 ID 索引。"""
+    """079 Item.wz 分 Consume/Etc/Install/Weapon 等子目录。"""
     s = f"{item_id:08d}"
     prefix4 = s[:4]
     if 2000000 <= item_id < 3000000:
         return ("Item.wz", f"Consume/{prefix4}.img"), (s, "info", "icon")
     if 4000000 <= item_id < 5000000:
         return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    if 4030000 <= item_id < 4040000:
-        return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    # 装备类在 Install 下按 ID 前 4 位分卷
+    if 1300000 <= item_id < 1400000 or 1370000 <= item_id < 1380000:
+        return ("Item.wz", f"Weapon/{prefix4}.img"), (s, "info", "icon")
+    if 1000000 <= item_id < 2000000:
+        return ("Item.wz", f"Install/{prefix4}.img"), (s, "info", "icon")
     return ("Item.wz", f"Install/{prefix4}.img"), (s, "info", "icon")
 
 
