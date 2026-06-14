@@ -144,6 +144,7 @@ func registerGameRoutes(r *gin.RouterGroup, h *GameHandler) {
 		game.POST("/gain-exp", h.GainExp)
 		game.POST("/move", h.MoveCharacter)
 		game.POST("/restore", h.RestoreCharacter)
+		game.POST("/change-map", h.ChangeMap)
 		game.POST("/levelup/:id", h.LevelUpCharacter)
 		game.POST("/add-ap", h.AddAbilityPoints)
 		game.GET("/map-instances", h.ListMapMobInstances)

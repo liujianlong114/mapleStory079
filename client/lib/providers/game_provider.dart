@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../models/character.dart';
 import '../models/game_map.dart';
 import '../models/game_state.dart';
+import '../game/engine/wz_map_layer.dart';
 import '../services/api_service.dart';
 
 class GameProvider with ChangeNotifier {
@@ -159,6 +160,38 @@ class GameProvider with ChangeNotifier {
 
   Future<bool> moveDown() async {
     return move(posX, posY + 10);
+  }
+
+  /// 传送门切换地图（需客户端已有目标图 JSON）
+  Future<bool> warpToMap(int targetMapId, {String portalName = ''}) async {
+    if (_currentCharacter == null) return false;
+    if (!await MapMetaFull.hasAsset(targetMapId)) {
+      debugPrint('warpToMap: no client asset for map $targetMapId');
+      return false;
+    }
+    try {
+      final data = await _api.changeMap(
+        _currentCharacter!.id,
+        targetMapId,
+        portalName: portalName,
+      );
+      final px = (data['position_x'] as num?)?.toDouble();
+      final py = (data['position_y'] as num?)?.toDouble();
+      _currentCharacter = await _api.getCharacter(_currentCharacter!.id);
+      _state.mapId = targetMapId;
+      if (px != null) _state.posX = px;
+      if (py != null) _state.posY = py;
+      try {
+        _currentMap = await _api.getMap(targetMapId);
+        _state.mapName = _currentMap?.name ?? _state.mapName;
+      } catch (_) {}
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = '传送失败: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> gainExperience(int expAmount) async {

@@ -167,6 +167,61 @@ def parse_spawn(map_img: WzSubProperty) -> Tuple[int, int]:
     return 400, 605
 
 
+def parse_portals(map_img: WzSubProperty) -> List[Dict[str, Any]]:
+    node = map_img.get("portal")
+    if not isinstance(node, WzSubProperty):
+        return []
+    out: List[Dict[str, Any]] = []
+    for ch in node.children():
+        if not isinstance(ch, WzSubProperty):
+            continue
+        try:
+            pid = int(ch.name)
+        except ValueError:
+            continue
+        out.append(
+            {
+                "id": pid,
+                "name": prop_str(ch, "pn"),
+                "type": prop_int(ch, "pt"),
+                "x": prop_int(ch, "x"),
+                "y": prop_int(ch, "y"),
+                "targetMap": prop_int(ch, "tm"),
+                "targetName": prop_str(ch, "tn"),
+            }
+        )
+    return out
+
+
+def load_tile_origins_from_xml(tS: str) -> Dict[Tuple[str, int], Tuple[int, int]]:
+    """ms079 XML 中的 origin（decode 失败时的回退）。"""
+    if tS != "grassySoil":
+        return {}
+    xml_path = os.environ.get(
+        "GRASSY_TILE_XML",
+        "/Users/lijianjun/GolandProjects/mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/Map.wz/Tile/grassySoil.img.xml",
+    )
+    if not os.path.isfile(xml_path):
+        return {}
+    import xml.etree.ElementTree as ET
+
+    root = ET.parse(xml_path).getroot()
+    out: Dict[Tuple[str, int], Tuple[int, int]] = {}
+    for group in root.findall("imgdir"):
+        u = group.get("name")
+        if u in (None, "info"):
+            continue
+        for canvas in group.findall("canvas"):
+            no_s = canvas.get("name")
+            if no_s is None:
+                continue
+            origin = canvas.find('vector[@name="origin"]')
+            ox = int(origin.get("x", 0)) if origin is not None else 0
+            oy = int(origin.get("y", 0)) if origin is not None else 0
+            out[(u, int(no_s))] = (ox, oy)
+    return out
+
+
 def ground_y_at(footholds: List[Dict[str, int]], x: int, feet_y: int, fallback: int = 605) -> int:
     """与 HeavenClient FootholdTree::get_fhid_below 一致：脚下最近可站立面（Y≥脚点）。"""
     ys: List[float] = []
@@ -470,6 +525,7 @@ def main() -> int:
     layers = parse_back_layers(map_img)
     footholds = parse_footholds(map_img)
     map_layers = parse_map_layers(map_img)
+    portals = parse_portals(map_img)
     spawn_x, _ = parse_spawn(map_img)
     spawn_y = ground_y_at(footholds, spawn_x, 605)
 
@@ -489,6 +545,7 @@ def main() -> int:
         "layers": layers,
         "mapLayers": map_layers,
         "footholds": footholds,
+        "portals": portals,
         "spawnX": spawn_x,
         "spawnY": spawn_y,
     }
@@ -528,14 +585,27 @@ def main() -> int:
             ook += 1
     print(f"✓ obj PNG {ook}/{len(obj_keys)}")
 
+    xml_origins = load_tile_origins_from_xml("grassySoil")
+
     for ml in map_layers:
         tS = ml.get("tS") or "grassySoil"
         kept_tiles = []
         for t in ml.get("tiles", []):
             key = (tS, t.get("u", ""), int(t.get("no", 0)))
+            ox, oy = tile_origins.get(key, (0, 0))
             if key not in tile_origins:
-                continue
-            ox, oy = tile_origins[key]
+                u, no = key[1], key[2]
+                png_path = os.path.join(args.out, "maps", "tiles", tS, f"{u}_{no}.png")
+                if os.path.isfile(png_path) and os.path.getsize(png_path) >= 40:
+                    meta_path = png_path + ".json"
+                    if os.path.isfile(meta_path):
+                        with open(meta_path, encoding="utf-8") as mf:
+                            meta = json.load(mf)
+                        ox, oy = int(meta.get("ox", 0)), int(meta.get("oy", 0))
+                    else:
+                        ox, oy = xml_origins.get((u, no), (0, 0))
+                else:
+                    continue
             t["ox"] = ox
             t["oy"] = oy
             kept_tiles.append(t)

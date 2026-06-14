@@ -72,4 +72,18 @@ class MapFootholds {
     if (hits.isEmpty) return null;
     return hits.reduce(math.min);
   }
+
+  /// x 处最低可站立面（Y 最大 = 屏幕最下方）
+  double? lowestWalkableYAt(double x) {
+    final ys = walkableYAt(x);
+    if (ys.isEmpty) return null;
+    return ys.reduce(math.max);
+  }
+
+  /// 出生/传送落点：脚下最近面，否则取主地面
+  double snapSpawnY(double x, double hintY) {
+    final atFeet = groundYAt(x, feetY: hintY);
+    if (atFeet != null) return atFeet;
+    return lowestWalkableYAt(x) ?? hintY;
+  }
 }

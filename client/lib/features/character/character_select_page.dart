@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/resources/assets.dart';
+import '../../core/storage/storage_service.dart';
 import '../../models/character.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/game_provider.dart';
@@ -82,6 +83,11 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
       setState(() => _errorMessage = game.errorMessage ?? '无法进入游戏');
       return;
     }
+    final token = ApiService().token;
+    if (token != null && token.isNotEmpty) {
+      await StorageService().saveToken(token);
+    }
+    await StorageService().saveCharacterId(c.id);
     if (mounted) {
       await AudioManager().stopBgm();
       Navigator.of(context).pushReplacementNamed('/game-scene');

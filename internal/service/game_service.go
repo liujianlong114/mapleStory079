@@ -139,8 +139,8 @@ func (s *GameService) GetAllSkills() ([]database.Skill, error) {
 
 // ========== 地图切换 ==========
 
-// ChangeMap 将角色移动到新地图（重置位置到地图入口点）。
-func (s *GameService) ChangeMap(ch *database.Character, newMapID uint) error {
+// ChangeMap 将角色移动到新地图（落点到目标图入口传送门附近）。
+func (s *GameService) ChangeMap(ch *database.Character, newMapID uint, portalName string) error {
 	if ch == nil {
 		return fmt.Errorf("nil character")
 	}
@@ -149,17 +149,26 @@ func (s *GameService) ChangeMap(ch *database.Character, newMapID uint) error {
 		return fmt.Errorf("map %d not found: %w", newMapID, err)
 	}
 	ch.MapID = newMapID
-	ch.PositionX = 0
-	ch.PositionY = 0
-	if m != nil {
-		if m.Width > 0 {
-			ch.PositionX = m.Width / 2
-		}
-		if m.Height > 0 {
-			ch.PositionY = m.Height / 2
-		}
-	}
+	x, y := spawnForMap(newMapID, portalName)
+	ch.PositionX = x
+	ch.PositionY = y
+	_ = m
 	return nil
+}
+
+func spawnForMap(mapID uint, portalName string) (int, int) {
+	// 079 彩虹村 / 南门外道等 — 与 client/assets/maps/*.json spawn 对齐
+	switch mapID {
+	case 1000000:
+		return 400, 605
+	case 20000:
+		if portalName == "in00" {
+			return -140, 273
+		}
+		return 400, 65
+	default:
+		return 400, 605
+	}
 }
 
 // ========== Gameplay Helpers ==========

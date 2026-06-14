@@ -21,6 +21,7 @@ import '../../services/websocket_service.dart';
 import 'game_controls.dart';
 import 'map_foothold.dart';
 import 'maple_island_map_layer.dart';
+import 'portal_component.dart';
 import 'wz_map_layer.dart';
 import 'wz_map_foreground.dart';
 import 'sprite_loader.dart';
@@ -67,7 +68,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     this.playerEyeAcc = 0,
     this.playerEarring = 0,
     this.playerLongcoat = 0,
-  })  : _defaultGroundY = playerInitial?.y ?? 605,
+  })  : _spawnY = playerInitial?.y ?? 605,
         player = PlayerComponent(
           position: Vector2(
             playerInitial?.x ?? mapWidth / 2,
@@ -115,9 +116,11 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final int playerEarring;
   final int playerLongcoat;
 
-  /// 079 默认地面 Y（无 foothold 数据时的回退）
-  final double _defaultGroundY;
+  /// 地图默认出生点 Y（仅初始落点回退）
+  final double _spawnY;
   MapFootholds? _footholds;
+  final List<PortalComponent> _portals = [];
+  double _portalCooldown = 0;
   double _vrLeft = 0;
   double _vrRight = 1600;
   double _vrTop = 0;
@@ -162,12 +165,19 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   double get groundY => groundAt(player.position.x, feetY: player.position.y);
 
   double? tryGroundAt(double x, {double? feetY}) {
-    if (_footholds == null) return _defaultGroundY;
+    if (_footholds == null) return null;
     return _footholds!.groundYAt(x, feetY: feetY ?? player.position.y);
   }
 
-  double groundAt(double x, {double? feetY}) =>
-      tryGroundAt(x, feetY: feetY) ?? _defaultGroundY;
+  double groundAt(double x, {double? feetY, bool allowFallback = false}) {
+    final gy = tryGroundAt(x, feetY: feetY);
+    if (gy != null) return gy;
+    if (!allowFallback) return player.position.y;
+    return _footholds?.lowestWalkableYAt(x) ?? _spawnY;
+  }
+
+  double _snapSpawnY(double x, double hintY) =>
+      _footholds?.snapSpawnY(x, hintY) ?? hintY;
 
   // ===== 角色属性 =====
   final int characterId;
@@ -216,6 +226,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     double? posY,
   })? onStatChange;
   void Function(NPCComponent npc)? onNpcInteract;
+  void Function(int targetMapId, String targetPortalName)? onMapWarp;
 
   // ===== 实体集合 =====
   final PlayerComponent player;
@@ -283,7 +294,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       mapId == 1000000 ||
       mapId == 1000001 ||
       mapId == 1000002 ||
-      (mapId >= 10000 && mapId < 20000);
+      (mapId >= 10000 && mapId <= 20000);
 
   @override
   Future<void> onLoad() async {
@@ -330,14 +341,19 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       await world.add(_WorldBackground(width: mapWidth, height: mapHeight));
     }
 
-    // 脚点对齐 foothold 主地面
-    final sx = playerInitial?.x ?? mapWidth / 2;
-    final sy = groundAt(sx);
+    // 脚点对齐 foothold（079：出生点必须落在可走面上）
+    final sx = playerInitial?.x ?? mapFull?.meta.spawnX.toDouble() ?? mapWidth / 2;
+    final hintY = playerInitial?.y ?? mapFull?.meta.spawnY.toDouble() ?? _spawnY;
+    final sy = _snapSpawnY(sx, hintY);
     player.position = Vector2(sx, sy);
     _onGround = true;
     _vy = 0;
 
     await world.add(player);
+
+    if (mapFull != null) {
+      await _spawnPortals(mapFull.portals);
+    }
 
     camera.viewfinder.anchor = Anchor.topLeft;
     _syncCamera();
@@ -414,6 +430,10 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       return;
     }
 
+    if (_portalCooldown > 0) {
+      _portalCooldown -= dt;
+    }
+
     // --- 079 移动 + 跳跃 + foothold ---
     bool moved = false;
     final left = GameControls.anyMoveLeft(_keysPressed);
@@ -464,6 +484,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     }
 
     _syncCamera();
+    _checkPortalWarp();
 
     if (moved) {
       _positionThrottle -= dt;
@@ -806,7 +827,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   void _respawnOnMap() {
     final rx = playerInitial?.x ?? mapWidth / 2;
-    final gy = groundAt(rx);
+    final gy = groundAt(rx, allowFallback: true);
     player.position = Vector2(rx, gy);
     _vy = 0;
     _onGround = true;
@@ -818,7 +839,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     hp = maxHp;
     mp = maxMp;
     final rx = playerInitial?.x ?? mapWidth / 2;
-    player.position = Vector2(rx, groundAt(rx));
+    player.position = Vector2(rx, groundAt(rx, allowFallback: true));
     try {
       AudioManager().playSfx(SfxAssets.revive);
     } catch (_) {}
@@ -833,10 +854,44 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   // ============ 外部 API ============
 
+  Future<void> _spawnPortals(List<MapPortalDef> defs) async {
+    for (final p in defs) {
+      if (p.type == 0 || p.type == 9) continue; // spawn / scripted tutorial
+      if (p.targetMap <= 0 || p.targetMap >= 999999999) continue;
+      final comp = PortalComponent(
+        portalId: p.id,
+        portalName: p.name,
+        portalType: p.type,
+        targetMapId: p.targetMap,
+        targetPortalName: p.targetName,
+        worldPosition: Vector2(p.x.toDouble(), p.y.toDouble()),
+        priority: 20,
+      );
+      _portals.add(comp);
+      await world.add(comp);
+    }
+  }
+
+  void _checkPortalWarp() {
+    if (_portalCooldown > 0 || onMapWarp == null) return;
+    final feet = player.position;
+    for (final portal in _portals) {
+      if (!portal.isVisible) continue;
+      if (!portal.containsPoint(feet)) continue;
+      if (portal.targetMapId <= 0) continue;
+      _portalCooldown = 1.2;
+      try {
+        AudioManager().playSfx(SfxAssets.portal);
+      } catch (_) {}
+      onMapWarp?.call(portal.targetMapId, portal.targetPortalName);
+      return;
+    }
+  }
+
   void movePlayer(Vector2 direction) {
     if (direction.x != 0) {
       player.moveHorizontal(direction.x > 0 ? 1 : -1, 1 / 60);
-      player.position.y = groundAt(player.position.x);
+      player.position.y = groundAt(player.position.x, allowFallback: true);
     }
   }
 
@@ -934,7 +989,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     updateRemotePlayer(
       characterId: cid,
       name: name,
-      position: Vector2(x, groundAt(x)),
+      position: Vector2(x, groundAt(x, allowFallback: true)),
     );
   }
 
@@ -970,7 +1025,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     }
     final templateId = (p['template_id'] as num?)?.toInt() ?? 0;
     final x = (p['x'] as num?)?.toDouble() ?? 0;
-    final y = groundAt(x);
+    final y = groundAt(x, allowFallback: true);
     final rx0 = (p['rx0'] as num?)?.toDouble() ?? (x - 100);
     final rx1 = (p['rx1'] as num?)?.toDouble() ?? (x + 100);
     final mob = Mob(
@@ -1062,7 +1117,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   void addMob(Mob mob, {Vector2? position}) {
     if (_mobByInstanceId(mob.id) != null) return;
     final x = position?.x ?? mob.posX;
-    final y = groundAt(x);
+    final y = groundAt(x, allowFallback: true);
     mob.posY = y;
     final component = MobComponent(
       mob: mob,
@@ -1086,7 +1141,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       npcName: name,
       dialogue: dialogue,
       hasShop: hasShop,
-      position: Vector2(x, groundAt(x)),
+      position: Vector2(x, groundAt(x, allowFallback: true)),
       onInteract: _tryNpcInteract,
     );
     npcs.add(npc);

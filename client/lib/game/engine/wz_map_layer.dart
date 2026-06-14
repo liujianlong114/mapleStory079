@@ -318,12 +318,14 @@ class MapMetaFull {
   final List<MapLayerDef> layers;
   final List<MapForegroundLayerDef> mapLayers;
   final MapFootholds? footholds;
+  final List<MapPortalDef> portals;
 
   MapMetaFull({
     required this.meta,
     required this.layers,
     required this.mapLayers,
     this.footholds,
+    this.portals = const [],
   });
 
   static Future<MapMetaFull?> load(int mapId) async {
@@ -331,6 +333,7 @@ class MapMetaFull {
       'assets/maps/$mapId.json',
       if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
       if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
+      if (mapId == 20000) 'assets/maps/20000.json',
       if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
       if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
     };
@@ -353,14 +356,68 @@ class MapMetaFull {
           j['footholds'] as List?,
           fallbackY: meta.spawnY.toDouble(),
         );
+        final portals = (j['portals'] as List?)
+                ?.map((e) => MapPortalDef.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [];
         return MapMetaFull(
           meta: meta,
           layers: layers,
           mapLayers: mapLayers,
           footholds: fh,
+          portals: portals,
         );
       } catch (_) {}
     }
     return null;
   }
+
+  /// 客户端是否已导出该地图 JSON（传送前检查）
+  static Future<bool> hasAsset(int mapId) async {
+    final paths = <String>{
+      'assets/maps/$mapId.json',
+      if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
+      if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
+      if (mapId == 20000) 'assets/maps/20000.json',
+      if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
+      if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
+    };
+    for (final p in paths) {
+      try {
+        await rootBundle.loadString(p);
+        return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+}
+
+class MapPortalDef {
+  final int id;
+  final String name;
+  final int type;
+  final int x;
+  final int y;
+  final int targetMap;
+  final String targetName;
+
+  const MapPortalDef({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.x,
+    required this.y,
+    required this.targetMap,
+    required this.targetName,
+  });
+
+  factory MapPortalDef.fromJson(Map<String, dynamic> j) => MapPortalDef(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        name: j['name'] as String? ?? '',
+        type: (j['type'] as num?)?.toInt() ?? 0,
+        x: (j['x'] as num?)?.toInt() ?? 0,
+        y: (j['y'] as num?)?.toInt() ?? 0,
+        targetMap: (j['targetMap'] as num?)?.toInt() ?? 0,
+        targetName: j['targetName'] as String? ?? '',
+      );
 }

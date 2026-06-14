@@ -122,7 +122,7 @@ class _GameScenePageState extends State<GameScenePage> {
       mapHeight: widget.mapHeight,
       characterId: widget.characterId,
       jobId: widget.jobId,
-      playerInitial: Vector2(widget.initialPosX, widget.groundY),
+      playerInitial: Vector2(widget.initialPosX, widget.initialPosY),
       str: widget.initialStr,
       dex: widget.initialDex,
       intelligence: widget.initialIntl,
@@ -154,6 +154,7 @@ class _GameScenePageState extends State<GameScenePage> {
     _gameWorld.level = widget.initialLevel;
     _gameWorld.onNpcInteract = _onNpcInteract;
     _gameWorld.onViewChanged = () => _minimapTick.value++;
+    _gameWorld.onMapWarp = _onPortalWarp;
     _setupStatSync();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _connectWebSocket();
@@ -285,6 +286,23 @@ class _GameScenePageState extends State<GameScenePage> {
         );
       }
     }
+  }
+
+  Future<void> _onPortalWarp(int targetMapId, String targetPortalName) async {
+    if (!mounted) return;
+    final gp = context.read<GameProvider>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('传送中 → 地图 $targetMapId ($targetPortalName)')),
+    );
+    final ok = await gp.warpToMap(targetMapId, portalName: targetPortalName);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目标地图尚未就绪，请稍后再试')),
+      );
+      return;
+    }
+    Navigator.of(context).pushReplacementNamed(Routes.gameScene);
   }
 
   void _onNpcInteract(NPCComponent npc) {
@@ -431,6 +449,7 @@ class _GameScenePageState extends State<GameScenePage> {
                     playerX: _gameWorld.playerPosition.x,
                     playerY: _gameWorld.playerPosition.y,
                     mapName: widget.mapName,
+                    mapId: widget.mapId,
                     npcDots: _gameWorld.npcs
                         .map((n) => Offset(n.position.x, n.position.y))
                         .toList(),
@@ -450,6 +469,11 @@ class _GameScenePageState extends State<GameScenePage> {
                   onShop: () {},
                   onInventory: () => _openMenu(Routes.inventory),
                   onSkills: () => _openMenu(Routes.skills),
+                  onStats: () => _showGameMenu(context),
+                  onKeyConfig: () => showDialog(
+                    context: context,
+                    builder: (_) => const KeyConfigDialog(),
+                  ),
                 ),
               ),
             ],

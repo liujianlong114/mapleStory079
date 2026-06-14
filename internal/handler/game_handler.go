@@ -266,6 +266,57 @@ func (h *GameHandler) MoveCharacter(c *gin.Context) {
 	})
 }
 
+type changeMapRequest struct {
+	CharacterID      uint   `json:"character_id"`
+	CharacterIDCamel uint   `json:"characterId"`
+	MapID            uint   `json:"map_id"`
+	MapIDCamel       uint   `json:"mapId"`
+	PortalName       string `json:"portal_name"`
+	PortalNameCamel  string `json:"portalName"`
+}
+
+func (h *GameHandler) ChangeMap(c *gin.Context) {
+	var req changeMapRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	charID := req.CharacterID
+	if charID == 0 {
+		charID = req.CharacterIDCamel
+	}
+	mapID := req.MapID
+	if mapID == 0 {
+		mapID = req.MapIDCamel
+	}
+	portalName := req.PortalName
+	if portalName == "" {
+		portalName = req.PortalNameCamel
+	}
+	if charID == 0 || mapID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "character_id and map_id required"})
+		return
+	}
+	ch, err := repository.GetCharacterByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "character not found"})
+		return
+	}
+	if err := h.gameSvc.ChangeMap(ch, mapID, portalName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := repository.UpdateCharacter(ch); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"map_id":     ch.MapID,
+		"position_x": ch.PositionX,
+		"position_y": ch.PositionY,
+	})
+}
+
 type restoreRequest struct {
 	CharacterID      uint `json:"character_id"`
 	CharacterIDCamel uint `json:"characterId"`

@@ -25,11 +25,11 @@ HUD_JOBS = [
     ("images/ui/hud/btn_shop_normal.png", ("UI.wz", "StatusBar.img"), ("BtShop", "normal", "0")),
     ("images/ui/hud/btn_menu_normal.png", ("UI.wz", "StatusBar.img"), ("BtMenu", "normal", "0")),
     ("images/ui/hud/btn_chat_normal.png", ("UI.wz", "StatusBar.img"), ("BtChat", "normal", "0")),
-    ("images/ui/hud/key_equip.png", ("UI.wz", "StatusBar.img"), ("EquipKey",)),
-    ("images/ui/hud/key_inven.png", ("UI.wz", "StatusBar.img"), ("InvenKey",)),
-    ("images/ui/hud/key_stat.png", ("UI.wz", "StatusBar.img"), ("StatKey",)),
-    ("images/ui/hud/key_skill.png", ("UI.wz", "StatusBar.img"), ("SkillKey",)),
-    ("images/ui/hud/key_keyset.png", ("UI.wz", "StatusBar.img"), ("KeySet",)),
+    ("images/ui/hud/key_equip.png", ("UI.wz", "StatusBar.img"), ("EquipKey", "normal", "0")),
+    ("images/ui/hud/key_inven.png", ("UI.wz", "StatusBar.img"), ("InvenKey", "normal", "0")),
+    ("images/ui/hud/key_stat.png", ("UI.wz", "StatusBar.img"), ("StatKey", "normal", "0")),
+    ("images/ui/hud/key_skill.png", ("UI.wz", "StatusBar.img"), ("SkillKey", "normal", "0")),
+    ("images/ui/hud/key_keyset.png", ("UI.wz", "StatusBar.img"), ("KeySet", "normal", "0")),
     # 数字（HP/MP/EXP 位图字）
     *[
         (f"images/ui/hud/num_{d}.png", ("UI.wz", "StatusBar.img"), ("number", str(d)))
@@ -90,21 +90,34 @@ def main() -> int:
             print(f"✗ {out_rel}: {e}")
             fail += 1
 
-    # 彩虹村 minimap 缩略图
-    try:
-        img, region, _ = src.load_img(("Map.wz", "MapHelper.img"))
-        node = resolve_prop(img._root, ("minimap", "user"))
-        from wzpy.properties import WzCanvasProperty
+    # 彩虹村 minimap 缩略图（Map0/000010000.img/miniMap/canvas）
+    minimap_jobs = [
+        ("images/ui/hud/minimap_1000000.png", ("Map.wz", "Map/Map0/000010000.img"), ("miniMap", "canvas")),
+    ]
+    for out_rel, spec, inner in minimap_jobs:
+        out_path = os.path.join(args.out, out_rel)
+        if not args.force and os.path.isfile(out_path) and os.path.getsize(out_path) >= 200:
+            ok += 1
+            continue
+        try:
+            img, region, _ = src.load_img(spec)
+            node = resolve_prop(img._root, inner)
+            if node is None:
+                print(f"✗ missing {spec} {'/'.join(inner)}")
+                fail += 1
+                continue
+            from wzpy.properties import WzCanvasProperty
 
-        if isinstance(node, WzCanvasProperty):
-            out_path = os.path.join(args.out, "images/ui/hud/minimap_1000000.png")
-            if args.force or not os.path.isfile(out_path):
-                save_canvas(node, region, out_path)
-                print("✓ images/ui/hud/minimap_1000000.png")
-                ok += 1
-    except Exception as e:
-        print(f"✗ minimap_1000000: {e}")
-        fail += 1
+            if not isinstance(node, WzCanvasProperty):
+                print(f"✗ not canvas {out_rel}")
+                fail += 1
+                continue
+            save_canvas(node, region, out_path)
+            print(f"✓ {out_rel}")
+            ok += 1
+        except Exception as e:
+            print(f"✗ {out_rel}: {e}")
+            fail += 1
 
     print(f"done ok={ok} fail={fail}")
     return 0 if fail == 0 else 1

@@ -17,6 +17,8 @@ class ApiService {
 
   String? _token;
 
+  String? get token => _token;
+
   void setToken(String? token) {
     _token = token;
   }
@@ -262,6 +264,24 @@ class ApiService {
         'character_id': characterId,
         'x': x,
         'y': y,
+      }),
+    );
+
+    return await _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> changeMap(
+    int characterId,
+    int mapId, {
+    String portalName = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/game/change-map'),
+      headers: _headers(),
+      body: jsonEncode({
+        'character_id': characterId,
+        'map_id': mapId,
+        'portal_name': portalName,
       }),
     );
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/resources/assets.dart';
 import '../providers/game_provider.dart';
 import 'ui/nine_patch_box.dart';
+import 'ui/wz_bitmap_text.dart';
 
 /// 079 底部状态栏 — UI.wz/StatusBar.img（800×71 + EXP 条）。
 class MapleStatusBar extends StatelessWidget {
@@ -14,6 +15,8 @@ class MapleStatusBar extends StatelessWidget {
     this.onShop,
     this.onInventory,
     this.onSkills,
+    this.onStats,
+    this.onKeyConfig,
   });
 
   final VoidCallback? onMenu;
@@ -21,18 +24,22 @@ class MapleStatusBar extends StatelessWidget {
   final VoidCallback? onShop;
   final VoidCallback? onInventory;
   final VoidCallback? onSkills;
+  final VoidCallback? onStats;
+  final VoidCallback? onKeyConfig;
 
   static const double barW = 800;
   static const double barH = 71;
   static const double expH = 31;
   static const double totalH = expH + barH;
+  static const double gaugeW = 109;
+  static const double gaugeH = 18;
 
   @override
   Widget build(BuildContext context) {
     final gp = context.watch<GameProvider>();
     final hpPct = gp.maxHp > 0 ? gp.hp / gp.maxHp : 0.0;
     final mpPct = gp.maxMp > 0 ? gp.mp / gp.maxMp : 0.0;
-    final expPct = GameConstants.expPercent(gp.level, gp.state.exp) / 100.0;
+    final expPct = GameConstants.expPercent(gp.level, gp.state.exp);
     final name = gp.state.characterName;
     final level = gp.level;
 
@@ -42,6 +49,7 @@ class MapleStatusBar extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // EXP 条（左下，原版 340×31）
           Positioned(
             left: 0,
             top: 0,
@@ -58,7 +66,7 @@ class MapleStatusBar extends StatelessWidget {
                 ClipRect(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    widthFactor: expPct.clamp(0.0, 1.0),
+                    widthFactor: (expPct / 100).clamp(0.0, 1.0),
                     child: Image.asset(
                       'assets/images/ui/hud/gauge_temp_exp.png',
                       width: 340,
@@ -68,21 +76,18 @@ class MapleStatusBar extends StatelessWidget {
                     ),
                   ),
                 ),
+                Positioned(
+                  left: 10,
+                  top: 8,
+                  child: WzBitmapText(
+                    text: '${expPct.toStringAsFixed(2)}%',
+                    height: 11,
+                  ),
+                ),
               ],
             ),
           ),
-          Positioned(
-            left: 8,
-            top: 8,
-            child: Text(
-              'EXP ${(expPct * 100).toStringAsFixed(2)}%',
-              style: const TextStyle(
-                color: Color(0xFF2c3e50),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          // 主状态栏底图
           Positioned(
             left: 0,
             bottom: 0,
@@ -104,9 +109,10 @@ class MapleStatusBar extends StatelessWidget {
               filterQuality: FilterQuality.none,
             ),
           ),
+          // 角色名 / 等级（肖像右侧）
           Positioned(
-            left: 248,
-            bottom: 48,
+            left: 198,
+            bottom: 44,
             child: Text(
               name,
               style: const TextStyle(
@@ -117,8 +123,8 @@ class MapleStatusBar extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 248,
-            bottom: 30,
+            left: 198,
+            bottom: 28,
             child: Text(
               'LV. $level',
               style: const TextStyle(
@@ -128,9 +134,10 @@ class MapleStatusBar extends StatelessWidget {
               ),
             ),
           ),
+          // HP 量表 + 数值
           Positioned(
-            right: 248,
-            bottom: 38,
+            left: 412,
+            bottom: 40,
             child: Row(
               children: [
                 Image.asset('assets/images/ui/hud/icon_red.png', width: 12, height: 12),
@@ -138,13 +145,25 @@ class MapleStatusBar extends StatelessWidget {
                 WzGaugeBar(
                   fillAsset: 'assets/images/ui/hud/hp_gauge.png',
                   ratio: hpPct,
+                  width: gaugeW,
+                  height: gaugeH,
                 ),
               ],
             ),
           ),
           Positioned(
-            right: 248,
-            bottom: 16,
+            left: 530,
+            bottom: 42,
+            child: WzBitmapText(
+              text: '${gp.hp}',
+              height: 11,
+              alignment: Alignment.centerRight,
+            ),
+          ),
+          // MP 量表 + 数值
+          Positioned(
+            left: 412,
+            bottom: 18,
             child: Row(
               children: [
                 Image.asset('assets/images/ui/hud/icon_blue.png', width: 12, height: 12),
@@ -152,50 +171,43 @@ class MapleStatusBar extends StatelessWidget {
                 WzGaugeBar(
                   fillAsset: 'assets/images/ui/hud/mp_gauge.png',
                   ratio: mpPct,
+                  width: gaugeW,
+                  height: gaugeH,
                 ),
               ],
             ),
           ),
           Positioned(
-            right: 108,
-            bottom: 38,
-            child: Text(
-              '${gp.hp}',
-              style: const TextStyle(
-                color: Color(0xFFc0392b),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
+            left: 528,
+            bottom: 20,
+            child: WzBitmapText(
+              text: '${gp.mp}',
+              height: 11,
+              alignment: Alignment.centerRight,
             ),
           ),
+          // 快捷键（EquipKey / InvenKey / StatKey / SkillKey / KeySet）
           Positioned(
-            right: 108,
-            bottom: 16,
-            child: Text(
-              '${gp.mp}',
-              style: const TextStyle(
-                color: Color(0xFF2980b9),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Positioned(
-            left: 12,
-            bottom: 22,
+            left: 58,
+            bottom: 10,
             child: Row(
               children: [
-                _keyHint('C', '装备', onInventory),
-                const SizedBox(width: 8),
-                _keyHint('I', '道具', onInventory),
-                const SizedBox(width: 8),
-                _keyHint('S', '技能', onSkills),
+                _keyBtn('assets/images/ui/hud/key_equip.png', onInventory),
+                const SizedBox(width: 2),
+                _keyBtn('assets/images/ui/hud/key_inven.png', onInventory),
+                const SizedBox(width: 2),
+                _keyBtn('assets/images/ui/hud/key_stat.png', onStats),
+                const SizedBox(width: 2),
+                _keyBtn('assets/images/ui/hud/key_skill.png', onSkills),
+                const SizedBox(width: 2),
+                _keyBtn('assets/images/ui/hud/key_keyset.png', onKeyConfig),
               ],
             ),
           ),
+          // 右侧菜单按钮
           Positioned(
-            right: 6,
-            bottom: 18,
+            right: 8,
+            bottom: 16,
             child: Row(
               children: [
                 _iconBtn('assets/images/ui/hud/btn_shop_normal.png', onShop),
@@ -209,25 +221,10 @@ class MapleStatusBar extends StatelessWidget {
     );
   }
 
-  Widget _keyHint(String key, String label, VoidCallback? onTap) {
+  Widget _keyBtn(String asset, VoidCallback? onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-            decoration: BoxDecoration(
-              color: const Color(0xFFd4c4a8),
-              border: Border.all(color: const Color(0xFF8b7355)),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: Text(key, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 2),
-          Text(label, style: const TextStyle(color: Color(0xFF4a3728), fontSize: 9)),
-        ],
-      ),
+      child: Image.asset(asset, height: 20, filterQuality: FilterQuality.none),
     );
   }
 
