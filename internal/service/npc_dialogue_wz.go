@@ -87,17 +87,10 @@ func parseTipNode(id string) (int, bool) {
 }
 
 func registerWZDialogueScripts(s *NPCService) {
+	// 彩虹岛任务 NPC 由 quest_dialogue.go 单独注册
+	registerRainbowQuestScripts(s)
+
 	scripts := map[uint][]string{
-		2101: {
-			"今天的天气真不错～",
-			"按左边的 Alt键，就可以跳跃。",
-			"用方向键可以移动角色。",
-		},
-		2100: {
-			"要晒的衣服怎么这么多呀～",
-			"你见过我妹妹希娜吗？",
-			"按↑键，可以爬梯子或吊绳。",
-		},
 		12100: {
 			"战士转职要求：等级10；弓箭手转职要求：等级10；飞侠转职要求：等级10；魔法师转职要求：等级8。",
 			"转职后可以学到新的技能同时增加背包容量，但是每次战斗牺牲都会减少一定经验值。",

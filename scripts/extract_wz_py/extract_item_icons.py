@@ -28,18 +28,41 @@ BEGINNER_ITEMS = [
 ]
 
 
-def _item_spec(item_id: int) -> tuple:
-    """079 Item.wz 分 Consume/Etc/Install 等子目录，条目在 .img 内按 8 位 ID 索引。"""
+def _item_spec(item_id: int) -> list[tuple]:
+    """079 Item.wz 分卷路径；装备类依次尝试 Install / Character/Weapon / Character/Cape 等。"""
     s = f"{item_id:08d}"
     prefix4 = s[:4]
     if 2000000 <= item_id < 3000000:
-        return ("Item.wz", f"Consume/{prefix4}.img"), (s, "info", "icon")
-    if 4000000 <= item_id < 5000000:
-        return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    if 4030000 <= item_id < 4040000:
-        return ("Item.wz", f"Etc/{prefix4}.img"), (s, "info", "icon")
-    # 装备类在 Install 下按 ID 前 4 位分卷
-    return ("Item.wz", f"Install/{prefix4}.img"), (s, "info", "icon")
+        return [("Item.wz", f"Consume/{prefix4}.img", (s, "info", "icon"))]
+    if 4000000 <= item_id < 5000000 or 4030000 <= item_id < 4040000:
+        return [("Item.wz", f"Etc/{prefix4}.img", (s, "info", "icon"))]
+    # 装备：Install 分卷 + Character 武器分卷（1302xxx 木剑等）
+    paths = [
+        ("Item.wz", f"Install/{prefix4}.img"),
+        ("Character.wz", f"Weapon/{prefix4}.img"),
+        ("Character.wz", f"Cap/{prefix4}.img"),
+        ("Character.wz", f"Coat/{prefix4}.img"),
+    ]
+    return [(wz, path, (s, "info", "icon")) for wz, path in paths]
+
+
+def _try_extract(src: Source, spec_paths: list) -> tuple | None:
+    """按候选路径依次尝试解析 icon / iconRaw。"""
+    for entry in spec_paths:
+        wz, img_path, inner = entry
+        try:
+            img, region, _ = src.load_img((wz, img_path))
+            node = resolve_prop(img._root, inner)
+            if node is None:
+                node = resolve_prop(img._root, (*inner[:-1], "iconRaw"))
+            if node is not None:
+                from wzpy.properties import WzCanvasProperty
+
+                if isinstance(node, WzCanvasProperty):
+                    return node, region
+        except Exception:
+            continue
+    return None
 
 
 def main() -> int:
@@ -58,23 +81,14 @@ def main() -> int:
         if not args.force and os.path.isfile(out_path) and os.path.getsize(out_path) >= 80:
             ok += 1
             continue
-        spec, inner = _item_spec(item_id)
+        spec_paths = _item_spec(item_id)
         try:
-            img, region, _ = src.load_img(spec)
-            node = resolve_prop(img._root, inner)
-            if node is None:
-                # 部分物品 icon 在 iconRaw
-                node = resolve_prop(img._root, (*inner[:-1], "iconRaw"))
-            if node is None:
+            found = _try_extract(src, spec_paths)
+            if found is None:
                 print(f"✗ {item_id} missing icon")
                 fail += 1
                 continue
-            from wzpy.properties import WzCanvasProperty
-
-            if not isinstance(node, WzCanvasProperty):
-                print(f"✗ {item_id} not canvas")
-                fail += 1
-                continue
+            node, region = found
             save_canvas(node, region, out_path)
             print(f"✓ {item_id}")
             ok += 1

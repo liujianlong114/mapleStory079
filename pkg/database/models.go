@@ -82,6 +82,17 @@ type CharacterInventory struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// CharacterQuest 角色任务进度（对照 ms079 QuestStatus）
+type CharacterQuest struct {
+	ID          uint      `gorm:"primary_key" json:"id"`
+	CharacterID uint      `gorm:"index:idx_char_quest,unique;not null" json:"character_id"`
+	QuestID     uint      `gorm:"index:idx_char_quest,unique;not null" json:"quest_id"`
+	Status      int       `gorm:"not null;default:1" json:"status"` // 1=进行中 2=已完成
+	Progress    int       `gorm:"default:0" json:"progress"`        // 击杀数/收集数等
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // ====================== 游戏数据 ======================
 
 // Item 物品表
