@@ -1,23 +1,42 @@
-# 自动推进进度 — 2026-06-14 首轮
+# 自动推进进度 — 2026-06-14 18:20 UTC
+
+## 对照 PROJECT_PLAN §2.5 / §11.2 / §12
+
+| 缺口 | 本轮状态 |
+|------|----------|
+| P0 UIWindow 背包/装备/属性/技能 | ✅ 上轮已完成；本轮未改 |
+| P0 彩虹村 1000000 脚点可玩 | ⏳ 待验收 enH0/enV0 贴图与 spawn 对齐 |
+| P1 彩虹岛任务/升级/打怪经验 | ✅ **本轮实现任务链骨架** |
+| 物品贴图 403xxxx | ⏳ 下轮（无 WZ 客户端，云环境无法 extract） |
 
 ## 本轮完成
-- [x] 创建 Cursor 定时 Automation（每 30 分钟，`*/30 * * * *`），已打开 Glass 编辑器待你确认保存
-- [x] 本地循环脚本 `.cursor/automation/local-loop.sh`（30 分钟健康检查 + 计划缺口记录）
-- [x] 导出 UIWindow 窗口贴图 40 张 → `client/assets/images/ui/windows/`
-- [x] 游戏内 WZ 叠加面板：背包/装备/属性/技能（`maple_game_panels.dart`），不再跳转 Material 全屏页
-- [x] 状态栏 EXP 条宽度修正为 WZ 实际 340px；装备键与背包键分离
-- [x] 物品图标导出脚本 `extract_item_icons.py`（Consume/Etc 路径已对齐 079 分卷规则）
 
-## 下轮优先（按 PROJECT_PLAN §11）
-1. 地图 1000000：补全 enH0/enV0/edU 真实贴图或确认 fallback 视觉可接受；脚点与 spawn/NPC/portal 验收
-2. 物品贴图：装备类 Install 分卷路径探测 + 彩虹岛任务道具 403xxxx
-3. 彩虹岛任务链：希娜对话 → 接任务 → 打蜗牛经验 → 南门传送（对照 ms079 Java Handler）
-4. HUD 细调：quickSlot 快捷栏、聊天条、商城/菜单按钮 hover 态
+- [x] **CharacterQuest** 表 + `QuestService`（接取/完成/击杀进度）
+- [x] 彩虹岛官方任务 **1000→1001**（希娜 2101 ↔ 莎丽 2100）NPC 多轮对话
+- [x] 任务 **400001 击退蜗牛**（击杀 mob 100100 ×10 自动记进度）
+- [x] API：`GET /api/v1/quests/character/:id`、`POST accept/complete`
+- [x] 客户端 `game_scene_page` 对接服务端 `/npc/dialogue` 多轮对话 + 任务奖励 SnackBar
+- [x] `go build` / `go vet`（主包）通过
+
+## 下轮优先
+
+1. 地图 1000000：enH0/enV0/edU 真实贴图或占位 origin 校验；spawn/NPC/portal 脚点截图验收
+2. 任务链延伸：1005/1006 信件任务、南门 out00→20000 传送后任务 NPC
+3. 物品贴图：有 WZ 环境时跑 `extract_item_icons.py` 补 403xxxx
+4. HUD 细调：quickSlot、聊天条 hover 态
 
 ## 自检
-- backend :8080 — 200
-- frontend :5173 — 200
+
+| 项 | 结果 |
+|----|------|
+| `go build ./cmd/server/...` | ✅ |
+| `go vet ./cmd/server ./internal ./pkg` | ✅ |
+| `curl localhost:8080/health` | ❌ MySQL 未就绪（云环境无 DB） |
+| `:5173` | ❌ Flutter 未安装（云环境） |
+| `flutter analyze` | ⏭ 跳过（无 flutter CLI） |
 
 ## 操作提示
-- Glass Automations 里确认 cron 已启用并保存（需登录 GitHub repo `liujianlong114/mapleStory079`）
-- 游戏内按 I/装备键/属性键/技能键打开 WZ 面板；Cmd+Shift+R 强刷看新贴图
+
+- 本地：`go run cmd/server/main.go` + `flutter run -d chrome --web-port=5173`
+- 进彩虹村与希娜对话 → 接「借来莎丽的镜子」→ 找莎丽交付 → 莎丽处接「给希娜弄来镜子」→ 回希娜交付
+- 击杀蜗牛时任务 400001 进度自动 +1，满 10 只后可找路卡斯(12100) 交付（需该 NPC 在图内）

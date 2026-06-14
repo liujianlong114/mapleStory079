@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -309,7 +311,7 @@ class _GameScenePageState extends State<GameScenePage> {
     Navigator.of(context).pushReplacementNamed(Routes.gameScene);
   }
 
-  void _onNpcInteract(NPCComponent npc) {
+  Future<void> _onNpcInteract(NPCComponent npc) async {
     if (npc.hasShop) {
       setState(() {
         _shopNpc = npc;
@@ -317,14 +319,120 @@ class _GameScenePageState extends State<GameScenePage> {
       });
       return;
     }
-    showNPCDialogue(
-      context,
-      npcName: npc.npcName,
-      dialogue: npc.dialogue.isNotEmpty
-          ? npc.dialogue
-          : '你好，冒险者！',
-      options: const ['再见'],
+    try {
+      final api = ApiService();
+      final data = await api.startNpcDialogue(
+        npcId: npc.npcId,
+        characterId: widget.characterId,
+      );
+      if (!mounted) return;
+      await _showServerDialogue(npc.npcId, data);
+    } catch (e) {
+      if (!mounted) return;
+      showNPCDialogue(
+        context,
+        npcName: npc.npcName,
+        dialogue: npc.dialogue.isNotEmpty ? npc.dialogue : '你好，冒险者！',
+        options: const ['再见'],
+      );
+    }
+  }
+
+  Future<void> _showServerDialogue(int npcId, Map<String, dynamic> data) async {
+    final node = data['node'] as Map<String, dynamic>?;
+    if (node == null) return;
+
+    final speaker = node['speaker'] as String? ?? data['npc_name'] as String? ?? 'NPC';
+    final text = node['text'] as String? ?? '';
+    final nodeId = node['id'] as String? ?? 'start';
+    final nodeType = node['node_type'] as String? ?? 'choice';
+    final choices = (node['choices'] as List?)
+            ?.map((c) => Map<String, dynamic>.from(c as Map))
+            .toList() ??
+        [];
+
+    if (nodeType == 'end' || choices.isEmpty) {
+      final msg = data['message'] as String?;
+      showNPCDialogue(
+        context,
+        npcName: speaker,
+        dialogue: msg != null && msg.isNotEmpty ? '$text\n\n$msg' : text,
+        options: const ['再见'],
+      );
+      _applyDialogueEffects(data['effects'] as Map<String, dynamic>?);
+      return;
+    }
+
+    final optionLabels = choices.map((c) => c['text'] as String? ?? '…').toList();
+    final completer = Completer<void>();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => NPCDialogueWidget(
+        npcName: speaker,
+        dialogue: text,
+        options: optionLabels,
+        onOptionSelected: (label) async {
+          Navigator.of(ctx).pop();
+          final idx = optionLabels.indexOf(label);
+          if (idx < 0) return;
+          try {
+            final next = await ApiService().continueNpcDialogue(
+              npcId: npcId,
+              characterId: widget.characterId,
+              nodeId: nodeId,
+              choiceIndex: idx,
+            );
+            if (!mounted) return;
+            _applyDialogueEffects(next['effects'] as Map<String, dynamic>?);
+            final nextNode = next['node'] as Map<String, dynamic>?;
+            if (nextNode != null) {
+              await _showServerDialogue(npcId, next);
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('对话错误: $e')),
+              );
+            }
+          } finally {
+            if (!completer.isCompleted) completer.complete();
+          }
+        },
+        onClose: () {
+          Navigator.of(ctx).pop();
+          if (!completer.isCompleted) completer.complete();
+        },
+      ),
     );
+    return completer.future;
+  }
+
+  void _applyDialogueEffects(Map<String, dynamic>? effects) {
+    if (effects == null) return;
+    final gp = context.read<GameProvider>();
+    final exp = (effects['exp_gained'] as num?)?.toInt();
+    final mesos = (effects['new_mesos'] as num?)?.toInt();
+    if (exp != null || mesos != null) {
+      gp.syncFromGameWorld(
+        exp: exp != null ? gp.state.exp + exp : null,
+        mesos: mesos,
+      );
+    }
+    final questAction = effects['quest_action'] as String?;
+    final questId = (effects['quest_id'] as num?)?.toInt();
+    if (questAction != null && questId != null && mounted) {
+      final label = questAction == 'completed' ? '完成任务' : '接取任务';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label #$questId')),
+      );
+    }
+    final msg = effects['message'] as String?;
+    if (msg != null && msg.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    }
   }
 
   int _currentMesos() {

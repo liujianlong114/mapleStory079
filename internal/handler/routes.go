@@ -51,6 +51,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	chatHandler := NewChatHandler()
 	socialHandler := NewSocialHandler()
 	avatarHandler := NewAvatarHandler()
+	questHandler := NewQuestHandler()
 
 	api := r.Group("/api")
 	{
@@ -67,6 +68,7 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 			registerChatRoutes(v1, chatHandler)
 			registerSocialRoutes(v1, socialHandler)
 			registerLookRoutes(v1, avatarHandler)
+			registerQuestRoutes(v1, questHandler)
 		}
 	}
 
@@ -204,6 +206,15 @@ func registerLookRoutes(r *gin.RouterGroup, h *AvatarHandler) {
 	lookGroup := r.Group("/look")
 	{
 		lookGroup.GET("/compose.png", h.Compose)
+	}
+}
+
+func registerQuestRoutes(r *gin.RouterGroup, h *QuestHandler) {
+	quests := r.Group("/quests")
+	{
+		quests.GET("/character/:characterId", h.ListCharacterQuests)
+		quests.POST("/accept", h.Accept)
+		quests.POST("/complete", h.Complete)
 	}
 }
 

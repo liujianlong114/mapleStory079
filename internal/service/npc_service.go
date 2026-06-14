@@ -43,12 +43,16 @@ type DialogueResult struct {
 
 // DialogueEffect 对话执行的副作用
 type DialogueEffect struct {
-	NewClass   int    `json:"new_class,omitempty"`
-	NewMapID   int    `json:"new_map_id,omitempty"`
-	NewHP      int    `json:"new_hp,omitempty"`
-	NewMP      int    `json:"new_mp,omitempty"`
-	NewMesos   int64  `json:"new_mesos,omitempty"`
-	ItemGained string `json:"item_gained,omitempty"`
+	NewClass    int    `json:"new_class,omitempty"`
+	NewMapID    int    `json:"new_map_id,omitempty"`
+	NewHP       int    `json:"new_hp,omitempty"`
+	NewMP       int    `json:"new_mp,omitempty"`
+	NewMesos    int64  `json:"new_mesos,omitempty"`
+	ExpGained   int    `json:"exp_gained,omitempty"`
+	ItemGained  string `json:"item_gained,omitempty"`
+	QuestID     uint   `json:"quest_id,omitempty"`
+	QuestAction string `json:"quest_action,omitempty"` // accepted | completed
+	Message     string `json:"message,omitempty"`
 }
 
 // NPCScript 已注册的NPC脚本接口
@@ -61,14 +65,19 @@ type NPCScript interface {
 // ============ NPC 对话服务 ============
 
 type NPCService struct {
-	scripts map[int]NPCScript
-	mu      sync.RWMutex
+	scripts   map[int]NPCScript
+	questSvc  *QuestService
+	mu        sync.RWMutex
 }
 
 func NewNPCService() *NPCService {
-	svc := &NPCService{scripts: make(map[int]NPCScript)}
+	svc := &NPCService{
+		scripts:  make(map[int]NPCScript),
+		questSvc: NewQuestService(),
+	}
 	svc.registerDefaultScripts()
 	registerWZDialogueScripts(svc)
+	registerRainbowQuestScripts(svc, svc.questSvc)
 	return svc
 }
 
@@ -226,7 +235,10 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 		Node:    nextNode,
 		Effects: effect,
 	}
-	if nextNode.NodeType == "end" {
+	if effect != nil && effect.Message != "" {
+		result.Message = effect.Message
+	}
+	if nextNode.NodeType == "end" && result.Message == "" {
 		result.Message = "对话结束"
 	}
 	return result, nil

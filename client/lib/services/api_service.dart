@@ -645,6 +645,50 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> startNpcDialogue({
+    required int npcId,
+    required int characterId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/npc/dialogue'),
+      headers: _headers(),
+      body: jsonEncode({'npcId': npcId, 'characterId': characterId}),
+    );
+    return _unwrapMap(await _handleResponse(response));
+  }
+
+  Future<Map<String, dynamic>> continueNpcDialogue({
+    required int npcId,
+    required int characterId,
+    required String nodeId,
+    required int choiceIndex,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/npc/dialogue/continue'),
+      headers: _headers(),
+      body: jsonEncode({
+        'npcId': npcId,
+        'characterId': characterId,
+        'nodeId': nodeId,
+        'choiceIndex': choiceIndex,
+      }),
+    );
+    return _unwrapMap(await _handleResponse(response));
+  }
+
+  Future<List<Map<String, dynamic>>> getCharacterQuests(int characterId) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/quests/character/$characterId'),
+      headers: _headers(),
+    );
+    final data = await _handleResponse(response);
+    final inner = _unwrapData(data);
+    if (inner is List) {
+      return inner.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return [];
+  }
+
   Future<List<Map<String, dynamic>>> getNPCsByMap(int mapId) async {
     final response = await http.get(
       Uri.parse('${AppConfig.apiBaseUrl}/npcs/map/$mapId'),
