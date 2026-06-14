@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -63,7 +64,7 @@ func RateLimitMiddleware() gin.HandlerFunc {
 		allowed, remaining, retryAfter := globalLimiter.allow(key)
 
 		c.Header("X-RateLimit-Limit", "60")
-		c.Header("X-RateLimit-Remaining", string(rune('0'+remaining)))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		c.Header("X-RateLimit-Reset", time.Now().Add(time.Minute).Format(time.RFC3339))
 
 		if !allowed {

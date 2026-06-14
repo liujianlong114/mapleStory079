@@ -10,9 +10,13 @@ import (
 	"mapleStory079/pkg/utils"
 )
 
-type CombatService struct{}
+type CombatService struct {
+	drops *DropService
+}
 
-func NewCombatService() *CombatService { return &CombatService{} }
+func NewCombatService() *CombatService {
+	return &CombatService{drops: NewDropService()}
+}
 
 type CombatResult struct {
 	PlayerDamage int
@@ -26,15 +30,16 @@ type CombatResult struct {
 
 // BattleResult 用于命中/暴击/伤害详情与目标状态返回。
 type BattleResult struct {
-	IsHit       bool
-	IsCritical  bool
-	Damage      int
-	TargetHP    int
-	TargetDead  bool
-	ExpGained   int
-	MesosGained int
-	LevelUp     bool
-	Message     string
+	IsHit        bool
+	IsCritical   bool
+	Damage       int
+	TargetHP     int
+	TargetDead   bool
+	ExpGained    int
+	MesosGained  int
+	LevelUp      bool
+	ItemsDropped []DroppedItem
+	Message      string
 }
 
 // Attack 玩家对怪物发起一次普通攻击。
@@ -147,6 +152,7 @@ func (s *CombatService) PlayerAttackMob(player *database.Character, mob *databas
 		result.MesosGained = mob.MesosReward
 		player.Exp += mob.ExpReward
 		player.Mesos += mob.MesosReward
+		result.ItemsDropped = s.drops.RollMobDrops(mob.ID, utils.DefaultDropRate)
 		if LevelUp(player) {
 			result.LevelUp = true
 			result.Message = "击败怪物，升级了！"

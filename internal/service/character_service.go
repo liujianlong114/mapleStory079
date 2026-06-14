@@ -75,6 +75,19 @@ func GetClassName(class int) string {
 	if name, ok := utils.JobNames[class]; ok {
 		return name
 	}
+	// 兼容 UI/测试使用的简化编号 1-5
+	switch class {
+	case 1:
+		return "战士"
+	case 2:
+		return "法师"
+	case 3:
+		return "弓箭手"
+	case 4:
+		return "飞侠"
+	case 5:
+		return "海盗"
+	}
 	return "未知"
 }
 

@@ -32,31 +32,37 @@ var upgrader = websocket.Upgrader{
 
 // WSMessage 是 WebSocket 消息统一入口。
 // Type 字段必须属于 pkg/utils.WSMessageTypes，否则会被视为非法消息。
+// 兼容客户端嵌套格式：{type, payload, sender_id, room}。
 type WSMessage struct {
-	Type        string  `json:"type"`
-	Channel     string  `json:"channel,omitempty"`
-	From        string  `json:"from,omitempty"`
-	To          string  `json:"to,omitempty"`
-	Content     string  `json:"content,omitempty"`
-	CharacterID int     `json:"character_id,omitempty"`
-	Name        string  `json:"name,omitempty"`
-	X           float64 `json:"x,omitempty"`
-	Y           float64 `json:"y,omitempty"`
-	DX          float64 `json:"dx,omitempty"`
-	DY          float64 `json:"dy,omitempty"`
-	SkillID     int     `json:"skill_id,omitempty"`
-	TargetID    int     `json:"target_id,omitempty"`
-	Damage      int     `json:"damage,omitempty"`
-	Critical    bool    `json:"critical,omitempty"`
-	ExpGained   int     `json:"exp_gained,omitempty"`
-	LevelUp     bool    `json:"level_up,omitempty"`
-	Mesos       int     `json:"mesos,omitempty"`
-	ItemID      int     `json:"item_id,omitempty"`
-	Quantity    int     `json:"quantity,omitempty"`
-	RespawnAt   int64   `json:"respawn_at,omitempty"`
-	MapID       int     `json:"map_id,omitempty"`
-	Level       string  `json:"level,omitempty"` // 系统公告等级
-	Timestamp   int64   `json:"ts,omitempty"`    // 服务端追加时间戳
+	Type        string                 `json:"type"`
+	Channel     string                 `json:"channel,omitempty"`
+	Room        string                 `json:"room,omitempty"`
+	From        string                 `json:"from,omitempty"`
+	To          string                 `json:"to,omitempty"`
+	Content     string                 `json:"content,omitempty"`
+	CharacterID int                    `json:"character_id,omitempty"`
+	SenderID    int                    `json:"sender_id,omitempty"`
+	Name        string                 `json:"name,omitempty"`
+	X           float64                `json:"x,omitempty"`
+	Y           float64                `json:"y,omitempty"`
+	DX          float64                `json:"dx,omitempty"`
+	DY          float64                `json:"dy,omitempty"`
+	SkillID     int                    `json:"skill_id,omitempty"`
+	TargetID    int                    `json:"target_id,omitempty"`
+	Damage      int                    `json:"damage,omitempty"`
+	Critical    bool                   `json:"critical,omitempty"`
+	ExpGained   int                    `json:"exp_gained,omitempty"`
+	LevelUp     bool                   `json:"level_up,omitempty"`
+	Mesos       int                    `json:"mesos,omitempty"`
+	ItemID      int                    `json:"item_id,omitempty"`
+	Quantity    int                    `json:"quantity,omitempty"`
+	RespawnAt   int64                  `json:"respawn_at,omitempty"`
+	MapID       int                    `json:"map_id,omitempty"`
+	Level       string                 `json:"level,omitempty"`  // 系统公告等级
+	Action      string                 `json:"action,omitempty"` // loot: spawn | pickup
+	DropID      string                 `json:"drop_id,omitempty"`
+	Timestamp   int64                  `json:"ts,omitempty"` // 服务端追加时间戳
+	Payload     map[string]interface{} `json:"payload,omitempty"`
 }
 
 // clientRef 用于统一管理连接 + 房间信息。
@@ -74,12 +80,14 @@ type WebSocketHandler struct {
 	mu      sync.RWMutex
 	clients map[*websocket.Conn]*clientRef
 	chat    *service.ChatService
+	loot    *service.LootService
 }
 
 func NewWebSocketHandler() *WebSocketHandler {
 	return &WebSocketHandler{
 		clients: make(map[*websocket.Conn]*clientRef),
 		chat:    service.NewChatService(),
+		loot:    service.DefaultLootService,
 	}
 }
 
@@ -91,7 +99,10 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	channel := c.DefaultQuery("channel", "world")
+	channel := c.DefaultQuery("channel", "")
+	if channel == "" {
+		channel = c.DefaultQuery("room", "world")
+	}
 	characterID := int(parseIntOrZero(c.Query("character_id")))
 	name := c.DefaultQuery("name", "无名冒险者")
 
@@ -101,6 +112,11 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 		characterID: characterID,
 		name:        name,
 	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
 
 	h.mu.Lock()
 	h.clients[conn] = ref
@@ -160,6 +176,7 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
+		normalizeWSMessage(&msg)
 
 		// 类型校验：未知类型直接忽略，防止注入
 		if !utils.WSMessageTypes[msg.Type] {
@@ -178,6 +195,7 @@ func (h *WebSocketHandler) routeMessage(ref *clientRef, msg *WSMessage) {
 
 	switch msg.Type {
 	case utils.WSMessageTypePing:
+		_ = ref.conn.SetReadDeadline(time.Now().Add(pongWait))
 		_ = h.send(ref.conn, &WSMessage{
 			Type:      utils.WSMessageTypePong,
 			Timestamp: now.Unix(),
@@ -277,17 +295,30 @@ func (h *WebSocketHandler) routeMessage(ref *clientRef, msg *WSMessage) {
 		return
 
 	case utils.WSMessageTypeLoot:
+		if msg.Action == "pickup" && msg.DropID != "" {
+			h.handleLootPickup(ref, msg, now)
+			return
+		}
+		if msg.Action == "spawn" {
+			// spawn 仅由服务端 HTTP 战斗触发，客户端不可伪造
+			return
+		}
 		if msg.ItemID == 0 && msg.Mesos <= 0 {
 			return
 		}
 		h.broadcastChannel(ref.channel, &WSMessage{
 			Type:        utils.WSMessageTypeLoot,
 			Channel:     ref.channel,
+			Action:      firstNotEmpty(msg.Action, "notify"),
 			CharacterID: msg.CharacterID,
 			Name:        msg.Name,
+			DropID:      msg.DropID,
 			ItemID:      msg.ItemID,
 			Quantity:    msg.Quantity,
 			Mesos:       msg.Mesos,
+			X:           msg.X,
+			Y:           msg.Y,
+			MapID:       msg.MapID,
 			Timestamp:   now.Unix(),
 		})
 		return
@@ -324,6 +355,41 @@ func (h *WebSocketHandler) routeMessage(ref *clientRef, msg *WSMessage) {
 		// 客户端心跳响应，仅记录
 		return
 	}
+}
+
+func (h *WebSocketHandler) BroadcastLoot(channel string, msg *WSMessage) {
+	if msg.Timestamp == 0 {
+		msg.Timestamp = time.Now().Unix()
+	}
+	h.broadcastChannel(channel, msg)
+}
+
+func (h *WebSocketHandler) handleLootPickup(ref *clientRef, msg *WSMessage, now time.Time) {
+	charID := uint(pickID(msg.CharacterID, ref.characterID))
+	loot, err := h.loot.Pickup(msg.DropID, charID, msg.X, msg.Y)
+	if err != nil {
+		_ = h.send(ref.conn, &WSMessage{
+			Type:      utils.WSMessageTypeSystem,
+			Level:     utils.SystemLevelWarning,
+			Content:   "拾取失败: " + err.Error(),
+			Timestamp: now.Unix(),
+		})
+		return
+	}
+	h.broadcastChannel(ref.channel, &WSMessage{
+		Type:        utils.WSMessageTypeLoot,
+		Channel:     ref.channel,
+		Action:      "pickup",
+		DropID:      loot.ID,
+		CharacterID: int(charID),
+		Name:        ref.name,
+		ItemID:      loot.ItemID,
+		Quantity:    loot.Quantity,
+		Mesos:       loot.Mesos,
+		X:           loot.X,
+		Y:           loot.Y,
+		Timestamp:   now.Unix(),
+	})
 }
 
 func (h *WebSocketHandler) broadcastChannel(channel string, msg *WSMessage) {
@@ -440,4 +506,76 @@ func sanitizeChat(s string) string {
 		}
 	}
 	return s
+}
+
+// normalizeWSMessage 将客户端 {type,payload,sender_id,room} 格式展平为顶层字段。
+func normalizeWSMessage(msg *WSMessage) {
+	if msg.SenderID != 0 && msg.CharacterID == 0 {
+		msg.CharacterID = msg.SenderID
+	}
+	if msg.Room != "" && msg.Channel == "" {
+		msg.Channel = msg.Room
+	}
+	if len(msg.Payload) == 0 {
+		return
+	}
+	p := msg.Payload
+	if v, ok := p["content"].(string); ok && msg.Content == "" {
+		msg.Content = v
+	}
+	if v, ok := p["character_id"].(float64); ok && msg.CharacterID == 0 {
+		msg.CharacterID = int(v)
+	}
+	if v, ok := p["sender_name"].(string); ok && msg.Name == "" {
+		msg.Name = v
+	}
+	if v, ok := p["x"].(float64); ok && msg.X == 0 {
+		msg.X = v
+	}
+	if v, ok := p["y"].(float64); ok && msg.Y == 0 {
+		msg.Y = v
+	}
+	if v, ok := p["skill_id"].(float64); ok && msg.SkillID == 0 {
+		msg.SkillID = int(v)
+	}
+	if v, ok := p["target_id"].(float64); ok && msg.TargetID == 0 {
+		msg.TargetID = int(v)
+	}
+	if v, ok := p["damage"].(float64); ok && msg.Damage == 0 {
+		msg.Damage = int(v)
+	}
+	if v, ok := p["critical"].(bool); ok {
+		msg.Critical = v
+	}
+	if v, ok := p["exp_gained"].(float64); ok && msg.ExpGained == 0 {
+		msg.ExpGained = int(v)
+	}
+	if v, ok := p["level_up"].(bool); ok {
+		msg.LevelUp = v
+	}
+	if v, ok := p["item_id"].(float64); ok && msg.ItemID == 0 {
+		msg.ItemID = int(v)
+	}
+	if v, ok := p["quantity"].(float64); ok && msg.Quantity == 0 {
+		msg.Quantity = int(v)
+	}
+	if v, ok := p["mesos"].(float64); ok && msg.Mesos == 0 {
+		msg.Mesos = int(v)
+	}
+	if v, ok := p["action"].(string); ok && msg.Action == "" {
+		msg.Action = v
+	}
+	if v, ok := p["drop_id"].(string); ok && msg.DropID == "" {
+		msg.DropID = v
+	}
+	if v, ok := p["map_id"].(string); ok && msg.MapID == 0 {
+		msg.MapID = int(parseIntOrZero(v))
+	}
+	if v, ok := p["map_id"].(float64); ok && msg.MapID == 0 {
+		msg.MapID = int(v)
+	}
+	if v, ok := p["channel"].(float64); ok && msg.Channel == "" {
+		msg.Channel = strconv.Itoa(int(v))
+	}
+	msg.Payload = nil
 }

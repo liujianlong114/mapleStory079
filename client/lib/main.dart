@@ -6,7 +6,7 @@ import 'config/app_config.dart';
 import 'features/login/login_page.dart';
 import 'features/character/character_select_page.dart';
 import 'features/game/game_page.dart';
-import 'features/game/game_scene_page.dart';
+import 'features/game/game_scene_loader.dart';
 import 'features/chat/chat_page.dart';
 import 'features/combat/combat_page.dart';
 import 'features/inventory/inventory_page.dart';
@@ -46,10 +46,7 @@ class MapleStoryApp extends StatelessWidget {
           Routes.login: (context) => const LoginPage(),
           Routes.characterSelect: (context) => const CharacterSelectPage(),
           Routes.game: (context) => const GamePage(),
-          Routes.gameScene: (context) => const GameScenePage(
-                mapId: 1,
-                mapName: '枫叶谷',
-              ),
+          Routes.gameScene: (context) => const GameSceneLoader(),
           Routes.chat: (context) => const ChatPage(),
           Routes.combat: (context) => const CombatPage(),
           Routes.inventory: (context) => const InventoryPage(),

@@ -24,7 +24,7 @@ class ChatMessage {
     required this.senderId,
     required this.senderName,
     this.receiverId,
-    required(this.channel),
+    required this.channel,
     required this.content,
     required this.timestamp,
     this.isSystem = false,

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -401,4 +402,33 @@ func CompareVersion(a, b string) int {
 		}
 	}
 	return 0
+}
+
+// FirstNotEmpty 返回第一个非空字符串。
+func FirstNotEmpty(a, b string) string {
+	if strings.TrimSpace(a) != "" {
+		return a
+	}
+	return b
+}
+
+// ToString 将任意值转为字符串。
+func ToString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return x
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case uint:
+		return strconv.FormatUint(uint64(x), 10)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }

@@ -130,7 +130,22 @@ flutter run -d chrome  # 或者在 Web 运行
 
 ---
 
+## 二、generate_assets —— 客户端占位资源生成
+
+在无 WZ 文件时生成 PNG 精灵与 WAV 音效占位文件，供 Flame 客户端加载。
+
+```bash
+go run scripts/generate_assets/main.go
+```
+
+输出目录：`client/assets/`（sprites、audio、images/tiles）
+
+有真实 WZ 资源时，用 HaRepacker 导出 PNG/OGG 覆盖同名文件即可。
+
+---
+
 **文件列表**
 
-- `scripts/init_data.go —— 数据初始化工具
+- `scripts/init_data.go` —— 数据初始化工具
+- `scripts/generate_assets/main.go` —— 客户端占位资源生成
 - `scripts/README.md` —— 本文件

@@ -67,13 +67,36 @@ const (
 	// 3 转 - 海盗分支
 	JobMarauder = 5110 // 斗士
 	JobOutlaw   = 5111 // 神枪手
+
+	// 4 转 - 战士分支
+	JobHero       = 1120 // 英雄
+	JobPaladin    = 1220 // 圣骑士
+	JobDarkKnight = 1320 // 黑骑士
+
+	// 4 转 - 法师分支
+	JobFPArchMage = 2120 // 火毒大魔导
+	JobILArchMage = 2220 // 冰雷大魔导
+	JobBishop     = 2320 // 主教
+
+	// 4 转 - 弓箭手分支
+	JobBowmaster = 3120 // 神射手
+	JobMarksman  = 3220 // 箭神
+
+	// 4 转 - 飞侠分支
+	JobNightLord = 4120 // 隐士
+	JobShadower  = 4220 // 侠盗
+
+	// 4 转 - 海盗分支
+	JobBuccaneer = 5120 // 冲锋队长
+	JobCorsair   = 5220 // 船长
 )
 
 // JobAdvanceLevel 各转阶需要的等级
 const (
-	LevelAdvanceLevel1 = 10 // 1 转等级
-	LevelAdvanceLevel2 = 30 // 2 转等级
-	LevelAdvanceLevel3 = 70 // 3 转等级
+	LevelAdvanceLevel1 = 10  // 1 转等级
+	LevelAdvanceLevel2 = 30  // 2 转等级
+	LevelAdvanceLevel3 = 70  // 3 转等级
+	LevelAdvanceLevel4 = 120 // 4 转等级
 )
 
 // JobStats 职业升级 HP/MP 增加值（每次升级时）
@@ -123,6 +146,19 @@ var JobLevelUpStatsMap = map[int]JobLevelUpStats{
 	JobGunslinger: {HP: 16, MP: 8},
 	JobMarauder:   {HP: 18, MP: 10},
 	JobOutlaw:     {HP: 18, MP: 10},
+
+	JobHero:       {HP: 22, MP: 6},
+	JobPaladin:    {HP: 24, MP: 6},
+	JobDarkKnight: {HP: 26, MP: 6},
+	JobFPArchMage: {HP: 12, MP: 24},
+	JobILArchMage: {HP: 12, MP: 24},
+	JobBishop:     {HP: 14, MP: 24},
+	JobBowmaster:  {HP: 16, MP: 12},
+	JobMarksman:   {HP: 16, MP: 12},
+	JobNightLord:  {HP: 16, MP: 14},
+	JobShadower:   {HP: 16, MP: 14},
+	JobBuccaneer:  {HP: 20, MP: 12},
+	JobCorsair:    {HP: 20, MP: 12},
 }
 
 // JobInitialStats 各职业的初始 HP/MP/STR/DEX/INT/LUK（转职时赠送的基础属性）
@@ -204,6 +240,20 @@ var JobInfoMap = map[int]JobInfo{
 
 	JobMarauder: {Name: "斗士", AdvanceLevel: LevelAdvanceLevel3, PreJob: JobBrawler},
 	JobOutlaw:   {Name: "神枪手", AdvanceLevel: LevelAdvanceLevel3, PreJob: JobGunslinger},
+
+	// 4 转
+	JobHero:       {Name: "英雄", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobCrusader},
+	JobPaladin:    {Name: "圣骑士", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobWhiteKnight},
+	JobDarkKnight: {Name: "黑骑士", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobDragonKnight},
+	JobFPArchMage: {Name: "火毒大魔导", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobFirePoisonWizard},
+	JobILArchMage: {Name: "冰雷大魔导", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobIceLightningWizard},
+	JobBishop:     {Name: "主教", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobPriest},
+	JobBowmaster:  {Name: "神射手", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobRanger},
+	JobMarksman:   {Name: "箭神", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobSniper},
+	JobNightLord:  {Name: "隐士", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobHermit},
+	JobShadower:   {Name: "侠盗", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobChiefBandit},
+	JobBuccaneer:  {Name: "冲锋队长", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobMarauder},
+	JobCorsair:    {Name: "船长", AdvanceLevel: LevelAdvanceLevel4, PreJob: JobOutlaw},
 }
 
 // JobNames 便于反向查询名称
@@ -238,6 +288,18 @@ var JobNames = map[int]string{
 	JobGunslinger:         "火枪手",
 	JobMarauder:           "斗士",
 	JobOutlaw:             "神枪手",
+	JobHero:               "英雄",
+	JobPaladin:            "圣骑士",
+	JobDarkKnight:         "黑骑士",
+	JobFPArchMage:         "火毒大魔导",
+	JobILArchMage:         "冰雷大魔导",
+	JobBishop:             "主教",
+	JobBowmaster:          "神射手",
+	JobMarksman:           "箭神",
+	JobNightLord:          "隐士",
+	JobShadower:           "侠盗",
+	JobBuccaneer:          "冲锋队长",
+	JobCorsair:            "船长",
 }
 
 // ==================== 聊天频道 ====================

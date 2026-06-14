@@ -24,6 +24,7 @@ type (
 	LoginLog           = database.LoginLog
 	TradeLog           = database.TradeLog
 	ChatLog            = database.ChatLog
+	MobDrop            = database.MobDrop
 
 	// 兼容旧代码：允许在 service / scripts 中引用的别名
 	CharacterItem  = database.CharacterInventory

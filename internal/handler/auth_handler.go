@@ -1,14 +1,15 @@
 package handler
 
 import (
-	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"mapleStory079/internal/model"
+	"mapleStory079/internal/middleware"
 	"mapleStory079/internal/service"
+	"mapleStory079/pkg/utils"
 )
 
-// AuthHandler 暴露账号相关的 handler（Register/Login）。
 type AuthHandler struct {
 	svc *service.AuthService
 }
@@ -31,26 +32,73 @@ type loginRequest struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		utils.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	if !utils.IsValidUsername(req.Username) {
+		utils.BadRequest(c, "用户名格式不正确")
 		return
 	}
 	if err := h.svc.Register(req.Username, req.Password, req.Email); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		utils.BadRequest(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": model.EntityRef{Name: req.Username}})
+	utils.OKMessage(c, "注册成功", gin.H{"username": req.Username})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		utils.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
 	acc, err := h.svc.Login(req.Username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": err.Error()})
+		utils.Unauthorized(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": acc})
+	// 生成会话 token 并返回
+	sessionID := "sess_" + utils.GenerateRandomString(16)
+	token := middleware.GenerateAuthToken(acc.ID, acc.Username, sessionID, 24*3600)
+
+	utils.OK(c, gin.H{
+		"account":    acc,
+		"token":      token,
+		"session_id": sessionID,
+		"expires_in": 24 * 3600,
+	})
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	// 从 Authorization Header 或 token 参数中解析 sessionID 并加入黑名单
+	auth := c.GetHeader("Authorization")
+	if idx := strings.Index(auth, " "); idx > 0 {
+		auth = auth[idx+1:]
+	}
+	if auth == "" {
+		auth = c.Query("token")
+	}
+	if auth == "" {
+		utils.BadRequest(c, "未提供 token")
+		return
+	}
+	sessionID := c.GetString("session_id")
+	if sessionID == "" {
+		sessionID = "logout_" + utils.GenerateRandomString(12)
+	}
+	if err := middleware.InvalidateToken(sessionID); err != nil {
+		utils.ServerError(c, "登出失败: "+err.Error())
+		return
+	}
+	utils.OKMessage(c, "已登出", nil)
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	username, _ := c.Get("username")
+	id, _ := strconv.Atoi(utils.FirstNotEmpty(utils.ToString(userID), "0"))
+	utils.OK(c, gin.H{
+		"user_id":  id,
+		"username": username,
+	})
 }

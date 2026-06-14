@@ -35,13 +35,14 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 
 	authHandler := NewAuthHandler()
 	charHandler := NewCharacterHandler()
+	wsHandler := NewWebSocketHandler()
 	gameHandler := NewGameHandler()
+	gameHandler.SetWebSocketHandler(wsHandler)
 	npcHandler := NewNPCHandler()
 	invHandler := NewInventoryHandler()
 	skillHandler := NewSkillHandler()
 	chatHandler := NewChatHandler()
 	socialHandler := NewSocialHandler()
-	wsHandler := NewWebSocketHandler()
 
 	api := r.Group("/api")
 	{
@@ -98,6 +99,19 @@ func registerGameRoutes(r *gin.RouterGroup, h *GameHandler) {
 	combat := r.Group("/combat")
 	{
 		combat.POST("/attack", h.Attack)
+		combat.POST("/calculate-damage", h.CalculateDamage)
+		combat.POST("/player-attack-mob", h.PlayerAttackMob)
+		combat.POST("/mob-attack-player", h.MobAttackPlayer)
+		combat.POST("/pickup-loot", h.PickupLoot)
+		combat.GET("/ground-loot", h.ListGroundLoot)
+		combat.GET("/stats", h.GetCombatStats)
+		combat.POST("/revive", h.ReviveCharacter)
+	}
+
+	items := r.Group("/items")
+	{
+		items.GET("/", h.ListItems)
+		items.GET("/:id", h.GetItem)
 	}
 
 	quests := r.Group("/quests")
@@ -109,14 +123,20 @@ func registerGameRoutes(r *gin.RouterGroup, h *GameHandler) {
 	{
 		game.GET("/state", h.GetGameState)
 		game.POST("/gain-exp", h.GainExp)
+		game.POST("/move", h.MoveCharacter)
+		game.POST("/restore", h.RestoreCharacter)
+		game.POST("/levelup/:id", h.LevelUpCharacter)
+		game.POST("/add-ap", h.AddAbilityPoints)
+		game.GET("/map-instances", h.ListMapMobInstances)
 	}
 }
 
 func registerNPCRoutes(r *gin.RouterGroup, h *NPCHandler) {
 	npcs := r.Group("/npcs")
 	{
-		npcs.GET("/:id", h.Start)
-		npcs.POST("/interact/:id", h.Start)
+		npcs.GET("/map/:mapId", h.ListByMap)
+		npcs.POST("/interact/:id", h.Interact)
+		npcs.GET("/:id", h.GetByID)
 	}
 
 	npc := r.Group("/npc")

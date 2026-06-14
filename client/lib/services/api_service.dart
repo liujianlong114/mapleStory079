@@ -35,12 +35,40 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (body.isEmpty) return {};
       try {
-        return jsonDecode(body) as Map<String, dynamic>;
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        return {'data': decoded};
       } catch (_) {
         return {'raw': body};
       }
     }
     throw Exception('API Error (${response.statusCode}): $body');
+  }
+
+  Map<String, dynamic> _unwrapMap(Map<String, dynamic> data) {
+    if (data['success'] == true && data['data'] is Map) {
+      return Map<String, dynamic>.from(data['data'] as Map);
+    }
+    return data;
+  }
+
+  List<Map<String, dynamic>> _unwrapList(
+    Map<String, dynamic> data, {
+    String key = 'items',
+  }) {
+    if (data[key] is List) {
+      return (data[key] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    if (data['success'] == true && data['data'] is List) {
+      return (data['data'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    return [];
   }
 
   Future<Account> register(String username, String password, String email) async {
@@ -101,8 +129,13 @@ class ApiService {
     );
 
     final data = await _handleResponse(response);
-    final list = data['characters'] as List? ?? [];
-    return list.map((e) => Character.fromJson(e as Map<String, dynamic>)).toList();
+    final list = _unwrapList(data, key: 'characters');
+    if (list.isEmpty && data['data'] is List) {
+      return (data['data'] as List)
+          .map((e) => Character.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return list.map((e) => Character.fromJson(e)).toList();
   }
 
   Future<Character> getCharacter(int id) async {
@@ -111,7 +144,7 @@ class ApiService {
       headers: _headers(),
     );
 
-    final data = await _handleResponse(response);
+    final data = _unwrapMap(await _handleResponse(response));
     return Character.fromJson(data);
   }
 
@@ -203,8 +236,8 @@ class ApiService {
     );
 
     final data = await _handleResponse(response);
-    final list = data['maps'] as List? ?? [];
-    return list.map((e) => GameMap.fromJson(e as Map<String, dynamic>)).toList();
+    final list = _unwrapList(data, key: 'maps');
+    return list.map((e) => GameMap.fromJson(e)).toList();
   }
 
   Future<GameMap> getMap(int id) async {
@@ -213,7 +246,7 @@ class ApiService {
       headers: _headers(),
     );
 
-    final data = await _handleResponse(response);
+    final data = _unwrapMap(await _handleResponse(response));
     return GameMap.fromJson(data);
   }
 
@@ -264,10 +297,40 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getMapMobInstances(int mapId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/game/map-instances?map_id=$mapId'),
+        headers: _headers(),
+      );
+      final data = await _handleResponse(response);
+      return _unwrapList(data, key: 'mob_instances');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCharacterInventory(int characterId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/inventory?characterId=$characterId&character_id=$characterId'),
+        headers: _headers(),
+      );
+      final data = await _handleResponse(response);
+      return _unwrapList(data, key: 'items');
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> playerAttackMob({
     required int characterId,
     required int mobId,
+    int? instanceId,
     int? skillId,
+    int? mapId,
+    double? x,
+    double? y,
   }) async {
     try {
       final response = await http.post(
@@ -275,14 +338,56 @@ class ApiService {
         headers: _headers(),
         body: jsonEncode({
           'character_id': characterId,
-          'mob_id': mobId,
-          'skill_id': skillId,
+          if (instanceId != null) 'instance_id': instanceId,
+          if (mobId > 0) 'mob_id': mobId,
+          if (skillId != null) 'skill_id': skillId,
+          if (mapId != null) 'map_id': mapId,
+          if (x != null) 'x': x,
+          if (y != null) 'y': y,
         }),
       );
       return await _handleResponse(response);
     } catch (_) {
       return {'damage': 0, 'is_critical': false, 'mob_killed': false};
     }
+  }
+
+  Future<Map<String, dynamic>> pickupLoot({
+    required int characterId,
+    required String dropId,
+    double? x,
+    double? y,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/combat/pickup-loot'),
+        headers: _headers(),
+        body: jsonEncode({
+          'character_id': characterId,
+          'drop_id': dropId,
+          if (x != null) 'x': x,
+          if (y != null) 'y': y,
+        }),
+      );
+      return await _handleResponse(response);
+    } catch (_) {
+      return {'success': false};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listGroundLoot(int mapId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/combat/ground-loot?map_id=$mapId'),
+        headers: _headers(),
+      );
+      final data = await _handleResponse(response);
+      final raw = data['ground_loots'];
+      if (raw is List) {
+        return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<Map<String, dynamic>> mobAttackPlayer({
@@ -336,7 +441,7 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _handleResponse(response);
-    final list = data['mobs'] as List? ?? [];
+    final list = _unwrapList(data, key: 'mobs');
     if (list.isEmpty) {
       // 回退到客户端内置怪物表
       return MobCatalog.templates.map((t) => Mob(
@@ -354,7 +459,7 @@ class ApiService {
             posY: 0,
           )).toList();
     }
-    return list.map((e) => Mob.fromJson(e as Map<String, dynamic>)).toList();
+    return list.map((e) => Mob.fromJson(e)).toList();
   }
 
   Future<Mob> getMob(int id) async {
@@ -362,7 +467,7 @@ class ApiService {
       Uri.parse('${AppConfig.apiBaseUrl}/mobs/$id'),
       headers: _headers(),
     );
-    return Mob.fromJson(await _handleResponse(response));
+    return Mob.fromJson(_unwrapMap(await _handleResponse(response)));
   }
 
   // ============= Skills APIs =============
@@ -372,11 +477,11 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _handleResponse(response);
-    final list = data['skills'] as List? ?? [];
+    final list = _unwrapList(data, key: 'skills');
     if (list.isEmpty) {
       return SkillCatalog.allSkills;
     }
-    return list.map((e) => Skill.fromJson(e as Map<String, dynamic>)).toList();
+    return list.map((e) => Skill.fromJson(e)).toList();
   }
 
   Future<Skill> getSkill(int id) async {
@@ -384,7 +489,7 @@ class ApiService {
       Uri.parse('${AppConfig.apiBaseUrl}/skills/$id'),
       headers: _headers(),
     );
-    return Skill.fromJson(await _handleResponse(response));
+    return Skill.fromJson(_unwrapMap(await _handleResponse(response)));
   }
 
   // ============= Items APIs =============
@@ -394,11 +499,11 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _handleResponse(response);
-    final list = data['items'] as List? ?? [];
+    final list = _unwrapList(data, key: 'items');
     if (list.isEmpty) {
       return ItemCatalog.defaultItems;
     }
-    return list.map((e) => Item.fromJson(e as Map<String, dynamic>)).toList();
+    return list.map((e) => Item.fromJson(e)).toList();
   }
 
   Future<Item> getItem(int id) async {

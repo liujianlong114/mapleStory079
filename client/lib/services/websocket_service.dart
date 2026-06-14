@@ -40,13 +40,28 @@ class WsMessage {
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory WsMessage.fromJson(Map<String, dynamic> json) {
+    final payload = Map<String, dynamic>.from(
+      json['payload'] as Map<String, dynamic>? ?? {},
+    );
+    for (final key in [
+      'action', 'drop_id', 'item_id', 'quantity', 'mesos', 'x', 'y',
+      'character_id', 'map_id', 'content', 'damage', 'critical',
+      'exp_gained', 'level_up', 'target_id', 'skill_id', 'name',
+    ]) {
+      if (json.containsKey(key) && !payload.containsKey(key)) {
+        payload[key] = json[key];
+      }
+    }
+    final sender = json['sender_id'] ?? json['character_id'];
     return WsMessage(
       type: json['type'] as String? ?? WsMessageType.system,
-      payload: json['payload'] as Map<String, dynamic>? ?? {},
-      senderId: json['sender_id'] as int?,
-      room: json['room'] as String?,
-      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
-          DateTime.now(),
+      payload: payload,
+      senderId: sender is int ? sender : int.tryParse('$sender'),
+      room: json['room'] as String? ?? json['channel'] as String?,
+      timestamp: json['ts'] != null
+          ? DateTime.fromMillisecondsSinceEpoch((json['ts'] as num).toInt() * 1000)
+          : DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+              DateTime.now(),
     );
   }
 
@@ -249,6 +264,26 @@ class WebSocketService {
         'character_id': characterId,
         'exp_gained': expGained,
         'level_up': levelUp,
+      },
+    ));
+  }
+
+  /// 请求拾取地面掉落（服务端校验距离与归属）
+  void sendLootPickup({
+    required int characterId,
+    required String dropId,
+    required double x,
+    required double y,
+  }) {
+    send(WsMessage(
+      type: WsMessageType.loot,
+      senderId: characterId,
+      payload: {
+        'action': 'pickup',
+        'character_id': characterId,
+        'drop_id': dropId,
+        'x': x,
+        'y': y,
       },
     ));
   }

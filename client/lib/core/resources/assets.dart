@@ -20,39 +20,47 @@ class BgmAssets {
   /// 根据地图 ID 返回对应 BGM；找不到时返回 null（客户端可跳过播放）。
   /// 服务端 pkg/utils/constants.go 中 MapXX 常量与此处分支保持对齐。
   static String? byMapId(int mapId) {
-    if (mapId >= 990000000) return 'audio/boss_zakum.ogg';     // BOSS 区
-    if (mapId >= 220000000) return ludibrium;                    // 玩具城
-    if (mapId >= 201000000) return orbis;                        // 天空之城
-    if (mapId >= 200000000) return elNath;                        // 冰峰雪域
-    if (mapId >= 103000000) return kerningCity;                   // 废弃都市
-    if (mapId >= 102000000) return perion;                        // 勇士部落
-    if (mapId >= 101000000) return ellinia;                       // 魔法密林
-    if (mapId >= 100000000) return henesys;                       // 射手村
-    if (mapId >= 10000) return mapleIsland;                       // 彩虹村/新手区
-    return null;
+    if (mapId >= 990000000) return 'audio/boss_zakum.wav';
+    if (mapId >= 220000000) return 'audio/00300000.wav';
+    if (mapId >= 201000000) return 'audio/00200001.wav';
+    if (mapId >= 200000000) return 'audio/00200000.wav';
+    if (mapId >= 103000000) return 'audio/00103000.wav';
+    if (mapId >= 102000000) return 'audio/00100000.wav';
+    if (mapId >= 101000000) return 'audio/00101000.wav';
+    if (mapId >= 100000000) return 'audio/00102000.wav';
+    if (mapId >= 10000) return 'audio/00001000.wav';
+    return 'audio/00001000.wav';
   }
 }
 
 /// ====== SFX 系统音效 ======
 class SfxAssets {
-  static const String levelUp = 'audio/sfx_levelup.ogg';
-  static const String hit     = 'audio/sfx_hit.ogg';
-  static const String pickup  = 'audio/sfx_pickup.ogg';
-  static const String mesos   = 'audio/sfx_meso.ogg';
-  static const String portal  = 'audio/sfx_portal.ogg';
-  static const String click   = 'audio/sfx_ui_click.ogg';
-  static const String chat    = 'audio/sfx_chat.ogg';
-  static const String dead    = 'audio/sfx_dead.ogg';
-  static const String revive  = 'audio/sfx_revive.ogg';
+  static const String levelUp = 'audio/sfx_levelup.wav';
+  static const String hit     = 'audio/sfx_hit.wav';
+  static const String pickup  = 'audio/sfx_pickup.wav';
+  static const String mesos   = 'audio/sfx_meso.wav';
+  static const String portal  = 'audio/sfx_portal.wav';
+  static const String click   = 'audio/sfx_ui_click.wav';
+  static const String chat    = 'audio/sfx_chat.wav';
+  static const String dead    = 'audio/sfx_dead.wav';
+  static const String revive  = 'audio/sfx_revive.wav';
 }
 
-/// ====== Sprite 精灵资源路径前缀 ======
+/// ====== Sprite 精灵资源路径 ======
 class SpriteDirs {
   static const String player = 'sprites/player/';
   static const String mob    = 'sprites/mob/';
   static const String npc    = 'sprites/npc/';
   static const String portal = 'sprites/portal/';
   static const String item   = 'sprites/item/';
+  static const String tiles  = 'images/tiles/';
+
+  static String mobPath(int mobId) => '$mob$mobId.png';
+  static String npcPath(int npcId) => '$npc$npcId.png';
+  static String playerStand() => '${player}stand.png';
+  static String playerWalk() => '${player}walk.png';
+  static String tileGrass() => '${tiles}grass.png';
+  static String tileDirt() => '${tiles}dirt.png';
 }
 
 /// ====== 单例音频播放器 ======

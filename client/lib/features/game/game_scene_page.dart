@@ -1,8 +1,13 @@
+import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_config.dart';
 import '../../providers/game_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/websocket_service.dart';
 import '../../widgets/player_stats.dart';
 import '../../widgets/mini_map.dart';
 import '../../game/engine/game_world.dart';
@@ -14,6 +19,19 @@ class GameScenePage extends StatefulWidget {
   final String mapName;
   final double mapWidth;
   final double mapHeight;
+  final int characterId;
+  final int jobId;
+  final int initialHp;
+  final int initialMaxHp;
+  final int initialMp;
+  final int initialMaxMp;
+  final int initialLevel;
+  final int initialExp;
+  final int initialStr;
+  final int initialDex;
+  final int initialIntl;
+  final int initialLuk;
+  final String? bgmAsset;
 
   const GameScenePage({
     super.key,
@@ -21,6 +39,19 @@ class GameScenePage extends StatefulWidget {
     required this.mapName,
     this.mapWidth = 1600,
     this.mapHeight = 900,
+    this.characterId = 1,
+    this.jobId = 0,
+    this.initialHp = 50,
+    this.initialMaxHp = 50,
+    this.initialMp = 50,
+    this.initialMaxMp = 50,
+    this.initialLevel = 1,
+    this.initialExp = 0,
+    this.initialStr = 10,
+    this.initialDex = 4,
+    this.initialIntl = 4,
+    this.initialLuk = 4,
+    this.bgmAsset,
   });
 
   @override
@@ -29,21 +60,56 @@ class GameScenePage extends StatefulWidget {
 
 class _GameScenePageState extends State<GameScenePage> {
   late final GameWorld _gameWorld;
-  final _damageNumbers = <_DamageFloat>[];
+  late final WebSocketService _ws;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
+    _ws = WebSocketService();
     _gameWorld = GameWorld(
       mapId: widget.mapId,
       mapName: widget.mapName,
       mapWidth: widget.mapWidth,
       mapHeight: widget.mapHeight,
+      characterId: widget.characterId,
+      jobId: widget.jobId,
+      str: widget.initialStr,
+      dex: widget.initialDex,
+      intelligence: widget.initialIntl,
+      luk: widget.initialLuk,
+      exp: widget.initialExp,
+      bgmAsset: widget.bgmAsset,
     );
+    _gameWorld.ws = _ws;
+    _gameWorld.api = ApiService();
+    _gameWorld.hp = widget.initialHp;
+    _gameWorld.maxHp = widget.initialMaxHp;
+    _gameWorld.mp = widget.initialMp;
+    _gameWorld.maxMp = widget.initialMaxMp;
+    _gameWorld.level = widget.initialLevel;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+      _connectWebSocket();
       _spawnDefaultEntities();
       _setupStatSync();
     });
+  }
+
+  Future<void> _connectWebSocket() async {
+    await _ws.connect(
+      AppConfig.wsUrl,
+      characterId: widget.characterId,
+      room: 'map_${widget.mapId}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _ws.disconnect();
+    _focusNode.dispose();
+    super.dispose();
   }
 
   void _setupStatSync() {
@@ -104,22 +170,19 @@ class _GameScenePageState extends State<GameScenePage> {
 
   void _onAttack() {
     _gameWorld.playerAttack();
-    final gp = context.read<GameProvider>();
-    final dmg = 10 + gp.state.level * 2;
-    setState(() {
-      _damageNumbers.add(_DamageFloat(
-        MediaQuery.of(context).size.width / 2,
-        MediaQuery.of(context).size.height / 2,
-        dmg,
-      ));
-    });
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        setState(() {
-          _damageNumbers.removeAt(0);
-        });
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      _gameWorld.handleKeyDown(event.logicalKey, true);
+      if (event.logicalKey == LogicalKeyboardKey.keyJ ||
+          event.logicalKey == LogicalKeyboardKey.space) {
+        _onAttack();
       }
-    });
+    } else if (event is KeyUpEvent) {
+      _gameWorld.handleKeyDown(event.logicalKey, false);
+    }
+    return KeyEventResult.handled;
   }
 
   @override
@@ -129,10 +192,15 @@ class _GameScenePageState extends State<GameScenePage> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: GameWidget(
-              game: _gameWorld,
-              backgroundBuilder: (_) => Container(
-                color: const Color(0xFF1a1a2e),
+            child: Focus(
+              focusNode: _focusNode,
+              autofocus: true,
+              onKeyEvent: _onKeyEvent,
+              child: GameWidget(
+                game: _gameWorld,
+                backgroundBuilder: (_) => Container(
+                  color: const Color(0xFF1a1a2e),
+                ),
               ),
             ),
           ),
@@ -153,29 +221,6 @@ class _GameScenePageState extends State<GameScenePage> {
               mapName: widget.mapName,
             ),
           ),
-          ..._damageNumbers.map((d) => Positioned(
-                left: d.x - 30,
-                top: d.y - 40,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 800),
-                  builder: (_, v, __) => Opacity(
-                    opacity: 1 - v,
-                    child: Transform.translate(
-                      offset: Offset(0, -40 * v),
-                      child: Text(
-                        '-${d.damage}',
-                        style: const TextStyle(
-                          color: Colors.yellowAccent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              )),
           Positioned(
             bottom: 20,
             left: 0,
@@ -245,12 +290,4 @@ class _GameScenePageState extends State<GameScenePage> {
       ),
     );
   }
-}
-
-class _DamageFloat {
-  final double x;
-  final double y;
-  final int damage;
-
-  _DamageFloat(this.x, this.y, this.damage);
 }

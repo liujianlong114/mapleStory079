@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
 

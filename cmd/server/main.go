@@ -7,10 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/viper"
 	"mapleStory079/internal/handler"
 	"mapleStory079/pkg/cache"
 	"mapleStory079/pkg/database"
+
+	"github.com/spf13/viper"
 )
 
 func initConfig() {
@@ -45,6 +46,7 @@ func main() {
 		&database.Map{},
 		&database.NPC{},
 		&database.Mob{},
+		&database.MobDrop{},
 		&database.Guild{},
 		&database.Party{},
 		&database.Friend{},
@@ -55,6 +57,10 @@ func main() {
 		log.Printf("Warning: auto-migration failed: %v", err)
 	}
 	defer database.Close()
+
+	if _, err := database.SeedDefaultData(); err != nil {
+		log.Printf("Warning: seed default data failed: %v", err)
+	}
 
 	if err := cache.Init(); err != nil {
 		log.Println("Failed to initialize cache, proceeding without cache:", err)

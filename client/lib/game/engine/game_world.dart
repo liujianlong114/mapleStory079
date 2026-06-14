@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/resources/assets.dart';
 import '../../models/mob.dart';
+import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
 import 'sprite_loader.dart';
 
@@ -24,7 +24,7 @@ import 'sprite_loader.dart';
 /// - AudioManager：按 mapId 自动播放 BGM；攻击/升级/死亡音效
 /// - 角色属性：HP/MP/EXP/STR/DEX/INT/LUK/AP/SP
 /// - 死亡与复活：HP/回生点（死亡状态机）
-class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
+class GameWorld extends FlameGame with HasCollisionDetection {
   GameWorld({
     this.mapId = 1,
     this.mapName = '未知地图',
@@ -40,6 +40,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     this.intelligence = 4,
     this.luk = 4,
     this.exp = 0,
+    this.bgmAsset,
   });
 
   // ===== 地图属性 =====
@@ -49,6 +50,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final double mapHeight;
   final double tileSize;
   final Vector2? playerInitial;
+  final String? bgmAsset;
 
   // ===== 角色属性 =====
   final int characterId;
@@ -82,6 +84,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   // ===== 外部回调（需在创建后、运行前设置）=====
   WebSocketService? ws;
+  ApiService? api;
   late final void Function(int newLevel)? onLevelUp;
   late final void Function()? onPlayerDead;
   late final void Function({
@@ -99,6 +102,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final List<MobComponent> mobs = [];
   final List<NPCComponent> npcs = [];
   final Map<int, RemotePlayerComponent> remotePlayers = {};
+  final Map<String, GroundLootComponent> _groundLoots = {};
 
   // ===== 节流器 =====
   double _positionThrottle = 0;
@@ -135,10 +139,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       snap: true,
       maxSpeed: 600,
     );
-    camera.worldBounds = Rect.fromLTWH(0, 0, mapWidth, mapHeight);
 
-    // ===== 音频：自动播放当前地图 BGM =====
-    final bgm = BgmAssets.byMapId(mapId);
+    // ===== 音频：优先服务端 music 字段，否则按 mapId 匹配 =====
+    final bgm = bgmAsset ?? BgmAssets.byMapId(mapId);
     if (bgm != null) {
       try {
         await AudioManager().playBgm(bgm);
@@ -151,6 +154,16 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     ws?.addListener(WsMessageType.dead, _onServerDead);
     ws?.addListener(WsMessageType.revive, _onServerRevive);
     ws?.addListener(WsMessageType.position, _onServerRemotePosition);
+    ws?.addListener(WsMessageType.loot, _onServerLoot);
+    _loadExistingGroundLoot();
+  }
+
+  Future<void> _loadExistingGroundLoot() async {
+    if (api == null) return;
+    final rows = await api!.listGroundLoot(mapId);
+    for (final row in rows) {
+      _spawnGroundLootFromMap(row);
+    }
   }
 
   @override
@@ -160,23 +173,21 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     ws?.removeListener(WsMessageType.dead, _onServerDead);
     ws?.removeListener(WsMessageType.revive, _onServerRevive);
     ws?.removeListener(WsMessageType.position, _onServerRemotePosition);
+    ws?.removeListener(WsMessageType.loot, _onServerLoot);
     try {
       AudioManager().stopBgm();
     } catch (_) {}
     super.onRemove();
   }
 
-  // ============ 键盘输入 ============
+  // ============ 键盘输入（由 GameScenePage KeyboardListener 驱动）============
 
-  @override
-  KeyEventResult onKeyEvent(
-    KeyEvent event,
-    Set<LogicalKeyboardKey> keysPressed,
-  ) {
-    _keysDown
-      ..clear()
-      ..addAll(keysPressed);
-    return KeyEventResult.handled;
+  void handleKeyDown(LogicalKeyboardKey key, bool isDown) {
+    if (isDown) {
+      _keysDown.add(key);
+    } else {
+      _keysDown.remove(key);
+    }
   }
 
   // ============ 主循环 ============
@@ -268,6 +279,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       });
     }
 
+    // --- 自动拾取附近掉落 ---
+    _tryAutoPickup();
+
     // --- 经验与升级检查 ---
     if (exp >= GameConstants.expRequired(level)) {
       _doLevelUp();
@@ -278,19 +292,6 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   void _doMeleeHit({required double range}) {
     final r2 = range * range;
-    // 按职业简单估算伤害（与服务端 combat_service.go 对齐：战士=STR, 法师=INT, 弓=DEX, 飞侠=LUK）
-    final base = jobId == 1
-        ? (str * 1.2 + level)
-        : jobId == 2
-            ? (intelligence * 1.3 + level)
-            : jobId == 3
-                ? (dex * 1.25 + level)
-                : jobId == 4
-                    ? (luk * 1.4 + level)
-                    : jobId == 5
-                        ? (str * 1.1 + dex * 0.8 + level)
-                        : (str * 1.0 + level);
-    _lastTargetMobId = null;
     MobComponent? nearest;
     double nearestD2 = double.infinity;
     for (final mob in mobs) {
@@ -305,42 +306,188 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       }
     }
     if (nearest == null) return;
-    _lastTargetMobId = nearest.mob.id;
-    // 暴击：LUK 影响，飞侠天生高
+    _lastTargetMobId = nearest.mob.mobId;
+
+    if (api != null) {
+      _resolveServerAttack(nearest);
+      return;
+    }
+
+    // 离线回退：本地伤害计算
+    final base = jobId == 1
+        ? (str * 1.2 + level)
+        : jobId == 2
+            ? (intelligence * 1.3 + level)
+            : jobId == 3
+                ? (dex * 1.25 + level)
+                : jobId == 4
+                    ? (luk * 1.4 + level)
+                    : jobId == 5
+                        ? (str * 1.1 + dex * 0.8 + level)
+                        : (str * 1.0 + level);
     final critRoll = math.Random().nextDouble();
     final critChance = 0.05 + luk * 0.005 + (jobId == 4 ? 0.1 : 0.0);
     final isCrit = critRoll < critChance;
     final dmgRaw = base.toInt() + math.Random().nextInt(4);
-    final dmg = (isCrit ? dmgRaw * 2 : dmgRaw).toInt();
-    final finalDmg = dmg < 1 ? 1 : dmg;
+    final finalDmg = ((isCrit ? dmgRaw * 2 : dmgRaw).toInt()).clamp(1, 99999);
+    _applyHitVisuals(nearest, finalDmg, isCrit);
+    _applyLocalKillRewards(nearest);
+  }
+
+  Future<void> _resolveServerAttack(MobComponent nearest) async {
+    final result = await api!.playerAttackMob(
+      characterId: characterId,
+      mobId: nearest.mob.mobId,
+      mapId: mapId,
+      x: nearest.position.x,
+      y: nearest.position.y,
+    );
+    if (result['is_hit'] == false) return;
+
+    final dmg = (result['damage'] as num?)?.toInt() ?? 1;
+    final isCrit = result['is_critical'] == true;
+    final targetHp = (result['target_hp'] as num?)?.toInt();
+    _applyHitVisuals(nearest, dmg, isCrit, applyDamage: targetHp == null);
+    if (targetHp != null) {
+      nearest.setHp(targetHp);
+    }
+
+    if (result['mob_killed'] == true) {
+      final expGain = (result['exp_gained'] as num?)?.toInt() ?? 0;
+      final mesos = (result['mesos_gained'] as num?)?.toInt() ?? 0;
+      if (expGain > 0) gainExp(expGain);
+      if (mesos > 0) {
+        mesosGained += mesos;
+        onStatChange?.call(mesos: mesosGained);
+        try {
+          AudioManager().playSfx(SfxAssets.mesos);
+        } catch (_) {}
+      }
+      killedMobs += 1;
+      if (result['level_up'] == true) {
+        onLevelUp?.call(level);
+      }
+      final loots = result['ground_loots'];
+      if (loots is List) {
+        for (final raw in loots) {
+          if (raw is Map) {
+            _spawnGroundLootFromMap(Map<String, dynamic>.from(raw));
+          }
+        }
+      }
+    }
+  }
+
+  void _applyHitVisuals(
+    MobComponent nearest,
+    int finalDmg,
+    bool isCrit, {
+    bool applyDamage = true,
+  }) {
     damageDealt += finalDmg;
-    nearest.takeDamage(finalDmg);
+    if (applyDamage) nearest.takeDamage(finalDmg);
     add(DamagePopup(
       damage: finalDmg,
       origin: nearest.position.clone(),
       isCritical: isCrit,
     ));
-
-    // 通知服务端：本次攻击（本地伤害先渲染，服务端最终裁决会覆盖）
     ws?.sendDamage(
       characterId: characterId,
-      targetId: nearest.mob.id,
+      targetId: nearest.mob.mobId,
       damage: finalDmg,
       critical: isCrit,
     );
+  }
 
+  void _applyLocalKillRewards(MobComponent nearest) {
     if (!nearest.mob.isAlive) {
       killedMobs += 1;
-      // 经验 = 怪物等级 * 4 + 10
-      final expGain = (nearest.mob.level * 4 + 10);
+      final expGain = nearest.mob.level * 4 + 10;
       gainExp(expGain);
-      // 金币 = 怪物等级 * 2 + 随机
       final mesos = nearest.mob.level * 2 + math.Random().nextInt(5);
       mesosGained += mesos;
       onStatChange?.call(mesos: mesosGained);
       try {
         AudioManager().playSfx(SfxAssets.mesos);
       } catch (_) {}
+    }
+  }
+
+  void _spawnGroundLootFromMap(Map<String, dynamic> row) {
+    final dropId = row['drop_id'] as String? ?? '';
+    if (dropId.isEmpty || _groundLoots.containsKey(dropId)) return;
+    final itemId = (row['item_id'] as num?)?.toInt() ?? 0;
+    final qty = (row['quantity'] as num?)?.toInt() ?? 1;
+    final x = (row['x'] as num?)?.toDouble() ?? player.position.x;
+    final y = (row['y'] as num?)?.toDouble() ?? player.position.y;
+    spawnGroundLoot(dropId: dropId, itemId: itemId, quantity: qty, x: x, y: y);
+  }
+
+  void spawnGroundLoot({
+    required String dropId,
+    required int itemId,
+    required int quantity,
+    required double x,
+    required double y,
+  }) {
+    if (_groundLoots.containsKey(dropId)) return;
+    final comp = GroundLootComponent(
+      dropId: dropId,
+      itemId: itemId,
+      quantity: quantity,
+      position: Vector2(x, y),
+    );
+    _groundLoots[dropId] = comp;
+    add(comp);
+  }
+
+  void removeGroundLoot(String dropId) {
+    _groundLoots.remove(dropId)?.removeFromParent();
+  }
+
+  void _tryAutoPickup() {
+    const pickupRange = 70.0;
+    const r2 = pickupRange * pickupRange;
+    for (final entry in _groundLoots.entries.toList()) {
+      final loot = entry.value;
+      final dx = loot.position.x - player.position.x;
+      final dy = loot.position.y - player.position.y;
+      if (dx * dx + dy * dy > r2) continue;
+      _pickupLoot(entry.key);
+      break;
+    }
+  }
+
+  Future<void> _pickupLoot(String dropId) async {
+    removeGroundLoot(dropId);
+    try {
+      AudioManager().playSfx(SfxAssets.pickup);
+    } catch (_) {}
+    if (api != null) {
+      await api!.pickupLoot(
+        characterId: characterId,
+        dropId: dropId,
+        x: player.position.x,
+        y: player.position.y,
+      );
+    } else {
+      ws?.sendLootPickup(
+        characterId: characterId,
+        dropId: dropId,
+        x: player.position.x,
+        y: player.position.y,
+      );
+    }
+  }
+
+  void _onServerLoot(WsMessage msg) {
+    final p = msg.payload;
+    final action = p['action'] as String? ?? '';
+    final dropId = p['drop_id'] as String? ?? '';
+    if (action == 'spawn') {
+      _spawnGroundLootFromMap(p);
+    } else if (action == 'pickup' && dropId.isNotEmpty) {
+      removeGroundLoot(dropId);
     }
   }
 
@@ -613,6 +760,7 @@ class PlayerComponent extends PositionComponent {
   String animationState = 'idle';
   double attackCooldown = 0.45;
   double _attackTimer = 0.0;
+  Sprite? _sprite;
 
   PlayerComponent({required Vector2 position, Vector2? size})
       : super(
@@ -620,6 +768,11 @@ class PlayerComponent extends PositionComponent {
           size: size ?? Vector2(48, 64),
           anchor: Anchor.center,
         );
+
+  @override
+  Future<void> onLoad() async {
+    _sprite = await SpriteLoader.tryLoad(SpriteDirs.playerStand());
+  }
 
   @override
   void update(double dt) {
@@ -653,6 +806,20 @@ class PlayerComponent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
+    // 优先渲染 PNG 精灵
+    if (_sprite != null) {
+      canvas.save();
+      if (direction < 0) {
+        canvas.translate(size.x, 0);
+        canvas.scale(-1, 1);
+      }
+      _sprite!.render(canvas, size: size);
+      canvas.restore();
+      _renderAttackGlow(canvas);
+      return;
+    }
+
+    // 回退：程序化 Canvas 绘制
     // 阴影
     canvas.drawOval(
       Rect.fromCenter(
@@ -669,7 +836,7 @@ class PlayerComponent extends PositionComponent {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFFf1c40f), Color(0xFFd35400)],
-      ).createShader(Offset.zero & size.toSize());
+      ).createShader(Offset.zero & Size(size.x, size.y));
     canvas.drawRect(
       Rect.fromLTWH(size.x * 0.2, size.y * 0.25, size.x * 0.6, size.y * 0.5),
       bodyPaint,
@@ -709,6 +876,10 @@ class PlayerComponent extends PositionComponent {
     );
 
     // 攻击光效
+    _renderAttackGlow(canvas);
+  }
+
+  void _renderAttackGlow(Canvas canvas) {
     if (_attackTimer > 0) {
       final glow = Paint()
         ..color = Colors.yellow.withOpacity(_attackTimer / attackCooldown * 0.8);
@@ -736,8 +907,21 @@ class NPCComponent extends PositionComponent {
           anchor: Anchor.center,
         );
 
+  Sprite? _sprite;
+
+  @override
+  Future<void> onLoad() async {
+    _sprite = await SpriteLoader.tryLoad(SpriteDirs.npcPath(npcId));
+  }
+
   @override
   void render(Canvas canvas) {
+    if (_sprite != null) {
+      _sprite!.render(canvas, size: size);
+      _renderNpcName(canvas);
+      return;
+    }
+
     // 阴影
     canvas.drawOval(
       Rect.fromCenter(
@@ -754,7 +938,7 @@ class NPCComponent extends PositionComponent {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFF3498db), Color(0xFF2c3e50)],
-      ).createShader(Offset.zero & size.toSize());
+      ).createShader(Offset.zero & Size(size.x, size.y));
     canvas.drawRect(
       Rect.fromLTWH(size.x * 0.18, size.y * 0.25, size.x * 0.64, size.y * 0.5),
       paint,
@@ -768,6 +952,10 @@ class NPCComponent extends PositionComponent {
     );
 
     // 名字
+    _renderNpcName(canvas);
+  }
+
+  void _renderNpcName(Canvas canvas) {
     final tp = TextPainter(
       text: TextSpan(
         text: npcName,
@@ -792,6 +980,7 @@ class MobComponent extends PositionComponent {
   final Mob mob;
   double _aiTimer = 0.0;
   double _attackCooldown = 0.0;
+  Sprite? _sprite;
 
   MobComponent({required this.mob, required Vector2 position})
       : super(
@@ -799,6 +988,11 @@ class MobComponent extends PositionComponent {
           size: Vector2(60, 60),
           anchor: Anchor.center,
         );
+
+  @override
+  Future<void> onLoad() async {
+    _sprite = await SpriteLoader.tryLoad(SpriteDirs.mobPath(mob.mobId));
+  }
 
   void updateAI(double dt, PlayerComponent player, {void Function(int dmg)? onDealDamage}) {
     if (!mob.isAlive) return;
@@ -841,8 +1035,23 @@ class MobComponent extends PositionComponent {
     }
   }
 
+  void setHp(int hp) {
+    mob.hp = hp.clamp(0, mob.maxHp);
+    if (mob.hp <= 0) {
+      mob.status = MobStatus.dead;
+    } else if (mob.status == MobStatus.dead) {
+      mob.status = MobStatus.idle;
+    }
+  }
+
   @override
   void render(Canvas canvas) {
+    if (_sprite != null && mob.isAlive) {
+      _sprite!.render(canvas, size: size);
+      _renderMobHud(canvas);
+      return;
+    }
+
     // 阴影
     canvas.drawOval(
       Rect.fromCenter(
@@ -862,7 +1071,7 @@ class MobComponent extends PositionComponent {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [color, color.withOpacity(0.6)],
-      ).createShader(Offset.zero & size.toSize());
+      ).createShader(Offset.zero & Size(size.x, size.y));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(size.x * 0.1, size.y * 0.2, size.x * 0.8, size.y * 0.7),
@@ -895,7 +1104,11 @@ class MobComponent extends PositionComponent {
       );
     }
 
-    // 血条
+    // 血条与名字
+    _renderMobHud(canvas);
+  }
+
+  void _renderMobHud(Canvas canvas) {
     final hpRatio = mob.maxHp > 0 ? mob.hp / mob.maxHp : 0.0;
     canvas.drawRect(
       Rect.fromLTWH(0, -12, size.x, 6),
@@ -910,8 +1123,6 @@ class MobComponent extends PositionComponent {
                 ? Colors.orangeAccent
                 : Colors.redAccent,
     );
-
-    // 名字
     if (mob.name.isNotEmpty) {
       final tp = TextPainter(
         text: TextSpan(
@@ -930,9 +1141,60 @@ class MobComponent extends PositionComponent {
   }
 }
 
-// 扩展：Vector2 -> Size
-extension _Vector2ToSize on Vector2 {
-  Size toSize() => Size(x, y);
+/// ==================== 地面掉落组件 ====================
+class GroundLootComponent extends PositionComponent {
+  GroundLootComponent({
+    required this.dropId,
+    required this.itemId,
+    required this.quantity,
+    required Vector2 position,
+  }) : super(
+          position: position,
+          size: Vector2(28, 28),
+          anchor: Anchor.center,
+        );
+
+  final String dropId;
+  final int itemId;
+  final int quantity;
+  double _bob = 0;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _bob += dt * 3;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final bobY = math.sin(_bob) * 3;
+    canvas.save();
+    canvas.translate(0, bobY);
+    final paint = Paint()
+      ..shader = LinearGradient(
+        colors: itemId > 0
+            ? [const Color(0xFFf1c40f), const Color(0xFFe67e22)]
+            : [const Color(0xFFf9e79f), const Color(0xFFf4d03f)],
+      ).createShader(Rect.fromLTWH(0, 0, size.x, size.y));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.x, size.y),
+        const Radius.circular(6),
+      ),
+      paint,
+    );
+    if (itemId > 0) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '$itemId',
+          style: const TextStyle(color: Colors.white, fontSize: 8),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.x);
+      tp.paint(canvas, Offset(2, size.y / 2 - tp.height / 2));
+    }
+    canvas.restore();
+  }
 }
 
 /// ==================== TileMap 背景层 ====================
@@ -1118,7 +1380,7 @@ class RemotePlayerComponent extends PositionComponent {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFF9b59b6), Color(0xFF6c3483)],
-      ).createShader(Offset.zero & size.toSize());
+      ).createShader(Offset.zero & Size(size.x, size.y));
     canvas.drawRect(
       Rect.fromLTWH(size.x * 0.2, size.y * 0.25, size.x * 0.6, size.y * 0.5),
       bodyPaint,

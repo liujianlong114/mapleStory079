@@ -2,9 +2,9 @@
 
 **项目名称**: MapleStory 079 复刻项目
 **创建日期**: 2024-06-12
-**当前版本**: v0.9.19
-**最后更新**: 2026-06-14 (自动化开发任务周期 #19 执行完毕)
-**状态**: ✅ 架构定期审计（周期 #19） ✅ cmd/internal/pkg/config/scripts/docs/test/deploy 目录完整 ✅ 9 个 handler + 10 个 service + 10 个 repository + 7 个 middleware 全量覆盖 ✅ go vet / go build / go test 全部通过 ✅ 代码量：Go 52 个文件/8408 行、Dart 43 个文件/9851 行、资源文件 7 个 ✅ Flutter features/ 8 个页面 + providers/ 6 个 + services/ 2 个 + widgets/ 8 个 + game/engine/ 2 个 + core/ 4 个 + config/ 1 个 ✅ 路由在 routes.go 显式装配中间件链 ✅ 社交路由完整（/api/v1/guilds /parties /friends） ✅ MultiProvider 完整注册（Auth/Game/Combat/Inventory/Skill/Chat） ✅ 游戏核心逻辑审计完成：AP/SP自动分配 + 职业差异化HP/MP增量已确认实现 ✅ API联调审计完成：发现6个客户端调用但后端缺失的接口 ✅ WebSocket协议审计完成：发现消息格式不匹配问题
+**当前版本**: v0.9.20
+**最后更新**: 2026-06-14 (自动化开发任务周期 #20 执行完毕)
+**状态**: ✅ 周期 #20 完成 API 路由补全（combat/items/npcs） ✅ WebSocket 嵌套 payload 协议统一 ✅ room/channel 查询参数兼容 ✅ go vet / go build / go test 全部通过 ⚠️ 客户端资源文件仍缺失（需 WZ 提取，见任务 4） ⚠️ REST 响应格式与客户端部分不一致（见任务 5） ⚠️ game/move 等 4 个路由仍缺失（见任务 8）
 
 ---
 

@@ -173,6 +173,18 @@ type Mob struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+// MobDrop 怪物掉落表（mob_id + item_id + 概率）
+type MobDrop struct {
+	ID        uint      `gorm:"primary_key" json:"id"`
+	MobID     uint      `gorm:"index;not null" json:"mob_id"`
+	ItemID    int       `gorm:"not null" json:"item_id"`
+	Chance    float64   `gorm:"default:0.1" json:"chance"` // 0~1
+	MinQty    int       `gorm:"default:1" json:"min_qty"`
+	MaxQty    int       `gorm:"default:1" json:"max_qty"`
+	QuestOnly bool      `gorm:"default:false" json:"quest_only"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ====================== 社交系统 ======================
 
 // Guild 公会表
