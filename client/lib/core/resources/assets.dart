@@ -78,6 +78,7 @@ class SpriteDirs {
   static String playerStand() => '${player}stand.png';
   static String playerWalk() => '${player}walk.png';
   static String tileGrass() => '${tiles}grass.png';
+  static String itemPath(int itemId) => '${item}${itemId}.png';
   static String tileDirt() => '${tiles}dirt.png';
 }
 
@@ -192,7 +193,8 @@ class GameConstants {
   static double expPercent(int level, int exp) {
     final need = expRequired(level);
     if (need <= 0) return 0;
-    return (exp / need) * 100.0;
+    final pct = (exp / need) * 100.0;
+    return pct.clamp(0.0, 100.0);
   }
 }
 

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
@@ -31,6 +32,18 @@ class WzMapForegroundLayer extends PositionComponent
   final List<MapForegroundLayerDef> _layerDefs = [];
   final List<_DrawItem> _items = [];
 
+  /// WZ 无法解码时，用相近真实贴图代替（禁止渲染 placeholder 色块）
+  static const Map<String, String> _tileFallback = {
+    'enH0': 'bsc',
+    'enV0': 'bsc',
+    'enV1': 'bsc',
+    'edU': 'bsc',
+    'slLU': 'slLD',
+    'slRU': 'slRD',
+  };
+
+  static const int _minTileBytes = 350;
+
   @override
   Future<void> onLoad() async {
     final full = await MapMetaFull.load(mapId);
@@ -44,7 +57,7 @@ class WzMapForegroundLayer extends PositionComponent
         final path = AssetPaths.bundle(
           'maps/obj/${o.oS}/${o.l0}_${o.l1}_${o.l2}.png',
         );
-        final img = await _loadImage(path);
+        final img = await _loadObjImage(path);
         if (img == null) continue;
         _items.add(
           _DrawItem(
@@ -61,10 +74,7 @@ class WzMapForegroundLayer extends PositionComponent
         );
       }
       for (final t in layer.tiles) {
-        final path = AssetPaths.bundle(
-          'maps/tiles/$tS/${t.u}_${t.no}.png',
-        );
-        final img = await _loadImage(path);
+        final img = await _loadTileImage(tS, t.u, t.no);
         if (img == null) continue;
         _items.add(
           _DrawItem(
@@ -90,11 +100,46 @@ class WzMapForegroundLayer extends PositionComponent
     });
   }
 
-  Future<ui.Image?> _loadImage(String bundledPath) async {
+  Future<ui.Image?> _loadTileImage(String tS, String u, int no) async {
+    final primary = AssetPaths.bundle('maps/tiles/$tS/${u}_$no.png');
+    final img = await _loadImage(primary);
+    if (img != null) return img;
+    final alt = _tileFallback[u];
+    if (alt == null) return null;
+    return _loadImage(AssetPaths.bundle('maps/tiles/$tS/${alt}_$no.png'));
+  }
+
+  Future<bool> _isPlaceholderAsset(String bundledPath) async {
+    try {
+      final metaPath = bundledPath.replaceFirst('.png', '.png.json');
+      final raw = await rootBundle.loadString(metaPath);
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      return j['placeholder'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<ui.Image?> _loadObjImage(String bundledPath) async {
     if (_images.containsKey(bundledPath)) return _images[bundledPath];
     try {
       final data = await rootBundle.load(bundledPath);
       if (data.lengthInBytes < 40) return null;
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      _images[bundledPath] = frame.image;
+      return frame.image;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ui.Image?> _loadImage(String bundledPath) async {
+    if (_images.containsKey(bundledPath)) return _images[bundledPath];
+    try {
+      final data = await rootBundle.load(bundledPath);
+      if (data.lengthInBytes < _minTileBytes) return null;
+      if (await _isPlaceholderAsset(bundledPath)) return null;
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
       _images[bundledPath] = frame.image;

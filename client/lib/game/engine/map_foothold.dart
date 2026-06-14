@@ -1,10 +1,18 @@
 import 'dart:math' as math;
 
-/// 079 地图 foothold 线段（从 Map.wz 导出）
+/// 079 地图 foothold 线段（HeavenClient Foothold + FootholdTree）
 class FootholdSegment {
+  final int id;
+  final int layer;
+  final int prev;
+  final int next;
   final double x1, y1, x2, y2;
 
   const FootholdSegment({
+    this.id = 0,
+    this.layer = 0,
+    this.prev = 0,
+    this.next = 0,
     required this.x1,
     required this.y1,
     required this.x2,
@@ -12,6 +20,10 @@ class FootholdSegment {
   });
 
   factory FootholdSegment.fromJson(Map<String, dynamic> j) => FootholdSegment(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        layer: (j['layer'] as num?)?.toInt() ?? 0,
+        prev: (j['prev'] as num?)?.toInt() ?? 0,
+        next: (j['next'] as num?)?.toInt() ?? 0,
         x1: (j['x1'] as num).toDouble(),
         y1: (j['y1'] as num).toDouble(),
         x2: (j['x2'] as num).toDouble(),
@@ -20,70 +32,196 @@ class FootholdSegment {
 
   double get minX => x1 < x2 ? x1 : x2;
   double get maxX => x1 > x2 ? x1 : x2;
+  double get left => minX;
+  double get right => maxX;
 
-  /// 可站立的线段（排除竖墙）
   bool get isWalkable => (x2 - x1).abs() >= 1;
+
+  bool containsX(double x, {double tolerance = 2}) =>
+      x >= minX - tolerance && x <= maxX + tolerance;
+
+  /// 079 Foothold::ground_below
+  double groundBelow(double x) {
+    final dx = x2 - x1;
+    if (dx.abs() < 0.001) return y1;
+    final t = ((x - x1) / dx).clamp(0.0, 1.0);
+    return y1 + (y2 - y1) * t;
+  }
 }
 
-/// 079 foothold 碰撞：Y 轴向下为正，取当前脚下最近的可站立面
+/// 079 foothold 碰撞树（对照 HeavenClient FootholdTree）
 class MapFootholds {
   final List<FootholdSegment> segments;
+  final Map<int, FootholdSegment> byId;
+  final Map<int, List<int>> idsByX;
   final double fallbackY;
+  final double borderBottom;
 
-  MapFootholds({required this.segments, required this.fallbackY});
+  MapFootholds({
+    required this.segments,
+    required this.byId,
+    required this.idsByX,
+    required this.fallbackY,
+    required this.borderBottom,
+  });
 
   factory MapFootholds.fromJson(List<dynamic>? list, {required double fallbackY}) {
-    final segs = list
-            ?.map((e) => FootholdSegment.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
-    return MapFootholds(segments: segs, fallbackY: fallbackY);
+    final segs = <FootholdSegment>[];
+    final byId = <int, FootholdSegment>{};
+    for (final raw in list ?? const []) {
+      final seg = FootholdSegment.fromJson(raw as Map<String, dynamic>);
+      segs.add(seg);
+      if (seg.id > 0) byId[seg.id] = seg;
+    }
+
+    final idsByX = <int, List<int>>{};
+    var borderBottom = fallbackY;
+    for (final s in segs) {
+      if (!s.isWalkable) continue;
+      final segBottom = s.y1 > s.y2 ? s.y1 : s.y2;
+      if (segBottom > borderBottom) borderBottom = segBottom;
+      final start = s.minX.floor();
+      final end = s.maxX.ceil();
+      final keyId = s.id > 0 ? s.id : segs.indexOf(s) + 1;
+      for (var xi = start; xi <= end; xi++) {
+        idsByX.putIfAbsent(xi, () => []).add(keyId);
+      }
+    }
+
+    return MapFootholds(
+      segments: segs,
+      byId: byId,
+      idsByX: idsByX,
+      fallbackY: fallbackY,
+      borderBottom: borderBottom + 100,
+    );
+  }
+
+  FootholdSegment? segmentById(int id) {
+    if (id <= 0) return null;
+    return byId[id];
+  }
+
+  Iterable<FootholdSegment> _walkableAtX(double x) sync* {
+    final xi = x.round();
+    final ids = idsByX[xi];
+    if (ids != null && byId.isNotEmpty) {
+      for (final id in ids) {
+        final fh = byId[id];
+        if (fh != null && fh.isWalkable && fh.containsX(x)) yield fh;
+      }
+      return;
+    }
+    for (final s in segments) {
+      if (s.isWalkable && s.containsX(x)) yield s;
+    }
+  }
+
+  /// HeavenClient FootholdTree::get_fhid_below — 脚下最近可站立面（Y ≥ fy 且最小）
+  int? getFhidBelow(double x, double y) {
+    var bestId = 0;
+    var bestY = borderBottom;
+    for (final fh in _walkableAtX(x)) {
+      final gy = fh.groundBelow(x);
+      if (bestY >= gy && gy >= y) {
+        bestY = gy;
+        bestId = fh.id;
+      }
+    }
+    return bestId > 0 ? bestId : null;
+  }
+
+  double? groundYOnFh(int fhid, double x) {
+    final fh = segmentById(fhid);
+    if (fh == null || !fh.isWalkable || !fh.containsX(x)) return null;
+    return fh.groundBelow(x);
   }
 
   /// 在 x 处所有可站立高度
   List<double> walkableYAt(double x, {double tolerance = 8}) {
     final out = <double>[];
-    for (final s in segments) {
-      if (!s.isWalkable) continue;
-      if (x < s.minX - tolerance || x > s.maxX + tolerance) continue;
-      final dx = s.x2 - s.x1;
-      final t = ((x - s.x1) / dx).clamp(0.0, 1.0);
-      out.add(s.y1 + (s.y2 - s.y1) * t);
+    for (final s in _walkableAtX(x)) {
+      out.add(s.groundBelow(x));
     }
     return out;
   }
 
-  /// 079：求脚下站立面。foothold Y 只能 **≥** 脚点（更大=更靠下），
-  /// 不能把头顶平台（Y 更小）当成地面。
   double? groundYAt(double x, {double? feetY, double tolerance = 8}) {
-    final ys = walkableYAt(x);
-    if (ys.isEmpty) return null;
     final refY = feetY ?? fallbackY;
-    final candidates = ys.where((y) => y >= refY - tolerance).toList();
-    if (candidates.isEmpty) return null;
-    return candidates.reduce(math.min);
+    final fhid = getFhidBelow(x, refY - tolerance);
+    if (fhid != null) return groundYOnFh(fhid, x);
+    return null;
   }
 
-  /// 空中落下时检测着陆面（第一个 Y ≥ 脚点的面）
   double? landingYAt(double x, double feetY, {double tolerance = 6}) {
-    final ys = walkableYAt(x);
-    if (ys.isEmpty) return null;
-    final hits = ys.where((y) => y >= feetY - tolerance).toList();
-    if (hits.isEmpty) return null;
-    return hits.reduce(math.min);
+    return groundYAt(x, feetY: feetY - tolerance);
   }
 
-  /// x 处最低可站立面（Y 最大 = 屏幕最下方）
   double? lowestWalkableYAt(double x) {
     final ys = walkableYAt(x);
     if (ys.isEmpty) return null;
     return ys.reduce(math.max);
   }
 
-  /// 出生/传送落点：脚下最近面，否则取主地面
-  double snapSpawnY(double x, double hintY) {
-    final atFeet = groundYAt(x, feetY: hintY);
-    if (atFeet != null) return atFeet;
-    return lowestWalkableYAt(x) ?? hintY;
+  /// 出生/传送：优先 fhid 落点
+  ({int? fhid, double y}) snapSpawn(double x, double hintY) {
+    var fhid = getFhidBelow(x, hintY);
+    fhid ??= getFhidBelow(x, hintY - 120);
+    if (fhid != null) {
+      final gy = groundYOnFh(fhid, x);
+      if (gy != null) return (fhid: fhid, y: gy);
+    }
+    return (fhid: null, y: lowestWalkableYAt(x) ?? hintY);
+  }
+
+  /// maplife 的 fh 字段 → 脚点 Y
+  double? lifeSpawnY(int fhid, double x, double hintY) {
+    final gy = groundYOnFh(fhid, x);
+    if (gy != null) return gy;
+    return groundYAt(x, feetY: hintY) ?? hintY;
+  }
+
+  /// 079 下跳：脚下是否有更低平台（HeavenClient enablejd + groundbelow）
+  static const double maxJumpDownGap = 600;
+
+  ({bool enabled, double dropY}) jumpDownInfo(int? fhid, double x) {
+    if (fhid == null || fhid <= 0) return (enabled: false, dropY: 0);
+    final ground = groundYOnFh(fhid, x);
+    if (ground == null) return (enabled: false, dropY: 0);
+    final belowId = getFhidBelow(x, ground + 1);
+    if (belowId == null || belowId == fhid) {
+      return (enabled: false, dropY: ground + 1);
+    }
+    final belowGround = groundYOnFh(belowId, x);
+    if (belowGround == null) return (enabled: false, dropY: ground + 1);
+    final enabled = (belowGround - ground) < maxJumpDownGap;
+    return (enabled: enabled, dropY: ground + 1);
+  }
+
+  /// 行走时沿 prev/next 链更新 fhid（HeavenClient update_fh）
+  int? advanceFhid({
+    required int? current,
+    required double x,
+    required double y,
+    required bool onGround,
+  }) {
+    if (!onGround) {
+      return getFhidBelow(x, y);
+    }
+    if (current == null || current <= 0) {
+      return getFhidBelow(x, y);
+    }
+    var fhid = current;
+    final fh = segmentById(fhid);
+    if (fh == null) return getFhidBelow(x, y);
+
+    if (x.floor() > fh.right && fh.next > 0) {
+      fhid = fh.next;
+    } else if (x.ceil() < fh.left && fh.prev > 0) {
+      fhid = fh.prev;
+    } else if (!fh.containsX(x, tolerance: 4)) {
+      return null;
+    }
+    return fhid;
   }
 }

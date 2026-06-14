@@ -8,6 +8,7 @@ import '../../providers/inventory_provider.dart';
 import '../../providers/game_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
+import '../../widgets/maple_game_panels.dart';
 import '../../widgets/maple_mini_map.dart';
 import '../../widgets/maple_status_bar.dart';
 import '../../widgets/npc_dialogue_widget.dart';
@@ -108,6 +109,7 @@ class _GameScenePageState extends State<GameScenePage> {
   late final WebSocketService _ws;
   final ValueNotifier<int> _minimapTick = ValueNotifier(0);
   bool _shopOpen = false;
+  GameUiPanel? _openPanel;
   NPCComponent? _shopNpc;
 
   @override
@@ -282,7 +284,9 @@ class _GameScenePageState extends State<GameScenePage> {
           name: npc.name,
           dialogue: npc.dialogue,
           hasShop: npc.hasShop,
-          position: Vector2(npc.x, 0),
+          feetY: npc.y,
+          footholdId: npc.footholdId,
+          position: Vector2(npc.x, npc.y),
         );
       }
     }
@@ -355,6 +359,17 @@ class _GameScenePageState extends State<GameScenePage> {
     }
   }
 
+  void _togglePanel(GameUiPanel panel) {
+    setState(() {
+      _openPanel = _openPanel == panel ? null : panel;
+    });
+    if (_openPanel == GameUiPanel.inventory) {
+      context.read<InventoryProvider>().loadInventory(widget.characterId);
+    }
+  }
+
+  void _closePanel() => setState(() => _openPanel = null);
+
   void _openMenu(String route) {
     Navigator.pushNamed(context, route);
   }
@@ -415,8 +430,12 @@ class _GameScenePageState extends State<GameScenePage> {
           autofocus: true,
         ),
         overlays: [
-          Stack(
-            children: [
+          SizedBox(
+            width: 800,
+            height: 600,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
               if (_shopOpen && _shopNpc != null)
                 NpcShopPanel(
                   npcId: _shopNpc!.npcId,
@@ -432,6 +451,14 @@ class _GameScenePageState extends State<GameScenePage> {
                     _gameWorld.onStatChange?.call(mesos: m);
                   },
                 ),
+              if (_openPanel == GameUiPanel.inventory)
+                MapleInventoryPanel(onClose: _closePanel),
+              if (_openPanel == GameUiPanel.equip)
+                MapleEquipPanel(onClose: _closePanel),
+              if (_openPanel == GameUiPanel.stat)
+                MapleStatPanel(onClose: _closePanel),
+              if (_openPanel == GameUiPanel.skill)
+                MapleSkillPanel(onClose: _closePanel),
               Positioned(
                 left: 10,
                 top: 10,
@@ -461,15 +488,15 @@ class _GameScenePageState extends State<GameScenePage> {
               ),
               Positioned(
                 left: 0,
-                right: 0,
                 bottom: 0,
                 child: MapleStatusBar(
                   onMenu: () => _showGameMenu(context),
                   onChat: () => _openMenu(Routes.chat),
                   onShop: () {},
-                  onInventory: () => _openMenu(Routes.inventory),
-                  onSkills: () => _openMenu(Routes.skills),
-                  onStats: () => _showGameMenu(context),
+                  onEquip: () => _togglePanel(GameUiPanel.equip),
+                  onInventory: () => _togglePanel(GameUiPanel.inventory),
+                  onSkills: () => _togglePanel(GameUiPanel.skill),
+                  onStats: () => _togglePanel(GameUiPanel.stat),
                   onKeyConfig: () => showDialog(
                     context: context,
                     builder: (_) => const KeyConfigDialog(),
@@ -477,6 +504,7 @@ class _GameScenePageState extends State<GameScenePage> {
                 ),
               ),
             ],
+            ),
           ),
         ],
       ),

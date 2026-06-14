@@ -6,7 +6,7 @@ import '../providers/game_provider.dart';
 import 'ui/nine_patch_box.dart';
 import 'ui/wz_bitmap_text.dart';
 
-/// 079 底部状态栏 — UI.wz/StatusBar.img（800×71 + EXP 条）。
+/// 079 底部状态栏 — 对齐 HeavenClient UIStatusBar（800×600，position y=480）
 class MapleStatusBar extends StatelessWidget {
   const MapleStatusBar({
     super.key,
@@ -14,6 +14,7 @@ class MapleStatusBar extends StatelessWidget {
     this.onChat,
     this.onShop,
     this.onInventory,
+    this.onEquip,
     this.onSkills,
     this.onStats,
     this.onKeyConfig,
@@ -23,14 +24,19 @@ class MapleStatusBar extends StatelessWidget {
   final VoidCallback? onChat;
   final VoidCallback? onShop;
   final VoidCallback? onInventory;
+  final VoidCallback? onEquip;
   final VoidCallback? onSkills;
   final VoidCallback? onStats;
   final VoidCallback? onKeyConfig;
 
-  static const double barW = 800;
+  static const double panelW = 800;
+  static const double panelH = 120;
   static const double barH = 71;
+  static const double expY = 87;
+  static const double expW = 340;
   static const double expH = 31;
-  static const double totalH = expH + barH;
+  static const double hpmpX = 412;
+  static const double hpmpY = 40;
   static const double gaugeW = 109;
   static const double gaugeH = 18;
 
@@ -44,56 +50,18 @@ class MapleStatusBar extends StatelessWidget {
     final level = gp.level;
 
     return SizedBox(
-      width: barW,
-      height: totalH,
+      width: panelW,
+      height: panelH,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // EXP 条（左下，原版 340×31）
-          Positioned(
-            left: 0,
-            top: 0,
-            width: 340,
-            height: expH,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'assets/images/ui/hud/exp_graduation.png',
-                  fit: BoxFit.fill,
-                  filterQuality: FilterQuality.none,
-                ),
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: (expPct / 100).clamp(0.0, 1.0),
-                    child: Image.asset(
-                      'assets/images/ui/hud/gauge_temp_exp.png',
-                      width: 340,
-                      height: expH,
-                      fit: BoxFit.fill,
-                      filterQuality: FilterQuality.none,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 10,
-                  top: 8,
-                  child: WzBitmapText(
-                    text: '${expPct.toStringAsFixed(2)}%',
-                    height: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // 主状态栏底图
+          // 主底栏（71px，贴底）
           Positioned(
             left: 0,
             bottom: 0,
             child: Image.asset(
               'assets/images/ui/hud/status_backgrnd.png',
-              width: barW,
+              width: panelW,
               height: barH,
               fit: BoxFit.fill,
               filterQuality: FilterQuality.none,
@@ -109,10 +77,42 @@ class MapleStatusBar extends StatelessWidget {
               filterQuality: FilterQuality.none,
             ),
           ),
-          // 角色名 / 等级（肖像右侧）
+          // EXP 条（HeavenClient exp_pos = 0,87）
           Positioned(
-            left: 198,
-            bottom: 44,
+            left: 0,
+            top: expY,
+            width: expW,
+            height: expH,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/images/ui/hud/exp_graduation.png',
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.none,
+                ),
+                WzGaugeBar(
+                  fillAsset: 'assets/images/ui/hud/gauge_temp_exp.png',
+                  bgAsset: 'assets/images/ui/hud/gauge_gray.png',
+                  ratio: expPct / 100,
+                  width: expW,
+                  height: 16,
+                ),
+                Positioned(
+                  left: 8,
+                  top: 7,
+                  child: WzBitmapText(
+                    text: '${expPct.toStringAsFixed(2)}%',
+                    height: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 角色名 / 等级
+          Positioned(
+            left: 487,
+            top: 40,
             child: Text(
               name,
               style: const TextStyle(
@@ -123,8 +123,8 @@ class MapleStatusBar extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 198,
-            bottom: 28,
+            left: 461,
+            top: 48,
             child: Text(
               'LV. $level',
               style: const TextStyle(
@@ -134,16 +134,17 @@ class MapleStatusBar extends StatelessWidget {
               ),
             ),
           ),
-          // HP 量表 + 数值
+          // HP
           Positioned(
-            left: 412,
-            bottom: 40,
+            left: hpmpX,
+            top: hpmpY,
             child: Row(
               children: [
                 Image.asset('assets/images/ui/hud/icon_red.png', width: 12, height: 12),
                 const SizedBox(width: 2),
                 WzGaugeBar(
                   fillAsset: 'assets/images/ui/hud/hp_gauge.png',
+                  bgAsset: 'assets/images/ui/hud/gauge_gray.png',
                   ratio: hpPct,
                   width: gaugeW,
                   height: gaugeH,
@@ -153,23 +154,24 @@ class MapleStatusBar extends StatelessWidget {
           ),
           Positioned(
             left: 530,
-            bottom: 42,
+            top: 70,
             child: WzBitmapText(
               text: '${gp.hp}',
               height: 11,
               alignment: Alignment.centerRight,
             ),
           ),
-          // MP 量表 + 数值
+          // MP
           Positioned(
-            left: 412,
-            bottom: 18,
+            left: hpmpX,
+            top: hpmpY + 22,
             child: Row(
               children: [
                 Image.asset('assets/images/ui/hud/icon_blue.png', width: 12, height: 12),
                 const SizedBox(width: 2),
                 WzGaugeBar(
                   fillAsset: 'assets/images/ui/hud/mp_gauge.png',
+                  bgAsset: 'assets/images/ui/hud/gauge_gray.png',
                   ratio: mpPct,
                   width: gaugeW,
                   height: gaugeH,
@@ -179,20 +181,20 @@ class MapleStatusBar extends StatelessWidget {
           ),
           Positioned(
             left: 528,
-            bottom: 20,
+            top: 86,
             child: WzBitmapText(
               text: '${gp.mp}',
               height: 11,
               alignment: Alignment.centerRight,
             ),
           ),
-          // 快捷键（EquipKey / InvenKey / StatKey / SkillKey / KeySet）
+          // 快捷键
           Positioned(
             left: 58,
             bottom: 10,
             child: Row(
               children: [
-                _keyBtn('assets/images/ui/hud/key_equip.png', onInventory),
+                _keyBtn('assets/images/ui/hud/key_equip.png', onEquip),
                 const SizedBox(width: 2),
                 _keyBtn('assets/images/ui/hud/key_inven.png', onInventory),
                 const SizedBox(width: 2),
@@ -204,10 +206,10 @@ class MapleStatusBar extends StatelessWidget {
               ],
             ),
           ),
-          // 右侧菜单按钮
+          // 右侧菜单
           Positioned(
-            right: 8,
-            bottom: 16,
+            left: 591,
+            top: 73,
             child: Row(
               children: [
                 _iconBtn('assets/images/ui/hud/btn_shop_normal.png', onShop),

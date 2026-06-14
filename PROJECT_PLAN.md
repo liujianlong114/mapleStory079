@@ -2,7 +2,7 @@
 
 > **用途**：以官方 079 客户端 WZ 资源 + `ms079-main` 服务端逻辑为基准，指导后续所有客户端/服务端/资源改动。  
 > **原则**：业务规则跟 Java 源码，画面跟 WZ，**不手搓假 UI**（禁止再用 `build_login_scene` 生成街机框背景）。  
-> **最后更新**：2026-06-14
+> **最后更新**：2026-06-14（地图 FootholdTree、Tile/Obj 前景、079 HUD、传送门链路）
 
 ---
 
@@ -11,7 +11,7 @@
 | 维度 | 目标 |
 |------|------|
 | 视觉 | 登录 MapLogin2 视差、选角 WZ UI、进图 WZ 地图 back / 精灵 |
-| 操作 | 079 键位：←→ 移动、Ctrl 攻击、Z 拾取、Alt 跳跃（跳跃待实现） |
+| 操作 | 079 键位：←→ 移动、Ctrl 攻击、Z 拾取、Alt 跳跃 |
 | 逻辑 | 创角白名单、禁名、初始 MP=50、出生图、装备 seed 与 ms079 一致 |
 | 传输 | HTTP JSON REST + WebSocket（**非**原版 TCP Opcode，规则仍对照原版） |
 
@@ -103,6 +103,99 @@ MAPLE_EXTERNAL_ROOT=/path/to/mapleStory079-external ./scripts/ingest_full.sh
 | `examples/OPEN_SOURCE_RESOURCES.md` | `…/docs-OPEN_SOURCE_RESOURCES.md` |
 | `~/Downloads/冒险岛079` | `…/00-官方客户端-…`（符号链接，原件仍在 Downloads） |
 | `~/Downloads/【怀旧岛079MAX3】…` | `…/01-MAX3怀旧岛-…`（符号链接） |
+
+### 2.5 按任务查参考代码（读哪个文件夹）
+
+改功能前**先打开对应参考**，不要凭空手搓坐标/碰撞。
+
+| 要改什么 | 优先读（外部参考） | 本项目实现 |
+|----------|-------------------|------------|
+| 地图 foothold / 跳跃 / 掉崖 | `04-HeavenClient-…/Gameplay/Physics/FootholdTree.cpp` `Foothold.cpp` `Physics.cpp` | `client/lib/game/engine/map_foothold.dart` `game_world.dart` |
+| 地图 Tile/Obj 绘制顺序 | `04-HeavenClient-…/Gameplay/MapleMap/`（Stage、MapTilesObjs） | `wz_map_foreground.dart` `wz_map_layer.dart` |
+| 视差背景 back 层 | `04-HeavenClient-…/Gameplay/MapleMap/MapBackgrounds.cpp` | `wz_map_layer.dart` `map_render_utils.dart` |
+| 登录 UI 坐标 | `02-★ms079-main-…/wz/UI.wz/Login.img.xml` | `scripts/export_login_manifest/` `wz_scene.dart` |
+| 创角/禁名/出生规则 | `02-★ms079-main-…/src/main/java/` | `internal/service/` `pkg/utils/` |
+| NPC/任务/商店对话 | `02-★ms079-main-…/wz/String.wz` + Java Handler | `internal/service/npc_dialogue_wz.go` `pkg/npcdata/` |
+| 地图 life 刷点 | `02-★ms079-main-…/wz/Map.wz/Map/Map0/000010000.img.xml` → `life` | `data/maplife/` `client/assets/maplife/` |
+| 传送门 | `04-HeavenClient-…/Gameplay/MapleMap/Portal.cpp` + Map.wz `portal` 节点 | `portal_component.dart` `POST /game/change-map` |
+| 进游戏 HUD | `02-★ms079-main-…/wz/UI.wz/StatusBar.img` `UIWindow.img/MiniMap` | `maple_status_bar.dart` `maple_mini_map.dart` |
+| 角色外观合成 | `06-ZLHSS2-…/tools/import_wz`（按需） | `scripts/extract_wz_py/compose_look.py` + `/look/compose.png` API |
+
+**HeavenClient 绝对路径（本机）**：
+
+```
+~/GolandProjects/mapleStory079-external/04-HeavenClient-C++参考-UI坐标与渲染逻辑/
+├── Gameplay/Physics/FootholdTree.cpp    # get_fhid_below / update_fh
+├── Gameplay/Physics/Foothold.cpp        # ground_below
+├── Gameplay/Physics/Physics.cpp         # 重力 / 地面移动
+└── Gameplay/MapleMap/                   # Stage 绘制、Portal
+```
+
+**ms079 XML 绝对路径（本机）**：
+
+```
+~/GolandProjects/mapleStory079-external/02-★ms079-main-业务规则对照-登录创角禁名-WZ-XML/wz/
+├── Map.wz/Map/Map0/000010000.img.xml    # 彩虹村：tile/obj/foothold/life/portal
+├── Map.wz/Tile/grassySoil.img.xml       # 地砖 origin（enH0 oy=38 等）
+├── UI.wz/StatusBar.img.xml              # 底部状态栏
+├── UI.wz/UIWindow.img.xml               # MiniMap 框
+└── String.wz/Npc.img.xml                # NPC 名称
+```
+
+### 2.6 资源解析：输入 WZ → 输出 assets（路径总表）
+
+| 阶段 | 输入（WZ / 参考） | 解析脚本 | 输出到本仓库 |
+|------|-------------------|----------|--------------|
+| 全量 ingest | `00-…/extracted_client/*.wz` 复制到 `03-…` | `./scripts/ingest_full.sh` | 多目录，见下 |
+| 登录 UI | `UI.wz/Login.img` | `scripts/extract_wz_py/extract.py` | `client/assets/images/ui/login/` |
+| 登录 manifest | 上 + MapLogin2 XML | `scripts/export_login_manifest/main.go` | `client/assets/scenes/login_*.json` |
+| MapLogin2 视差 | `Map.wz/MapLogin/MapLogin2.img` | `scripts/export_maplogin_layers/main.go` | `client/assets/scenes/maplogin2_layers.json` |
+| 地图 JSON | `Map.wz/Map/Map0/000010000.img` | `scripts/extract_wz_py/export_map_from_wz.py` | `client/assets/maps/{mapId}.json` |
+| 地图 back PNG | `Map.wz/Back/grassySoil.img`（主客户端常缺） | 同上 + `--back-client MAX3` | `client/assets/maps/back/grassySoil/` |
+| 地图 tile PNG | `Map.wz/Tile/grassySoil.img` | 同上；失败项用 `gen_grassy_tile_placeholders.py` | `client/assets/maps/tiles/grassySoil/` |
+| 地图 obj PNG | `Map.wz/Obj/*.img` | 同上 | `client/assets/maps/obj/{oS}/` |
+| 地图 life | Map.wz `life` 节点 | `scripts/export_map_life/main.go` | `data/maplife/` + `client/assets/maplife/` |
+| 进游戏 HUD | `UI.wz/StatusBar.img` `UIWindow.img` | `scripts/extract_wz_py/extract_hud_ui.py` | `client/assets/images/ui/hud/` |
+| 传送门动画 | `Map.wz/MapHelper.img` portalContinue | 手动/脚本导出 | `client/assets/sprites/portal/continue_*.png` |
+| Mob/Npc 精灵 | `Mob.wz` `Npc.wz` | `scripts/extract_wz_py/extract_mobs_npcs.py` | `client/assets/sprites/{mob,npc}/` |
+| 角色部件 | `Character.wz` | `extract_parts.py` `extract_avatars.py` | `client/assets/characters/parts/` `avatars/` |
+| 角色实时合成 | Character.wz + 后端 | `compose_look.py` + Go handler | HTTP `/look/compose.png` |
+| wz-python 引擎 | GitHub 克隆 | `ingest_full.sh` 自动 | `.cache/wz-python/`（不提交 git） |
+
+**官方 WZ 二进制（提取主源，勿提交 git）**：
+
+```
+~/GolandProjects/mapleStory079-external/00-官方客户端-冒险岛079-资源提取主源-WZ安装包与extracted_client/extracted_client/
+├── Map.wz          # 地图 / back / tile / obj / MapHelper
+├── Character.wz    # 角色外观
+├── Mob.wz / Npc.wz
+├── UI.wz           # 登录 + HUD
+└── Sound.wz        # BGM / SE
+```
+
+**ingest 工作副本（脚本读写，勿手改）**：
+
+```
+~/GolandProjects/mapleStory079-external/03-★maple-client-ingest工作目录-WZ副本-脚本自动复制/
+├── Map.wz …        # 从 00 复制
+└── extracted/max3/ # MAX3 解压备份（补 grassySoil 等）
+```
+
+**本项目已解析资源（Flutter 运行时读取）**：
+
+```
+client/assets/
+├── maps/
+│   ├── 1000000.json          # 彩虹村：6 back + 6 fg层 + 83 foothold(id/prev/next) + portal
+│   ├── 20000.json            # 南门外道（传送目标）
+│   ├── back/grassySoil/      # 视差背景 PNG
+│   ├── tiles/grassySoil/     # 地砖 PNG + *.json(origin)
+│   └── obj/                  # 物件 PNG（acc1/guide/house…）
+├── maplife/1000000.json      # NPC x/y/fh（希娜 2101 等）
+├── images/ui/hud/            # StatusBar + MiniMap（079 HUD）
+├── sprites/portal/           # 传送门 continue 动画
+└── scenes/login_*.json         # 登录屏 manifest
+```
 
 ---
 
@@ -208,29 +301,36 @@ Manifest 由 `scripts/export_login_manifest/main.go` 生成；**勿运行** `scr
 
 ```
 CharacterSelectPage → GameProvider.loadCharacterState
-  → GameSceneLoader（读 MapMeta）
+  → GameSceneLoader（读 MapMeta + 恢复 token/charId）
   → GameScenePage → GameWorld (Flame)
 ```
 
 | 步骤 | 官方 | 本项目 |
 |------|------|--------|
-| 地图 ID | 000010000 → 逻辑 1000000 | `pkg/utils/constants.go` `MapTutorialStart=0` 或 seed 彩虹村 |
-| 视口 | 800×600 卷轴 | 横版 750 高，相机仅跟 X |
-| 背景 | Map.wz back 层 + tile + obj | `WzMapLayer` 渲染 back PNG（**无 tile/obj**） |
-| 地面 | foothold 碰撞 | `1000000.json` 83 条 foothold → `MapFootholds.groundYAt(x)` |
-| 操作 | ←→ / Ctrl / Z | `game_controls.dart` |
-| 怪物 | WZ life + 服务端 AI | `data/maplife/*.json` + `mob_sync_service` + WS |
-| 精灵 | Character/Mob WZ | `assets/sprites/{player,mob,npc}/` |
+| 地图 ID | 000010000 → 逻辑 1000000 | seed + `client/assets/maps/1000000.json` |
+| 视口 | 800×600 卷轴 | `MapMeta.officialViewportW/H` = 800×600，相机跟玩家 |
+| 背景 | Map.wz back 视差 | `WzMapLayer`（`camera.backdrop`） |
+| 前景 | tile 0–7 + obj | `WzMapForegroundLayer`（世界坐标 1:1） |
+| 地面 | FootholdTree | `map_foothold.dart`：id/prev/next，`getFhidBelow`，崖边掉落 |
+| NPC 刷点 | maplife x/y/fh | `assets/maplife/*.json` → 用 WZ **y** 作脚点 |
+| 传送门 | MapHelper portalContinue | `portal_component.dart` + `POST /game/change-map` |
+| HUD | StatusBar + MiniMap | `maple_status_bar.dart`（底）`maple_mini_map.dart`（左上） |
+| 操作 | ←→ / Ctrl / Alt / Z | `game_controls.dart`；空中按方向保持 jump 动作 |
+| 怪物 | WZ life + 服务端 AI | `data/maplife/` + WS `mob_sync` |
 
 **核心客户端文件**：
 
 | 文件 | 职责 |
 |------|------|
-| `client/lib/game/engine/game_world.dart` | 横版移动、攻击、WS、foothold Y |
-| `client/lib/game/engine/wz_map_layer.dart` | 地图视差 back 层 |
-| `client/lib/game/engine/map_foothold.dart` | foothold 求 Y |
-| `client/lib/game/engine/sprite_loader.dart` | Mob/Npc/Player PNG 加载 |
-| `client/lib/features/maple/maple_avatar_view.dart` | 选角/角色 WZ 部件预览 |
+| `client/lib/game/engine/game_world.dart` | 移动/跳跃/foothold fhid、传送、实体 Y 排序 |
+| `client/lib/game/engine/map_foothold.dart` | FootholdTree（对照 HeavenClient） |
+| `client/lib/game/engine/wz_map_layer.dart` | 视差 back + `MapMetaFull.load` |
+| `client/lib/game/engine/wz_map_foreground.dart` | Tile + Obj 前景层 |
+| `client/lib/game/engine/portal_component.dart` | 传送门动画与碰撞 |
+| `client/lib/game/engine/map_life_loader.dart` | maplife NPC x/y/fh |
+| `client/lib/widgets/maple_status_bar.dart` | 079 底部状态栏 |
+| `client/lib/widgets/maple_mini_map.dart` | 079 小地图 |
+| `client/lib/providers/game_provider.dart` | `warpToMap()` 传送状态 |
 
 ---
 
@@ -256,20 +356,26 @@ client/assets/
 │   └── panel_backgrnd.png
 │
 ├── maps/
-│   ├── 1000000.json           ← 彩虹村：layers + footholds + spawn
-│   └── back/grassySoil/{0,1,2,3,5,6}.png  ← MAX3 补全
+│   ├── 1000000.json           # 彩虹村：back + mapLayers + 83 foothold(id/prev/next) + portal
+│   ├── 20000.json             # 南门外道
+│   ├── back/grassySoil/       # 视差 back（MAX3 补全）
+│   ├── tiles/grassySoil/      # 地砖 + origin json
+│   └── obj/                   # 地图物件
+├── maplife/                   # NPC 刷点（与 data/maplife 同步）
+├── images/ui/hud/             # StatusBar + MiniMap
+├── sprites/portal/            # 传送门 continue 动画
 │
 ├── sprites/
-│   ├── mob/                   ← Mob.wz stand 帧（ingest 约 5800+）
-│   ├── npc/                   ← Npc.wz
-│   ├── player/                ← Character.wz 组合 avatar（按需/少量）
-│   └── item/                  ← 部分 Item 图标
+│   ├── mob/                   # Mob.wz stand 帧（ingest 约 5800+）
+│   ├── npc/                   # Npc.wz
+│   ├── player/                # Character.wz 组合 avatar（按需/少量）
+│   └── item/                  # 部分 Item 图标
 │
 ├── characters/
-│   ├── parts/                 ← 部件 PNG（extract_parts / avatars）
-│   └── avatars/               ← 预烘焙全身图
+│   ├── parts/                 # 部件 PNG（extract_parts / avatars）
+│   └── avatars/               # 预烘焙全身图
 │
-└── images/tiles/              ← 预留，当前几乎为空
+└── images/tiles/              # 旧路径，新 tile 在 maps/tiles/
 ```
 
 **Flutter 注册**：`client/pubspec.yaml` — 子目录必须**逐条**声明（如 `assets/sprites/mob/`），否则 Web 打包后 manifest 为空。
@@ -341,7 +447,9 @@ go run scripts/check_assets/main.go
 | `scripts/setup_maple_wz.sh` | 单客户端 WZ 提取 |
 | `scripts/replica.sh` | 轻量复刻（无 WZ 时程序化回退） |
 | `scripts/extract_wz_py/extract.py` | Login/BGM/Back 主提取 |
-| `scripts/extract_wz_py/export_map_from_wz.py` | 地图 JSON + foothold + back PNG |
+| `scripts/extract_wz_py/export_map_from_wz.py` | 地图 JSON + foothold(id) + tile/obj/back PNG |
+| `scripts/extract_wz_py/gen_grassy_tile_placeholders.py` | 地砖 decode 失败时按 XML 尺寸生成占位 |
+| `scripts/extract_wz_py/extract_hud_ui.py` | StatusBar + MiniMap HUD 贴图 |
 | `scripts/extract_wz_py/extract_mobs_npcs.py` | Mob/Npc 精灵 |
 | `scripts/extract_wz_py/extract_avatars.py` | 角色 avatar 烘焙 |
 | `scripts/export_login_manifest/main.go` | 登录 JSON manifest |
@@ -383,19 +491,18 @@ go run scripts/check_assets/main.go
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 登录 BGM | ✅ | title.mp3 |
-| Login.img 按钮 | ✅ | 三态 PNG |
-| MapLogin2 back 38 层 | ✅ | images/ui/login/back/ |
-| 登录各屏视差 | ✅ | 6 个 login_*.json |
-| 彩虹村 map JSON | ✅ | layers + 83 footholds |
-| grassySoil back PNG | ✅ | MAX3 补 6 层 |
-| Mob 精灵 | ✅ | ~5800 PNG |
-| Npc 精灵 | ⚠️ | 部分 |
-| Player 部件/avatar | ⚠️ | 少量，按 ID 按需提取 |
-| 地图 Tile | ❌ | 未提取未渲染 |
-| 地图 Obj（房屋树） | ❌ | 未提取未渲染 |
-| 技能/物品/Effect 精灵 | ❌ | 未做 |
-| UI.img 音效 | ⚠️ | 部分 |
+| 登录 BGM / Login.img | ✅ | title.mp3、按钮三态 |
+| MapLogin2 视差 | ✅ | 6 个 login_*.json |
+| 彩虹村 map JSON | ✅ | 83 foothold（含 id/prev/next/layer）、6 portal |
+| grassySoil back | ✅ | MAX3 补 6 层 |
+| 地图 Tile | ⚠️ | 已导出 15 类地砖；部分 enV0/edU 为占位 PNG |
+| 地图 Obj | ⚠️ | 彩虹村/guide/acc 等已导出；缺项按地图补 |
+| 进游戏 HUD | ✅ | `images/ui/hud/` StatusBar + MiniMap |
+| 传送门精灵 | ✅ | `sprites/portal/continue_0..6.png` |
+| Mob 精灵 | ⚠️ | 大量已有；部分怪仍显示占位红块 |
+| Npc 精灵 | ⚠️ | 部分 ID 缺 PNG |
+| Player 动画 | ⚠️ | compose API walk/jump/attack；缺帧时回退火柴人 |
+| 地图 20000 | ✅ | 南门外道 JSON（out00 传送目标） |
 
 ### 10.2 客户端功能
 
@@ -404,62 +511,88 @@ go run scripts/check_assets/main.go
 | 登录→性别→世界→选角→创建 | ✅ |
 | MapLogin2 视差背景 | ✅ |
 | 079 键位 | ✅ |
-| 横版移动（仅 X） | ✅ |
-| WZ 地图 back 视差 | ✅ |
-| foothold 地面 Y | ⚠️ 贴地无跳跃/多层 |
-| WZ 角色预览（选角） | ⚠️ 依赖装备 API + 部件 PNG |
-| WZ Mob 显示 | ✅ |
-| 本地/WS 怪物同步 | ✅ |
-| 背包/技能/社交 UI 页 | ⚠️ 框架有，未对齐 WZ UI |
+| 移动 + Alt 跳跃 + 重力 | ✅ |
+| FootholdTree（多层平台/崖边掉落） | ⚠️ 已接 HeavenClient 算法；下跳穿板未做 |
+| WZ 地图 back + tile + obj | ⚠️ 已渲染；脚点与贴图偶发错位需逐图修 |
+| 079 HUD（底栏+小地图） | ✅ 代码已接；需硬刷新去旧 Material 顶栏缓存 |
+| 传送门显示 + 切图 API | ⚠️ 彩虹村 out00→20000 可测；更多地图待导出 |
+| 空中按方向保持 jump 动作 | ✅ |
+| walk/attack 动画 | ⚠️ 攻击已防 walk 覆盖；walk 多帧依赖 compose |
+| WS 怪物同步 | ✅ |
+| 背包/技能/社交 UI | ⚠️ 框架有，未对齐 WZ UIWindow |
 
 ### 10.3 服务端
 
 | 功能 | 状态 |
 |------|------|
 | 登录/创角/禁名 | ✅ |
-| FindEquipped (`is_equipped`) | ✅ 已修 |
+| 彩虹村官方 NPC（希娜/莎丽） | ✅ maplife + WZ 对话 |
+| `POST /game/change-map` | ✅ 落点 spawnForMap |
 | Mob spawn from maplife | ✅ |
 | Mob AI + WS 广播 | ✅ |
 | 完整伤害/技能/任务 | ⚠️ 简化 |
 
 ---
 
-## 11. 缺失内容与优先级
+## 11. 当前重要问题与计划
 
-### P0 — 视觉与玩法核心
+### 11.1 已知问题（优先修）
 
-| # | 缺失 | 做法 |
+| # | 现象 | 根因 | 计划 |
+|---|------|------|------|
+| **A** | 人/怪/NPC 脚点与地砖视觉错位、悬空或埋地 | 多层 foothold（425/605）+ tile 层 zM 混渲；部分 tile 占位图 origin 不准 | 对照 `grassySoil.img.xml` 校验 origin；按 fhlayer 过滤或 Y 排序 tile；逐坐标验收 |
+| **B** | 浏览器仍见旧顶栏 HUD（黄框属性条） | Flutter Web 缓存 / 未硬刷新 | 用户 Cmd+Shift+R；确认 `game_scene_page` 仅用 `MapleStatusBar` |
+| **C** | 部分怪物红块占位 | MobId 无对应 `sprites/mob/{id}.png` | `extract_mobs_npcs.py --id` 补提取 + manifest |
+| **D** | 地图边缘地砖呈「石墙满屏」 | enV0 竖边 tile 叠层 + 占位 PNG | 优先真实 WZ decode；失败项用 XML 尺寸占位并核对 ox/oy |
+| **E** | 下跳（Alt+↓）穿薄板 | 未实现 `enablejd` / CHECKBELOW | 对照 HeavenClient `PhysicsObject::Flag::CHECKBELOW` |
+| **F** | 传送后仅客户端切图，频道/同图玩家 | 无原版 TCP 频道服 | 短期：HTTP change-map + 重载 GameScene；长期再议 |
+
+### 11.2 优先级路线图
+
+#### P0 — 地图可玩性（本周）
+
+| # | 任务 | 参考 | 产出 |
+|---|------|------|------|
+| 1 | 彩虹村脚点/贴图逐段验收（spawn、希娜、out00） | HeavenClient FootholdTree + `000010000.img.xml` | 截图对比清单 |
+| 2 | 补全/修正 tile PNG（enV0/enH0/edU 非占位） | `export_map_from_wz.py` + `gen_grassy_tile_placeholders.py` | `maps/tiles/grassySoil/` |
+| 3 | 怪物精灵补缺（蘑菇、野猪等新手怪） | `Mob.wz` + `extract_mobs_npcs.py` | `sprites/mob/` |
+| 4 | 下跳穿板 + 绳梯（rope/ladder obj） | HeavenClient Physics | `game_world.dart` |
+
+#### P1 — 079 体验对齐
+
+| # | 任务 | 说明 |
 |---|------|------|
-| 1 | 地图 **Tile 层** | 从 `Map.wz/Map/Map0/000010000.img` 导出 tile + `Tile/grassySoil.img`，Flame 渲染 |
-| 2 | 地图 **Obj 层** | 导出 `Map.wz/Obj/*.img` 物件 PNG + 坐标，叠加到 `WzMapLayer` 之上 |
-| 3 | **跳跃 + 多层 foothold** | 读 foothold 图结构，Alt 跳、落点检测 |
-| 4 | 角色 **walk/attack 动画** | Character.wz 多帧 + Flame SpriteAnimation |
+| 5 | 批量导出新手岛地图链 | 1000000 → 20000 → 30000… `batch_export_town_maps.sh` |
+| 6 | 小地图 canvas 贴图逐图导出 | `Map/Map0/000010000.img/miniMap/canvas` |
+| 7 | 伤害数字 / 拾取特效 | Effect.wz |
+| 8 | 地图 BGM 按图切换 | `Sound.wz/Bgm00/` → `assets/audio/bgm/` |
+| 9 | 背包/装备 UIWindow | `UI.wz/UIWindow.img` |
 
-### P1 — 登录与角色
+#### P2 — 登录与角色
 
-| # | 缺失 | 做法 |
+| # | 任务 | 说明 |
 |---|------|------|
-| 5 | MapLogin2 **卷轴动画** | 标题→选角镜头平滑滚动（非硬切 camera） |
-| 6 | Logo 从 WZ Obj 提取 | Map/Obj/login.img Title/logo（MAX3 Data 或补丁 WZ） |
-| 7 | 全量 **Character 部件** | `extract_avatars.py --all` 或按需缓存策略 |
-| 8 | 选角 **charInfo 面板** | Login.img CharSelect/charInfo1 叠加 |
+| 10 | MapLogin2 镜头平滑滚动 | 标题→选角非硬切 camera |
+| 11 | 全量 Character 部件缓存 | `extract_avatars.py --all` 或按需 |
+| 12 | UI.img 点击音效 | CharSelect/BtMouseClick |
 
-### P2 — 体验补齐
-
-| # | 缺失 | 做法 |
-|---|------|------|
-| 9 | UI.img 音效 | CharSelect/WorldSelect/BtMouseClick |
-| 10 | 地图 BGM 逐图 | Sound.wz Bgm00/* → assets/audio/bgm/ |
-| 11 | 背包/装备 UI | UIWindow.img 贴图 |
-| 12 | 更多地图 | 按 mapId 批量跑 export_map_from_wz |
-
-### 已知 WZ 缺口
+### 11.3 已知 WZ 缺口
 
 | 缺口 | 说明 | 解决 |
 |------|------|------|
-| 主客户端无 grassySoil.img | Map.wz/Back 不含 | MAX3 Data 客户端 |
+| 主客户端无 grassySoil.img | Map.wz/Back 不含 | MAX3 Data（`01-…` 或 `03-…/extracted/max3`） |
+| 部分 Tile canvas decode 失败 | wz-python 对部分 enV0/edU 报错 | XML origin + `gen_grassy_tile_placeholders.py` |
 | 主客户端无 Obj/login.img | Map.wz/Obj 无 login | UI 层用 Login.img；Obj 用 MAX3 |
 | 补丁 1.5m.exe | RAR 自解压，Mac 难解压 | Windows 解压后合并 WZ |
+
+### 11.4 已废弃 / 勿再使用
+
+| 项 | 说明 |
+|----|------|
+| `scripts/build_login_scene/main.go` | 假街机框背景 |
+| `client/lib/widgets/player_stats.dart` | 旧 Material 顶栏（已由 `MapleStatusBar` 替代） |
+| `client/lib/widgets/mini_map.dart` | 手绘小地图（已由 `MapleMiniMap` 替代） |
+| 仅用 `groundYAt` 扁平 foothold | 已升级为 FootholdTree（id/prev/next） |
 
 ---
 
@@ -478,11 +611,19 @@ go run scripts/check_assets/main.go
 ### 12.2 改地图/进游戏画面
 
 1. 确定 WZ 地图文件：`Map/Map0/000010000.img` ↔ 逻辑 mapId `1000000`  
-2. `export_map_from_wz.py --map 000010000 --map-id 1000000 --back-client MAX3`  
-3. 缺 back set → `extract_map_backs.py` 或 MAX3 Data  
-4. 改 `wz_map_layer.dart` / `game_world.dart` 渲染或碰撞  
-5. 更新 `pubspec.yaml` 若新增 assets 子目录  
-6. 服务端 `data/maplife/` + spawn 坐标与 WZ life 一致  
+2. 对照 HeavenClient：`04-…/Gameplay/Physics/FootholdTree.cpp`  
+3. 导出：
+   ```bash
+   PYTHONPATH=.cache/wz-python .cache/wz-python/.venv/bin/python \
+     scripts/extract_wz_py/export_map_from_wz.py \
+     --client "$(maple_mxd079_client)/extracted_client" \
+     --map 000010000 --map-id 1000000 --force
+   ```
+4. 地砖缺项：`scripts/extract_wz_py/gen_grassy_tile_placeholders.py`  
+5. 改 `map_foothold.dart` / `game_world.dart` / `wz_map_foreground.dart`  
+6. NPC 刷点：`data/maplife/` + `client/assets/maplife/` 必须含 **x/y/fh**  
+7. 更新 `pubspec.yaml` 若新增 assets 子目录  
+8. `flutter run -d web-server --web-port=5173` 后 **硬刷新** 验证
 
 ### 12.3 改服务端规则
 
@@ -600,5 +741,6 @@ mapleStory079/
 
 | 日期 | 摘要 |
 |------|------|
+| 2026-06-14 | 进游戏：FootholdTree(id/prev/next)、Tile/Obj 前景、079 HUD、传送门+change-map；更新 §2.5/§2.6 参考与解析路径表；重写 §11 问题与计划 |
 | 2026-06-14 | 示例代码迁出：`examples/` 删除，统一至同级 `mapleStory079-external/`；新增 §2 路径总表 |
 | 2026-06-14 | 重写本文档：以官方 extracted_client + MAX3 为资源基准；MapLogin2 视差登录；彩虹村 foothold/back；弃用 build_login_scene |

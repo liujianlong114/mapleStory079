@@ -102,6 +102,7 @@ class WzGaugeBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = ratio.clamp(0.0, 1.0);
+    final fillW = (width * pct).clamp(0.0, width);
     return SizedBox(
       width: width,
       height: height,
@@ -110,19 +111,25 @@ class WzGaugeBar extends StatelessWidget {
         children: [
           if (bgAsset != null)
             Image.asset(bgAsset!, fit: BoxFit.fill, filterQuality: FilterQuality.none),
-          ClipRect(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              widthFactor: pct,
-              child: Image.asset(
-                fillAsset,
-                width: width,
-                height: height,
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.none,
+          if (fillW > 0)
+            ClipRect(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                widthFactor: pct,
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: Image.asset(
+                    fillAsset,
+                    width: width,
+                    height: height,
+                    fit: BoxFit.fill,
+                    filterQuality: FilterQuality.none,
+                    repeat: ImageRepeat.repeatX,
+                  ),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

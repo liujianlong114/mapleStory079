@@ -119,6 +119,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   /// 地图默认出生点 Y（仅初始落点回退）
   final double _spawnY;
   MapFootholds? _footholds;
+  int? _playerFhid;
   final List<PortalComponent> _portals = [];
   double _portalCooldown = 0;
   double _vrLeft = 0;
@@ -177,7 +178,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   }
 
   double _snapSpawnY(double x, double hintY) =>
-      _footholds?.snapSpawnY(x, hintY) ?? hintY;
+      _footholds?.snapSpawn(x, hintY).y ?? hintY;
 
   // ===== 角色属性 =====
   final int characterId;
@@ -344,7 +345,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     // 脚点对齐 foothold（079：出生点必须落在可走面上）
     final sx = playerInitial?.x ?? mapFull?.meta.spawnX.toDouble() ?? mapWidth / 2;
     final hintY = playerInitial?.y ?? mapFull?.meta.spawnY.toDouble() ?? _spawnY;
-    final sy = _snapSpawnY(sx, hintY);
+    final spawn = _footholds?.snapSpawn(sx, hintY);
+    final sy = spawn?.y ?? hintY;
+    _playerFhid = spawn?.fhid;
     player.position = Vector2(sx, sy);
     _onGround = true;
     _vy = 0;
@@ -438,53 +441,96 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     bool moved = false;
     final left = GameControls.anyMoveLeft(_keysPressed);
     final right = GameControls.anyMoveRight(_keysPressed);
+    final down = GameControls.anyMoveDown(_keysPressed);
     if (left && !right) {
-      player.moveHorizontal(-1, dt);
+      player.moveHorizontal(-1, dt, onGround: _onGround);
       moved = true;
     } else if (right && !left) {
-      player.moveHorizontal(1, dt);
+      player.moveHorizontal(1, dt, onGround: _onGround);
       moved = true;
     }
     player.position.x = player.position.x.clamp(_vrLeft + 16, _vrRight - 16);
 
     final jumpNow = GameControls.anyJump(_keysPressed);
     if (jumpNow && !_jumpHeldLast && _onGround) {
-      _vy = _jumpSpeed;
-      _onGround = false;
-      player.animationState = 'jump';
+      final jd = _footholds?.jumpDownInfo(_playerFhid, player.position.x);
+      if (down && jd != null && jd.enabled) {
+        player.position.y = jd.dropY;
+        _onGround = false;
+        _playerFhid = null;
+        _vy = 0;
+        if (!player.isAttacking) player.animationState = 'jump';
+      } else {
+        _vy = _jumpSpeed;
+        _onGround = false;
+        player.animationState = 'jump';
+      }
     }
     _jumpHeldLast = jumpNow;
 
     if (!_onGround) {
       _vy += _gravity * dt;
       player.position.y += _vy * dt;
+      if (!player.isAttacking) {
+        player.animationState = 'jump';
+      }
       final landing = _footholds?.landingYAt(player.position.x, player.position.y);
       if (landing != null && player.position.y >= landing - 2 && _vy >= 0) {
         player.position.y = landing;
         _vy = 0;
         _onGround = true;
+        _playerFhid = _footholds?.getFhidBelow(player.position.x, player.position.y);
         if (!player.isAttacking) {
-          player.animationState = moved ? 'walk' : 'idle';
+          if (down && !left && !right) {
+            player.animationState = 'prone';
+          } else {
+            player.animationState = moved ? 'walk' : 'idle';
+          }
         }
       } else if (player.position.y > _vrBottom + 120) {
         _respawnOnMap();
       }
     } else {
       final gy = tryGroundAt(player.position.x, feetY: player.position.y);
-      if (gy == null) {
+      final nextFhid = _footholds?.advanceFhid(
+        current: _playerFhid,
+        x: player.position.x,
+        y: player.position.y,
+        onGround: true,
+      );
+      if (nextFhid == null || gy == null) {
         _onGround = false;
-        _vy = 0;
-      } else if (gy > player.position.y + 4) {
-        _onGround = false;
+        _playerFhid = null;
         _vy = 0;
       } else {
-        player.position.y = gy;
-        if (!moved && !player.isAttacking) player.animationState = 'idle';
+        _playerFhid = nextFhid;
+        final fhGy = _footholds?.groundYOnFh(nextFhid, player.position.x) ?? gy;
+        if (fhGy > player.position.y + 4) {
+          _onGround = false;
+          _playerFhid = null;
+          _vy = 0;
+        } else {
+          player.position.y = fhGy;
+          if (!player.isAttacking) {
+            if (down && !left && !right) {
+              player.animationState = 'prone';
+            } else if (!moved) {
+              player.animationState = 'idle';
+            }
+          }
+        }
       }
     }
 
     _syncCamera();
     _checkPortalWarp();
+    player.priority = player.position.y.toInt();
+    for (final npc in npcs) {
+      npc.priority = npc.position.y.toInt();
+    }
+    for (final mob in mobs) {
+      mob.priority = mob.position.y.toInt();
+    }
 
     if (moved) {
       _positionThrottle -= dt;
@@ -497,7 +543,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
         );
       }
       _scheduleMoveApiSave();
-      if (_onGround && !player.isAttacking) player.animationState = 'walk';
+      if (_onGround && !player.isAttacking && moved && player.animationState != 'prone') {
+        player.animationState = 'walk';
+      }
     }
 
     // --- 怪物 AI（无 WS 同步时本地模拟）---
@@ -550,7 +598,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   void _performAttack() {
     if (isDead) return;
-    if (!player.attack()) return;
+    if (!player.attack(prone: player.animationState == 'prone')) return;
     attackCount += 1;
     _doMeleeHit(range: 160);
     ws?.sendAttack(
@@ -890,7 +938,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   void movePlayer(Vector2 direction) {
     if (direction.x != 0) {
-      player.moveHorizontal(direction.x > 0 ? 1 : -1, 1 / 60);
+      player.moveHorizontal(direction.x > 0 ? 1 : -1, 1 / 60, onGround: _onGround);
       player.position.y = groundAt(player.position.x, allowFallback: true);
     }
   }
@@ -1117,7 +1165,9 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   void addMob(Mob mob, {Vector2? position}) {
     if (_mobByInstanceId(mob.id) != null) return;
     final x = position?.x ?? mob.posX;
-    final y = groundAt(x, allowFallback: true);
+    final hintY = mob.posY > 0 ? mob.posY : mob.spawnY;
+    final y = _footholds?.groundYAt(x, feetY: hintY) ??
+        _snapSpawnY(x, hintY > 0 ? hintY : _spawnY);
     mob.posY = y;
     final component = MobComponent(
       mob: mob,
@@ -1132,16 +1182,28 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     required int id,
     required String name,
     Vector2? position,
+    double? feetY,
+    int? footholdId,
     bool hasShop = false,
     String dialogue = '',
   }) {
     final x = position?.x ?? mapWidth / 2;
+    double y;
+    if (footholdId != null && footholdId > 0) {
+      y = _footholds?.groundYOnFh(footholdId, x) ??
+          (feetY != null && feetY > 0 ? feetY : _snapSpawnY(x, position?.y ?? _spawnY));
+    } else if (feetY != null && feetY > 0) {
+      // WZ maplife 的 y 为官方刷点脚点，优先直接使用
+      y = feetY;
+    } else {
+      y = _snapSpawnY(x, position?.y ?? _spawnY);
+    }
     final npc = NPCComponent(
       npcId: id,
       npcName: name,
       dialogue: dialogue,
       hasShop: hasShop,
-      position: Vector2(x, groundAt(x, allowFallback: true)),
+      position: Vector2(x, y),
       onInteract: _tryNpcInteract,
     );
     npcs.add(npc);
@@ -1239,9 +1301,13 @@ class PlayerComponent extends PositionComponent {
   SpriteAnimationTicker? _walkTicker;
   SpriteAnimation? _attackAnim;
   SpriteAnimationTicker? _attackTicker;
+  SpriteAnimation? _proneAttackAnim;
+  SpriteAnimationTicker? _proneAttackTicker;
   Sprite? _standSprite;
   Sprite? _attackSprite;
+  Sprite? _proneAttackSprite;
   Sprite? _jumpSprite;
+  Sprite? _proneSprite;
   bool _composeReady = false;
 
   bool get isAttacking => _attackTimer > 0;
@@ -1340,8 +1406,6 @@ class PlayerComponent extends PositionComponent {
         look,
         pose: 'swingO1',
         scale: 1,
-        maxFrames: 4,
-        stepTime: 0.08,
         loop: false,
       );
       if (_attackAnim != null) {
@@ -1354,6 +1418,22 @@ class PlayerComponent extends PositionComponent {
       _jumpSprite =
           (await SpriteLoader.tryLoadCompose(look, pose: 'jump', scale: 1)) ??
               _standSprite;
+      _proneSprite =
+          (await SpriteLoader.tryLoadCompose(look, pose: 'prone', scale: 1)) ??
+              _standSprite;
+      _proneAttackAnim = await SpriteLoader.tryLoadComposeAnimation(
+        look,
+        pose: 'proneStab',
+        scale: 1,
+        loop: false,
+      );
+      if (_proneAttackAnim != null) {
+        _proneAttackTicker = SpriteAnimationTicker(_proneAttackAnim!);
+      } else {
+        _proneAttackSprite =
+            (await SpriteLoader.tryLoadCompose(look, pose: 'proneStab', scale: 1)) ??
+                _proneSprite;
+      }
       _applyDisplaySize();
       return;
     }
@@ -1435,7 +1515,8 @@ class PlayerComponent extends PositionComponent {
     scan(_walkAnim);
     scan(_standAnim);
     scan(_attackAnim);
-    for (final s in [_standSprite, _attackSprite, _jumpSprite]) {
+    scan(_proneAttackAnim);
+    for (final s in [_standSprite, _attackSprite, _jumpSprite, _proneSprite, _proneAttackSprite]) {
       if (s != null) {
         maxW = math.max(maxW, s.srcSize.x);
         maxH = math.max(maxH, s.srcSize.y);
@@ -1445,6 +1526,9 @@ class PlayerComponent extends PositionComponent {
   }
 
   Sprite? _activeSprite() {
+    if (animationState == 'prone_attack' && _proneAttackTicker != null) {
+      return _proneAttackTicker!.getSprite();
+    }
     if (animationState == 'attack' && _attackTicker != null) {
       return _attackTicker!.getSprite();
     }
@@ -1452,8 +1536,12 @@ class PlayerComponent extends PositionComponent {
       return _walkTicker!.getSprite();
     }
     if (_composeReady) {
+      if (animationState == 'prone_attack' && _proneAttackSprite != null) {
+        return _proneAttackSprite;
+      }
       if (animationState == 'attack' && _attackSprite != null) return _attackSprite;
       if (animationState == 'jump' && _jumpSprite != null) return _jumpSprite;
+      if (animationState == 'prone' && _proneSprite != null) return _proneSprite;
       return _standSprite;
     }
     if (animationState == 'walk' && _walkTicker != null) {
@@ -1469,10 +1557,14 @@ class PlayerComponent extends PositionComponent {
     if (_attackTimer > 0) {
       _attackTimer -= dt;
       if (_attackTimer < 0) _attackTimer = 0;
+    } else if (animationState == 'prone_attack') {
+      animationState = 'prone';
     } else if (animationState == 'attack') {
       animationState = 'idle';
     }
-    if (animationState == 'attack' && _attackTicker != null) {
+    if (animationState == 'prone_attack' && _proneAttackTicker != null) {
+      _proneAttackTicker!.update(dt);
+    } else if (animationState == 'attack' && _attackTicker != null) {
       _attackTicker!.update(dt);
     } else if (animationState == 'walk' && _walkTicker != null) {
       _walkTicker!.update(dt);
@@ -1481,11 +1573,13 @@ class PlayerComponent extends PositionComponent {
     }
   }
 
-  void moveHorizontal(int dir, double dt) {
+  void moveHorizontal(int dir, double dt, {bool onGround = true}) {
     if (dir != 0) {
       direction = dir > 0 ? 1 : -1;
       position.x += direction * moveSpeed * dt;
-      if (!isAttacking) animationState = 'walk';
+      if (onGround && !isAttacking && animationState != 'prone') {
+        animationState = 'walk';
+      }
     }
   }
 
@@ -1495,11 +1589,17 @@ class PlayerComponent extends PositionComponent {
     }
   }
 
-  bool attack() {
+  bool attack({bool prone = false}) {
     if (_attackTimer <= 0) {
-      _attackTimer = attackCooldown;
-      animationState = 'attack';
-      _attackTicker?.reset();
+      final pose = prone ? 'proneStab' : 'swingO1';
+      _attackTimer = SpriteLoader.poseDurationSeconds(pose);
+      if (prone && (_proneAttackTicker != null || _proneAttackSprite != null)) {
+        animationState = 'prone_attack';
+        _proneAttackTicker?.reset();
+      } else {
+        animationState = 'attack';
+        _attackTicker?.reset();
+      }
       return true;
     }
     return false;
@@ -1607,7 +1707,7 @@ class PlayerComponent extends PositionComponent {
   void _renderAttackGlow(Canvas canvas) {
     if (_attackTimer > 0) {
       final glow = Paint()
-        ..color = Colors.yellow.withOpacity(_attackTimer / attackCooldown * 0.8);
+        ..color = Colors.yellow.withOpacity((_attackTimer / 0.8).clamp(0.0, 1.0) * 0.8);
       canvas.drawCircle(
         Offset(direction * 24.0, -size.y * 0.45),
         size.x * 0.3,

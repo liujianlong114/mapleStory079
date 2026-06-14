@@ -9,6 +9,7 @@ class GameControls {
 
   static LogicalKeyboardKey moveLeft = LogicalKeyboardKey.arrowLeft;
   static LogicalKeyboardKey moveRight = LogicalKeyboardKey.arrowRight;
+  static LogicalKeyboardKey moveDown = LogicalKeyboardKey.arrowDown;
   static LogicalKeyboardKey attack = LogicalKeyboardKey.controlLeft;
   static LogicalKeyboardKey jump = LogicalKeyboardKey.altLeft;
   static LogicalKeyboardKey pickup = LogicalKeyboardKey.keyZ;
@@ -22,6 +23,7 @@ class GameControls {
     final p = await SharedPreferences.getInstance();
     moveLeft = _fromId(p.getInt('${_prefix}left')) ?? LogicalKeyboardKey.arrowLeft;
     moveRight = _fromId(p.getInt('${_prefix}right')) ?? LogicalKeyboardKey.arrowRight;
+    moveDown = _fromId(p.getInt('${_prefix}down')) ?? LogicalKeyboardKey.arrowDown;
     attack = _fromId(p.getInt('${_prefix}attack')) ?? LogicalKeyboardKey.controlLeft;
     jump = _fromId(p.getInt('${_prefix}jump')) ?? LogicalKeyboardKey.altLeft;
     pickup = _fromId(p.getInt('${_prefix}pickup')) ?? LogicalKeyboardKey.keyZ;
@@ -34,6 +36,7 @@ class GameControls {
     final p = await SharedPreferences.getInstance();
     await p.setInt('${_prefix}left', moveLeft.keyId);
     await p.setInt('${_prefix}right', moveRight.keyId);
+    await p.setInt('${_prefix}down', moveDown.keyId);
     await p.setInt('${_prefix}attack', attack.keyId);
     await p.setInt('${_prefix}jump', jump.keyId);
     await p.setInt('${_prefix}pickup', pickup.keyId);
@@ -44,6 +47,7 @@ class GameControls {
   static Future<void> resetDefaults() async {
     moveLeft = LogicalKeyboardKey.arrowLeft;
     moveRight = LogicalKeyboardKey.arrowRight;
+    moveDown = LogicalKeyboardKey.arrowDown;
     attack = LogicalKeyboardKey.controlLeft;
     jump = LogicalKeyboardKey.altLeft;
     pickup = LogicalKeyboardKey.keyZ;
@@ -72,6 +76,9 @@ class GameControls {
   static bool isMoveRight(LogicalKeyboardKey key) =>
       key == moveRight || key == LogicalKeyboardKey.keyD;
 
+  static bool isMoveDown(LogicalKeyboardKey key) =>
+      key == moveDown || key == LogicalKeyboardKey.keyS;
+
   static bool isAttack(LogicalKeyboardKey key) =>
       key == attack || key == LogicalKeyboardKey.controlRight;
 
@@ -89,6 +96,9 @@ class GameControls {
 
   static bool anyMoveRight(Set<LogicalKeyboardKey> pressed) =>
       pressed.any(isMoveRight);
+
+  static bool anyMoveDown(Set<LogicalKeyboardKey> pressed) =>
+      pressed.any(isMoveDown);
 
   static bool anyJump(Set<LogicalKeyboardKey> pressed) => pressed.any(isJump);
 

@@ -7,13 +7,17 @@ class MapLifeNpcSpawn {
   const MapLifeNpcSpawn({
     required this.id,
     required this.x,
+    required this.y,
     required this.name,
     required this.dialogue,
+    this.footholdId = 0,
     this.hasShop = false,
   });
 
   final int id;
   final double x;
+  final double y;
+  final int footholdId;
   final String name;
   final String dialogue;
   final bool hasShop;
@@ -60,10 +64,14 @@ Future<List<MapLifeNpcSpawn>> loadMapLifeNpcs(int mapId) async {
       if (row['type'] != 'n' || (row['hide'] as num?)?.toInt() == 1) continue;
       final id = (row['id'] as num).toInt();
       final x = (row['x'] as num).toDouble();
+      final y = (row['y'] as num?)?.toDouble() ?? 0;
+      final fh = (row['fh'] as num?)?.toInt() ?? 0;
       final meta = _npcCatalog[id];
       out.add(MapLifeNpcSpawn(
         id: id,
         x: x,
+        y: y,
+        footholdId: fh,
         name: meta?.name ?? 'NPC',
         dialogue: meta?.dialogue ?? '你好，冒险者！',
         hasShop: meta?.shop ?? false,

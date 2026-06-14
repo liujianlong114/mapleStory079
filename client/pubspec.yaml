@@ -30,6 +30,8 @@ flutter:
     - assets/images/
     - assets/images/ui/login/
     - assets/images/ui/hud/
+    - assets/images/ui/windows/
+    - assets/sprites/item/
     - assets/images/ui/login/back/
     - assets/scenes/
     - assets/maps/

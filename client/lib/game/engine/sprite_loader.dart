@@ -51,6 +51,14 @@ class SpriteLoader {
 
   /// Phase 1：后端 wzpy 实时合成完整 CharLook
   /// [scale] 游戏内用 1（与地图/NPC 1:1 WZ 像素一致）；选角 UI 用 3 更清晰。
+  /// 079 姿势帧数与 delay（ms），来自 Character.wz Body pose_frame_delays
+  static const Map<String, ({int frames, List<double> stepTimes})> wzPoseTiming = {
+    'swingO1': (frames: 3, stepTimes: [0.30, 0.15, 0.35]),
+    'proneStab': (frames: 2, stepTimes: [0.30, 0.40]),
+    'walk1': (frames: 4, stepTimes: [0.18, 0.18, 0.18, 0.18]),
+    'stand1': (frames: 3, stepTimes: [0.50, 0.50, 0.50]),
+  };
+
   /// Phase 1：按帧拉取 compose PNG 组成动画（HeavenClient stance + stframe）
   static Future<SpriteAnimation?> tryLoadComposeAnimation(
     CharLook look, {
@@ -58,10 +66,17 @@ class SpriteLoader {
     int scale = 1,
     int maxFrames = 4,
     double stepTime = 0.18,
+    List<double>? stepTimes,
     bool loop = true,
+    int minFrameW = 40,
+    int minFrameH = 38,
   }) async {
+    final timing = wzPoseTiming[pose];
+    final frameLimit = timing?.frames ?? maxFrames;
+    final perFrameTimes = stepTimes ?? timing?.stepTimes;
+
     final sprites = <Sprite>[];
-    for (var frame = 0; frame < maxFrames; frame++) {
+    for (var frame = 0; frame < frameLimit; frame++) {
       final params = look.toQueryParams(pose: pose, frame: frame);
       params['scale'] = '$scale';
       if (scale <= 1) params['pad'] = '0';
@@ -72,17 +87,34 @@ class SpriteLoader {
         if (resp.statusCode != 200 || resp.bodyBytes.length < 256) break;
         final codec = await ui.instantiateImageCodec(resp.bodyBytes);
         final img = (await codec.getNextFrame()).image;
+        if (img.width < minFrameW || img.height < minFrameH) break;
         sprites.add(Sprite(img));
       } catch (_) {
         break;
       }
     }
-    if (sprites.length < 2) return null;
-    return SpriteAnimation.spriteList(
+    if (sprites.isEmpty) return null;
+    if (sprites.length == 1) {
+      return SpriteAnimation.spriteList(
+        sprites,
+        stepTime: perFrameTimes?.first ?? stepTime,
+        loop: loop,
+      );
+    }
+    final times = perFrameTimes != null && perFrameTimes.length >= sprites.length
+        ? perFrameTimes.sublist(0, sprites.length)
+        : List.filled(sprites.length, stepTime);
+    return SpriteAnimation.variableSpriteList(
       sprites,
-      stepTime: stepTime,
+      stepTimes: times,
       loop: loop,
     );
+  }
+
+  static double poseDurationSeconds(String pose) {
+    final t = wzPoseTiming[pose];
+    if (t == null) return 0.45;
+    return t.stepTimes.fold<double>(0, (a, b) => a + b);
   }
 
   static Future<Sprite?> tryLoadCompose(

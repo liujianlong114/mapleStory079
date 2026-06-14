@@ -1,0 +1,17 @@
+[2026-06-15T01:55:01+08:00] local loop started interval=1800s
+[2026-06-15T01:55:01+08:00] === loop tick ===
+  backend DOWN
+  frontend ok
+| 1 | 彩虹村脚点/贴图逐段验收（spawn、希娜、out00） | HeavenClient FootholdTree + `000010000.img.xml` | 截图对比清单 |
+| 2 | 补全/修正 tile PNG（enV0/enH0/edU 非占位） | `export_map_from_wz.py` + `gen_grassy_tile_placeholders.py` | `maps/tiles/grassySoil/` |
+| 3 | 怪物精灵补缺（蘑菇、野猪等新手怪） | `Mob.wz` + `extract_mobs_npcs.py` | `sprites/mob/` |
+| 4 | 下跳穿板 + 绳梯（rope/ladder obj） | HeavenClient Physics | `game_world.dart` |
+| 5 | 批量导出新手岛地图链 | 1000000 → 20000 → 30000… `batch_export_town_maps.sh` |
+| 6 | 小地图 canvas 贴图逐图导出 | `Map/Map0/000010000.img/miniMap/canvas` |
+| 7 | 伤害数字 / 拾取特效 | Effect.wz |
+| 8 | 地图 BGM 按图切换 | `Sound.wz/Bgm00/` → `assets/audio/bgm/` |
+| 9 | 背包/装备 UIWindow | `UI.wz/UIWindow.img` |
+| 10 | MapLogin2 镜头平滑滚动 | 标题→选角非硬切 camera |
+| 11 | 全量 Character 部件缓存 | `extract_avatars.py --all` 或按需 |
+| 12 | UI.img 点击音效 | CharSelect/BtMouseClick |
+[2026-06-15T01:55:01+08:00] next tick in 1800s — read /Users/lijianjun/GolandProjects/mapleStory079/.cursor/automation/overnight-prompt.md

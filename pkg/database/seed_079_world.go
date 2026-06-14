@@ -23,6 +23,7 @@ func default079Maps() []Map {
 		{1000000, "彩虹村", "Maple Island - Amherst", "Bgm00/FloralLife", 1705, 1230},
 		{1000001, "彩虹村训练场", "新手训练场", "Bgm00/FloralLife", 1705, 1230},
 		{1000002, "蘑菇山丘", "离开彩虹村前的练级区", "Bgm00/FloralLife", 1705, 1230},
+		{20000, "南门外道", "Maple Road South Forest", "Bgm00/mapleisland", 800, 600},
 		{104000000, "明珠港", "Lith Harbor", "Bgm00.southperry", 0, 0},
 		{104010001, "明珠港码头", "乘船前往大陆", "Bgm00.southperry", 0, 0},
 		{100000000, "射手村", "Henesys", "Bgm00.henesys", 0, 0},

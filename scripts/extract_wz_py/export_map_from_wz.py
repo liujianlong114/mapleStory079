@@ -136,6 +136,10 @@ def parse_footholds(map_img: WzSubProperty) -> List[Dict[str, int]]:
     for layer in fh.children():
         if not isinstance(layer, WzSubProperty):
             continue
+        try:
+            layer_id = int(layer.name)
+        except ValueError:
+            continue
         for grp in layer.children():
             if not isinstance(grp, WzSubProperty):
                 continue
@@ -144,8 +148,16 @@ def parse_footholds(map_img: WzSubProperty) -> List[Dict[str, int]]:
                     continue
                 if seg.get("x1") is None:
                     continue
+                try:
+                    fid = int(seg.name)
+                except ValueError:
+                    continue
                 out.append(
                     {
+                        "id": fid,
+                        "layer": layer_id,
+                        "prev": prop_int(seg, "prev"),
+                        "next": prop_int(seg, "next"),
                         "x1": prop_int(seg, "x1"),
                         "y1": prop_int(seg, "y1"),
                         "x2": prop_int(seg, "x2"),
@@ -302,6 +314,17 @@ def parse_map_layers(map_img: WzSubProperty) -> List[Dict[str, Any]]:
             out.append({"id": layer_id, "tS": tS, "tiles": tiles, "objs": objs})
     out.sort(key=lambda L: L["id"])
     return out
+
+
+def _is_real_tile_png(png_path: str) -> bool:
+    if not os.path.isfile(png_path) or os.path.getsize(png_path) < 350:
+        return False
+    meta_path = png_path + ".json"
+    if os.path.isfile(meta_path):
+        with open(meta_path, encoding="utf-8") as mf:
+            if json.load(mf).get("placeholder"):
+                return False
+    return True
 
 
 def export_tile_from_data_client(
@@ -596,16 +619,13 @@ def main() -> int:
             if key not in tile_origins:
                 u, no = key[1], key[2]
                 png_path = os.path.join(args.out, "maps", "tiles", tS, f"{u}_{no}.png")
-                if os.path.isfile(png_path) and os.path.getsize(png_path) >= 40:
-                    meta_path = png_path + ".json"
-                    if os.path.isfile(meta_path):
-                        with open(meta_path, encoding="utf-8") as mf:
-                            meta = json.load(mf)
-                        ox, oy = int(meta.get("ox", 0)), int(meta.get("oy", 0))
-                    else:
-                        ox, oy = xml_origins.get((u, no), (0, 0))
+                meta_path = png_path + ".json"
+                if _is_real_tile_png(png_path) and os.path.isfile(meta_path):
+                    with open(meta_path, encoding="utf-8") as mf:
+                        meta = json.load(mf)
+                    ox, oy = int(meta.get("ox", 0)), int(meta.get("oy", 0))
                 else:
-                    continue
+                    ox, oy = xml_origins.get((u, no), (0, 0))
             t["ox"] = ox
             t["oy"] = oy
             kept_tiles.append(t)
