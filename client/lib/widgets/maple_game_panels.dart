@@ -450,3 +450,113 @@ class MapleSkillPanel extends StatelessWidget {
     );
   }
 }
+
+/// 079 底部快捷道具栏 — 显示消耗品图标，点击使用并恢复 HP/MP。
+///
+/// 参考 HeavenClient UI/Pot/UseItem 动画，
+/// 使用后通过 [onItemUsed] 回调通知外部播放动画和提示。
+class MapleQuickSlotBar extends StatelessWidget {
+  const MapleQuickSlotBar({
+    super.key,
+    required this.consumables,
+    required this.onItemUsed,
+    this.maxSlots = 8,
+  });
+
+  /// 当前背包中的消耗品列表
+  final List<Item> consumables;
+
+  /// 点击使用道具时的回调：参数为道具ID、HP恢复值、MP恢复值。
+  final void Function(int itemId, int hpRecovery, int mpRecovery)? onItemUsed;
+
+  final int maxSlots;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayItems = consumables.take(maxSlots).toList();
+
+    return SizedBox(
+      height: 42,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(maxSlots, (i) {
+          final item = i < displayItems.length ? displayItems[i] : null;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: _quickSlotItem(item),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _quickSlotItem(Item? item) {
+    return GestureDetector(
+      onTap: item == null
+          ? null
+          : () {
+              AudioManager().playUiClick();
+              final hp = item.stats['hp'] ?? 0;
+              final mp = item.stats['mp'] ?? 0;
+              onItemUsed?.call(item.id, hp, mp);
+            },
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: item != null
+                ? const Color(0xFF8B6914)
+                : const Color(0xFF4A3728),
+            width: 2,
+          ),
+          color: item != null
+              ? const Color(0xFF2C1810).withValues(alpha: 0.85)
+              : const Color(0xFF1A0F0A).withValues(alpha: 0.6),
+        ),
+        child: item == null
+            ? null
+            : Stack(
+                alignment: Alignment.center,
+                children: [
+                  _itemIcon(item),
+                  if (item.quantity > 1)
+                    Positioned(
+                      right: 1,
+                      bottom: 1,
+                      child: Text(
+                        '${item.quantity}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(color: Colors.black, blurRadius: 2),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _itemIcon(Item item) {
+    final path = item.icon.isNotEmpty
+        ? AssetPaths.bundle(item.icon)
+        : AssetPaths.bundle(SpriteDirs.itemPath(item.id));
+    return Image.asset(
+      path,
+      width: 32,
+      height: 32,
+      filterQuality: FilterQuality.none,
+      errorBuilder: (_, __, ___) => Image.asset(
+        'assets/images/ui/windows/item_slot_active.png',
+        width: 32,
+        height: 32,
+        filterQuality: FilterQuality.none,
+      ),
+    );
+  }
+}

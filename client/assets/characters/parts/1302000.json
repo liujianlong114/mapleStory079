@@ -1,0 +1,20 @@
+{
+  "part_id": 1302000,
+  "canvases": [
+    {
+      "name": "weapon",
+      "origin_x": 25,
+      "origin_y": 7,
+      "map_anchors": {
+        "hand": {
+          "x": 6,
+          "y": -5
+        }
+      },
+      "z_slot": "weapon",
+      "width": 41,
+      "height": 13,
+      "z_index": 115
+    }
+  ]
+}

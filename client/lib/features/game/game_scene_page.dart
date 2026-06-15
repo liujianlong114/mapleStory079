@@ -11,6 +11,7 @@ import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
 import '../../widgets/maple_game_panels.dart';
 import '../../widgets/maple_mini_map.dart';
+import '../../widgets/maple_pickup_notice.dart';
 import '../../widgets/maple_status_bar.dart';
 import '../../widgets/npc_dialogue_panel.dart';
 import '../../game/engine/game_controls.dart';
@@ -132,6 +133,7 @@ class _GameScenePageState extends State<GameScenePage> {
   NPCComponent? _shopNpc;
   bool _debugShowFh = false;
   bool _debugShowFoot = false;
+  final GlobalKey<MaplePickupNoticeState> _pickupNoticeKey = GlobalKey();
 
   @override
   void initState() {
@@ -339,6 +341,74 @@ class _GameScenePageState extends State<GameScenePage> {
       return;
     }
     _showServerNpcDialogue(npc.npcId, npc.npcName);
+  }
+
+  Future<void> _onUseItem(int itemId, int hpRecovery, int mpRecovery) async {
+    if (!mounted) return;
+    final api = ApiService();
+    final gp = context.read<GameProvider>();
+    final inv = context.read<InventoryProvider>();
+
+    try {
+      final result = await api.useItem(
+        characterId: widget.characterId,
+        itemId: itemId,
+      );
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final newHp = (result['hp'] as num?)?.toInt() ?? gp.hp;
+        final newMaxHp = (result['max_hp'] as num?)?.toInt() ?? gp.maxHp;
+        final newMp = (result['mp'] as num?)?.toInt() ?? gp.mp;
+        final newMaxMp = (result['max_mp'] as num?)?.toInt() ?? gp.maxMp;
+        final newMesos = (result['mesos'] as num?)?.toInt();
+        final actualHp = (result['hp_recovery'] as num?)?.toInt() ?? hpRecovery;
+        final actualMp = (result['mp_recovery'] as num?)?.toInt() ?? mpRecovery;
+
+        // 同步状态
+        gp.syncFromGameWorld(
+          hp: newHp,
+          maxHp: newMaxHp,
+          mp: newMp,
+          maxMp: newMaxMp,
+          mesos: newMesos,
+        );
+        _gameWorld.updatePlayerStats(
+          hp: newHp,
+          maxHp: newMaxHp,
+          mp: newMp,
+          maxMp: newMaxMp,
+        );
+
+        // 显示恢复提示
+        if (actualHp > 0 || actualMp > 0) {
+          _pickupNoticeKey.currentState?.notify(
+            '恢复 HP ${actualHp > 0 ? '+$actualHp' : ''} ${actualMp > 0 ? ' MP +$actualMp' : ''}'.trim(),
+            color: const Color(0xFF7CFC00),
+          );
+        }
+
+        // 播放喝药水动画
+        _gameWorld.playEffect('drink');
+
+        // 刷新背包
+        inv.loadInventory(widget.characterId);
+      } else {
+        final errorMsg = result['error'] as String? ?? '道具不足';
+        _pickupNoticeKey.currentState?.notify(
+          errorMsg,
+          color: const Color(0xFFFF6B6B),
+        );
+      }
+    } catch (_) {
+      // 网络错误时显示提示
+      if (mounted) {
+        _pickupNoticeKey.currentState?.notify(
+          '道具不足',
+          color: const Color(0xFFFF6B6B),
+        );
+      }
+    }
   }
 
   Future<void> _showServerNpcDialogue(int npcId, String fallbackName) async {
@@ -645,6 +715,23 @@ class _GameScenePageState extends State<GameScenePage> {
                   ),
                 ),
               ),
+              // 快捷道具栏：显示消耗品，点击使用
+              Positioned(
+                left: 120,
+                bottom: 8,
+                child: Consumer<InventoryProvider>(
+                  builder: (context, inv, _) => MapleQuickSlotBar(
+                    consumables: inv.consumables,
+                    onItemUsed: (itemId, hp, mp) => _onUseItem(itemId, hp, mp),
+                  ),
+                ),
+              ),
+              // 拾取/恢复通知
+              Positioned(
+                left: 10,
+                bottom: 130,
+                child: MaplePickupNotice(key: _pickupNoticeKey),
+              ),
               Positioned(
                 right: 10,
                 top: 10,
@@ -653,7 +740,7 @@ class _GameScenePageState extends State<GameScenePage> {
                   builder: (_, __, ___) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
@@ -691,7 +778,7 @@ class _GameScenePageState extends State<GameScenePage> {
       child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: value ? Colors.green.withOpacity(0.8) : Colors.grey.withOpacity(0.6),
+        color: value ? Colors.green.withValues(alpha: 0.8) : Colors.grey.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

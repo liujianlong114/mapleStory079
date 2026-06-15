@@ -6,7 +6,6 @@ import '../services/api_service.dart';
 class InventoryProvider with ChangeNotifier {
   final ApiService _api = ApiService();
 
-  int _characterId = 0;
   final List<Item?> _equipSlots = List.filled(6, null);
   final List<Item> _consumables = [];
   final List<Item> _etcItems = [];
@@ -33,7 +32,6 @@ class InventoryProvider with ChangeNotifier {
   }
 
   Future<void> loadInventory(int characterId) async {
-    _characterId = characterId;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

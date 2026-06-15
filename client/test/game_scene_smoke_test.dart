@@ -17,7 +17,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => GameProvider()),
           ChangeNotifierProvider(create: (_) => InventoryProvider()),
         ],
-        child: MaterialApp(
+        child: const MaterialApp(
           home: SizedBox(
             width: 1280,
             height: 800,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/skill_provider.dart';
-import '../models/skill.dart';
 
 class SkillBarWidget extends StatefulWidget {
   final int characterId;
@@ -25,7 +24,7 @@ class _SkillBarWidgetState extends State<SkillBarWidget> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      color: Colors.black.withOpacity(0.4),
+      color: Colors.black.withValues(alpha: 0.4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(widget.slotCount, (index) {
@@ -60,13 +59,13 @@ class _SkillBarWidgetState extends State<SkillBarWidget> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: skill != null
-                      ? Colors.purpleAccent.withOpacity(0.5)
-                      : Colors.grey.withOpacity(0.3),
+                      ? Colors.purpleAccent.withValues(alpha: 0.5)
+                      : Colors.grey.withValues(alpha: 0.3),
                 ),
                 boxShadow: skill != null && !onCd
                     ? [
                         BoxShadow(
-                          color: Colors.purpleAccent.withOpacity(0.3),
+                          color: Colors.purpleAccent.withValues(alpha: 0.3),
                           blurRadius: 6,
                         ),
                       ]
@@ -85,7 +84,7 @@ class _SkillBarWidgetState extends State<SkillBarWidget> {
                                 size: 22,
                               ),
                               Text(
-                                '${skill.currentLevel > 0 ? 'Lv.${skill.currentLevel}' : ''}',
+                                skill.currentLevel > 0 ? 'Lv.$skill.currentLevel' : '',
                                 style: const TextStyle(color: Colors.white, fontSize: 9),
                               ),
                             ],
@@ -108,7 +107,7 @@ class _SkillBarWidgetState extends State<SkillBarWidget> {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(

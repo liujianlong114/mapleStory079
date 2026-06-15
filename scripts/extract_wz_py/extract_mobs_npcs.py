@@ -183,12 +183,52 @@ def extract_mob(wf: WzFile, mob_id: int, out_mob: str, region: str, force: bool)
             stand = first_canvas(img.get(alt), region=region)
             if stand:
                 break
+    # 如果当前 img 只有 link，跳转到链接对应的 img（与 extract_npc 逻辑一致）
+    if stand is None:
+        info = img.get("info")
+        if info is not None:
+            link_prop = info.get("link")
+            if hasattr(link_prop, "value") and link_prop.value:
+                link_str = str(link_prop.value)
+                link_key = f"{link_str}.img"
+                linked = wf.root.get(link_key)
+                if linked is None:
+                    # 再试 0 前缀变体
+                    for key in (f"{int(link_str):07d}.img", f"{int(link_str):06d}.img"):
+                        linked = wf.root.get(key)
+                        if linked is not None:
+                            break
+                if linked is not None:
+                    linked.parse()
+                    for alt in ("stand", "fly", "hit1", "regen", "info", "move"):
+                        stand = first_canvas(linked.get(alt), region=region)
+                        if stand:
+                            break
     if stand is None:
         return False
     if not save_canvas(stand, region, stand_path):
         return False
+    # move_frames 也尝试从 linked img 提取（如果原 mob 没有 move）
     move_pose = img.get("move") or img.get("fly")
     move_frames = collect_frames(move_pose)
+    if not move_frames:
+        # 原 mob 无 move，尝试从 link 目标提取
+        info = img.get("info")
+        if info is not None:
+            link_prop = info.get("link")
+            if hasattr(link_prop, "value") and link_prop.value:
+                link_str = str(link_prop.value)
+                link_key = f"{link_str}.img"
+                linked = wf.root.get(link_key)
+                if linked is None:
+                    for key in (f"{int(link_str):07d}.img", f"{int(link_str):06d}.img"):
+                        linked = wf.root.get(key)
+                        if linked is not None:
+                            break
+                if linked is not None:
+                    linked.parse()
+                    move_pose = linked.get("move") or linked.get("fly")
+                    move_frames = collect_frames(move_pose)
     if move_frames:
         pil_frames = [decode_canvas(c, region=region) for c in move_frames]
         save_strip(pil_frames, move_path)

@@ -12,22 +12,34 @@ import (
 
 const mobRespawnDelay = 8 * time.Second
 
+// MobAIState 怪物 AI 状态（079 HeavenClient 对照）
+type MobAIState string
+
+const (
+	AIStateIdle   MobAIState = "idle"
+	AIStatePatrol MobAIState = "patrol"
+	AIStateChase  MobAIState = "chase"
+	AIStateAttack MobAIState = "attack"
+)
+
 // MobInstance 地图上的怪物实例（内存态，按 map 隔离）。
 type MobInstance struct {
-	InstanceID uint    `json:"instance_id"`
-	MapID      uint    `json:"map_id"`
-	TemplateID uint    `json:"template_id"`
-	Name       string  `json:"name"`
-	Level      int     `json:"level"`
-	HP         int     `json:"hp"`
-	MaxHP      int     `json:"max_hp"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Rx0        float64 `json:"rx0"`
-	Rx1        float64 `json:"rx1"`
-	Speed      int     `json:"speed"`
-	Facing     int     `json:"facing"`
-	Alive      bool    `json:"alive"`
+	InstanceID uint       `json:"instance_id"`
+	MapID      uint       `json:"map_id"`
+	TemplateID uint       `json:"template_id"`
+	Name       string     `json:"name"`
+	Level      int        `json:"level"`
+	HP         int        `json:"hp"`
+	MaxHP      int        `json:"max_hp"`
+	X          float64    `json:"x"`
+	Y          float64    `json:"y"`
+	Rx0        float64    `json:"rx0"`
+	Rx1        float64    `json:"rx1"`
+	Speed      int        `json:"speed"`
+	Facing     int        `json:"facing"`
+	Alive      bool       `json:"alive"`
+	AIState    MobAIState `json:"ai_state"`
+	Fhid       int        `json:"fhid"` // 当前脚点 ID
 }
 
 type spawnDef struct {
@@ -165,6 +177,8 @@ func (s *MobInstanceService) TickAI(dt float64) []MobMoveUpdate {
 					Y:          inst.Y,
 					Facing:     inst.Facing,
 					Moving:     inst.moving,
+					AIState:    inst.AIState,
+					Fhid:       inst.Fhid,
 				})
 			}
 		}
@@ -192,6 +206,7 @@ func (inst *mobInstanceInternal) tickPatrol(dt float64) bool {
 	inst.X = math.Max(inst.Rx0, math.Min(inst.Rx1, inst.X))
 	inst.Y = inst.spawnY
 	inst.moving = math.Abs(inst.X-oldX) > 0.01
+	inst.AIState = AIStatePatrol
 	return inst.moving
 }
 
@@ -236,6 +251,8 @@ func (s *MobInstanceService) seedMapLocked(mapID uint) {
 				Speed:      tmpl.Speed,
 				Facing:     facing,
 				Alive:      true,
+				AIState:    AIStatePatrol,
+				Fhid:       0,
 			},
 			spawnX: d.x,
 			spawnY: d.y,

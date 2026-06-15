@@ -228,6 +228,17 @@ class _WzSceneScreenState extends State<WzSceneScreen>
     if (widget.playBgm) {
       AudioManager().playBgmAsset(widget.manifest.bgm);
     }
+    // 触发 MapLogin2 镜头平滑进入当前页目标。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.manifest.useParallax && widget.useMapLoginParallax) {
+        MapLoginParallax.setTarget(
+          widget.manifest.parallaxCameraX,
+          widget.manifest.parallaxCameraY,
+          duration: const Duration(milliseconds: 650),
+        );
+      }
+    });
   }
 
   @override

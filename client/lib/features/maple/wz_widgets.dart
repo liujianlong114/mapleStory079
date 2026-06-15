@@ -103,22 +103,6 @@ class _WzSpriteButtonState extends State<WzSpriteButton> {
       ),
     );
   }
-
-  Widget _fallback() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF8B6914),
-        border: Border.all(color: const Color(0xFF3B2414)),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Center(
-        child: Text(
-          widget.fallbackLabel ?? '',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
-        ),
-      ),
-    );
-  }
 }
 
 /// WZ 面板背景图（优先 PNG，失败时用木框）

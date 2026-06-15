@@ -75,7 +75,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildChannelBar(ChatProvider chat) {
-    final channels = ChatChannel.values;
+    const channels = ChatChannel.values;
     return Container(
       height: 48,
       color: const Color(0xFF0f3460),

@@ -1,0 +1,20 @@
+{
+  "part_id": 20401,
+  "canvases": [
+    {
+      "name": "face",
+      "origin_x": 13,
+      "origin_y": 8,
+      "map_anchors": {
+        "brow": {
+          "x": -1,
+          "y": -12
+        }
+      },
+      "z_slot": "face",
+      "width": 26,
+      "height": 16,
+      "z_index": 127
+    }
+  ]
+}

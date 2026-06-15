@@ -43,10 +43,10 @@ class NPCDialogueWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1a1a2e),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 20,
               spreadRadius: 4,
             ),
@@ -93,9 +93,9 @@ class NPCDialogueWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: Text(
                   dialogue,
@@ -113,12 +113,12 @@ class NPCDialogueWidget extends StatelessWidget {
                               ? () => onOptionSelected!(option)
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amberAccent.withOpacity(0.2),
+                            backgroundColor: Colors.amberAccent.withValues(alpha: 0.2),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
-                              side: BorderSide(color: Colors.amberAccent.withOpacity(0.5)),
+                              side: BorderSide(color: Colors.amberAccent.withValues(alpha: 0.5)),
                             ),
                           ),
                           child: Text(option, style: const TextStyle(fontSize: 14)),

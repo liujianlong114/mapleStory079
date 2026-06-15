@@ -17,6 +17,7 @@ type GameHandler struct {
 	questSvc  *service.QuestService
 	lootSvc   *service.LootService
 	instances *service.MobInstanceService
+	invSvc    *service.InventoryService
 	wsHandler *WebSocketHandler
 }
 
@@ -27,6 +28,7 @@ func NewGameHandler() *GameHandler {
 		questSvc:  service.NewQuestService(),
 		lootSvc:   service.DefaultLootService,
 		instances: service.DefaultMobInstanceService,
+		invSvc:    service.NewInventoryService(),
 	}
 }
 
@@ -380,6 +382,56 @@ func (h *GameHandler) LevelUpCharacter(c *gin.Context) {
 		"leveled_up": result.Leveled,
 		"old_level":  result.OldLevel,
 		"new_level":  result.NewLevel,
+	})
+}
+
+type useItemRequest struct {
+	CharacterID      uint `json:"character_id"`
+	CharacterIDCamel uint `json:"characterId"`
+	ItemID           int  `json:"item_id" binding:"required"`
+}
+
+func (h *GameHandler) UseItem(c *gin.Context) {
+	var req useItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	charID := req.CharacterID
+	if charID == 0 {
+		charID = req.CharacterIDCamel
+	}
+	if charID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "character_id required"})
+		return
+	}
+	ch, err := repository.GetCharacterByID(charID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "character not found"})
+		return
+	}
+	result, err := h.invSvc.UseItem(charID, req.ItemID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	// 应用 HP/MP 恢复
+	h.gameSvc.Restore(ch, result.HPRecovery, result.MPRecovery)
+	if err := repository.UpdateCharacter(ch); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"item_id": result.ItemID,
+		"quantity": result.Quantity,
+		"hp":       ch.HP,
+		"max_hp":   ch.MaxHP,
+		"mp":       ch.MP,
+		"max_mp":   ch.MaxMP,
+		"mesos":    ch.Mesos,
+		"hp_recovery":  result.HPRecovery,
+		"mp_recovery":  result.MPRecovery,
 	})
 }
 

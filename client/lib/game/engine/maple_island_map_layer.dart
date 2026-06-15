@@ -190,7 +190,7 @@ class MapleIslandMapLayer extends PositionComponent {
       ..moveTo(x, y + 80)
       ..quadraticBezierTo(x + w * 0.5, y - 40, x + w, y + 80)
       ..close();
-    canvas.drawPath(path, Paint()..color = color.withOpacity(0.85));
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.85));
   }
 
   void _drawCloud(Canvas canvas, double x, double y, double scale) {
@@ -220,8 +220,8 @@ class MapleIslandMapLayer extends PositionComponent {
       );
     } else {
       canvas.drawCircle(Offset(t.x, t.y - 55), 28, Paint()..color = leaf);
-      canvas.drawCircle(Offset(t.x - 14, t.y - 48), 20, Paint()..color = leaf.withOpacity(0.9));
-      canvas.drawCircle(Offset(t.x + 14, t.y - 48), 20, Paint()..color = leaf.withOpacity(0.9));
+      canvas.drawCircle(Offset(t.x - 14, t.y - 48), 20, Paint()..color = leaf.withValues(alpha: 0.9));
+      canvas.drawCircle(Offset(t.x + 14, t.y - 48), 20, Paint()..color = leaf.withValues(alpha: 0.9));
     }
   }
 
@@ -241,7 +241,7 @@ class MapleIslandMapLayer extends PositionComponent {
 
   void _drawSign(Canvas canvas, double cx, double cy, String text, Color color) {
     canvas.drawRect(Rect.fromCenter(center: Offset(cx, cy), width: 140, height: 32), Paint()..color = const Color(0xFF5D4037));
-    canvas.drawRect(Rect.fromCenter(center: Offset(cx, cy), width: 134, height: 26), Paint()..color = color.withOpacity(0.35));
+    canvas.drawRect(Rect.fromCenter(center: Offset(cx, cy), width: 134, height: 26), Paint()..color = color.withValues(alpha: 0.35));
     final tp = TextPainter(
       text: TextSpan(
         text: text,

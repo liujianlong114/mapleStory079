@@ -116,3 +116,68 @@ func (s *InventoryService) GetEquipped(characterID uint) ([]database.CharacterIn
 	}
 	return equipped, nil
 }
+
+// UseItemResult 消耗类道具使用结果。
+type UseItemResult struct {
+	ItemID     int `json:"item_id"`
+	Quantity   int `json:"quantity"`
+	HPRecovery int `json:"hp_recovery"`
+	MPRecovery int `json:"mp_recovery"`
+}
+
+// UseItem 使用一个消耗类道具：查找角色背包中的目标物品，扣除 1 个数量，
+// 并返回该道具的 HP/MP 恢复值（从 Item 元数据读取）。
+// 若物品不存在、数量不足或非消耗品则返回错误。
+func (s *InventoryService) UseItem(characterID uint, itemID int) (*UseItemResult, error) {
+	items, err := repository.GetCharacterInventory(characterID, "")
+	if err != nil {
+		return nil, err
+	}
+	var targetIdx int = -1
+	for i := range items {
+		if items[i].ItemID == itemID {
+			targetIdx = i
+			break
+		}
+	}
+	if targetIdx < 0 {
+		return nil, errors.New("item not found in inventory")
+	}
+	if items[targetIdx].Quantity <= 0 {
+		return nil, errors.New("item quantity is zero")
+	}
+
+	// 读取道具元数据获取恢复值
+	itemMeta, err := repository.GetItemByID(uint(itemID))
+	if err != nil {
+		return nil, err
+	}
+	hpRec := 0
+	mpRec := 0
+	if itemMeta != nil {
+		// 消耗品（ItemType == 0）才有恢复值
+		if itemMeta.ItemType == 0 || itemMeta.ItemType == 2 {
+			hpRec = itemMeta.HPRecovery
+			mpRec = itemMeta.MPRecovery
+		}
+	}
+
+	// 扣除 1 个
+	items[targetIdx].Quantity -= 1
+	if items[targetIdx].Quantity <= 0 {
+		if err := repository.DeleteCharacterItem(items[targetIdx].ID); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := repository.UpdateCharacterItem(&items[targetIdx]); err != nil {
+			return nil, err
+		}
+	}
+
+	return &UseItemResult{
+		ItemID:     itemID,
+		Quantity:   1,
+		HPRecovery: hpRec,
+		MPRecovery: mpRec,
+	}, nil
+}

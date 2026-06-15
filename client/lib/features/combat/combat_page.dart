@@ -23,7 +23,6 @@ class _CombatPageState extends State<CombatPage> {
   int _playerHp = 0;
   bool _inCombat = false;
   final List<Widget> _damageWidgets = [];
-  int _damageCounter = 0;
 
   @override
   void initState() {
@@ -53,7 +52,6 @@ class _CombatPageState extends State<CombatPage> {
   void _addDamageWidget(int damage, {bool isPlayer = false}) {
     final key = UniqueKey();
     setState(() {
-      _damageCounter++;
       _damageWidgets.add(
         Positioned(
           key: key,
@@ -152,7 +150,7 @@ class _CombatPageState extends State<CombatPage> {
               decoration: BoxDecoration(
                 color: Colors.red[900],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
               ),
               child: Column(
                 children: [
@@ -197,7 +195,7 @@ class _CombatPageState extends State<CombatPage> {
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.redAccent.withOpacity(0.6),
+                                      color: Colors.redAccent.withValues(alpha: 0.6),
                                       blurRadius: 16,
                                     ),
                                   ],
@@ -241,7 +239,7 @@ class _CombatPageState extends State<CombatPage> {
                                   decoration: BoxDecoration(
                                     color: Colors.purple[700],
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.purpleAccent.withOpacity(0.5)),
+                                    border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.5)),
                                   ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,

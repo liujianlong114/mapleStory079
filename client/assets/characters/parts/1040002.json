@@ -1,0 +1,35 @@
+{
+  "part_id": 1040002,
+  "canvases": [
+    {
+      "name": "mail",
+      "origin_x": 11,
+      "origin_y": 9,
+      "map_anchors": {
+        "navel": {
+          "x": -8,
+          "y": 1
+        }
+      },
+      "z_slot": "mailChest",
+      "width": 14,
+      "height": 14,
+      "z_index": 95
+    },
+    {
+      "name": "mailArm",
+      "origin_x": 3,
+      "origin_y": 4,
+      "map_anchors": {
+        "navel": {
+          "x": -12,
+          "y": 4
+        }
+      },
+      "z_slot": "mailArm",
+      "width": 5,
+      "height": 7,
+      "z_index": 120
+    }
+  ]
+}

@@ -45,21 +45,21 @@ class StatelessButton extends StatelessWidget {
     final bg = color ?? theme.primaryColor;
     final fg = textColor ??
         (theme.brightness == Brightness.dark ? Colors.white : Colors.white);
-    final border = borderColor ?? Colors.black.withOpacity(0.35);
+    final border = borderColor ?? Colors.black.withValues(alpha: 0.35);
 
     return Container(
       width: width,
       height: height,
       constraints: const BoxConstraints(minHeight: 40, minWidth: 80),
       child: Material(
-        color: isDisabled ? bg.withOpacity(0.45) : bg,
+        color: isDisabled ? bg.withValues(alpha: 0.45) : bg,
         borderRadius: BorderRadius.circular(borderRadius ?? 8),
         elevation: isDisabled ? 0 : elevation,
-        shadowColor: Colors.black.withOpacity(0.35),
+        shadowColor: Colors.black.withValues(alpha: 0.35),
         child: InkWell(
           onTap: isDisabled ? null : onPressed,
           borderRadius: BorderRadius.circular(borderRadius ?? 8),
-          overlayColor: WidgetStateProperty.all(fg.withOpacity(0.18)),
+          overlayColor: WidgetStateProperty.all(fg.withValues(alpha: 0.18)),
           child: Container(
             padding: padding ??
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -71,9 +71,9 @@ class StatelessButton extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withOpacity(isDisabled ? 0.05 : 0.18),
+                  Colors.white.withValues(alpha: isDisabled ? 0.05 : 0.18),
                   Colors.transparent,
-                  Colors.black.withOpacity(isDisabled ? 0.05 : 0.22),
+                  Colors.black.withValues(alpha: isDisabled ? 0.05 : 0.22),
                 ],
               ),
             ),
@@ -92,7 +92,7 @@ class StatelessButton extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: textStyle ??
                         TextStyle(
-                          color: isDisabled ? fg.withOpacity(0.6) : fg,
+                          color: isDisabled ? fg.withValues(alpha: 0.6) : fg,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.6,
@@ -137,7 +137,7 @@ class StatelessButtonSecondary extends StatelessWidget {
       padding: padding,
       color: isDark ? const Color(0xFF2a2a4a) : const Color(0xFFe8e2cf),
       textColor: isDark ? const Color(0xFFeaeaea) : const Color(0xFF2c2c2c),
-      borderColor: isDark ? Colors.white.withOpacity(0.25) : Colors.black.withOpacity(0.25),
+      borderColor: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.25),
       elevation: 1,
     );
   }
@@ -167,7 +167,7 @@ class StatelessButtonDanger extends StatelessWidget {
       disabled: disabled,
       color: const Color(0xFFe94560),
       textColor: Colors.white,
-      borderColor: Colors.black.withOpacity(0.35),
+      borderColor: Colors.black.withValues(alpha: 0.35),
       elevation: 3,
     );
   }
@@ -197,7 +197,7 @@ class StatelessButtonSuccess extends StatelessWidget {
       disabled: disabled,
       color: const Color(0xFF27ae60),
       textColor: Colors.white,
-      borderColor: Colors.black.withOpacity(0.35),
+      borderColor: Colors.black.withValues(alpha: 0.35),
       elevation: 3,
     );
   }

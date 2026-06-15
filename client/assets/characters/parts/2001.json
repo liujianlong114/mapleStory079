@@ -1,0 +1,43 @@
+{
+  "part_id": 2001,
+  "canvases": [
+    {
+      "name": "body",
+      "origin_x": 16,
+      "origin_y": 31,
+      "map_anchors": {
+        "neck": {
+          "x": -4,
+          "y": -32
+        },
+        "navel": {
+          "x": -8,
+          "y": -21
+        }
+      },
+      "z_slot": "body",
+      "width": 21,
+      "height": 31,
+      "z_index": 85
+    },
+    {
+      "name": "arm",
+      "origin_x": 5,
+      "origin_y": 9,
+      "map_anchors": {
+        "navel": {
+          "x": -13,
+          "y": -1
+        },
+        "hand": {
+          "x": -1,
+          "y": 5
+        }
+      },
+      "z_slot": "arm",
+      "width": 10,
+      "height": 19,
+      "z_index": 117
+    }
+  ]
+}

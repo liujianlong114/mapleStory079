@@ -79,7 +79,7 @@ class _StarPainter extends CustomPainter {
       final x = rnd.nextDouble() * size.width;
       final y = rnd.nextDouble() * size.height;
       final blink = 0.3 + 0.7 * ((math.sin(t * math.pi * 2 + i) + 1) / 2);
-      paint.color = Colors.white.withOpacity(0.15 + blink * 0.55);
+      paint.color = Colors.white.withValues(alpha: 0.15 + blink * 0.55);
       canvas.drawCircle(Offset(x, y), 0.6 + rnd.nextDouble() * 1.2, paint);
     }
   }
@@ -192,7 +192,7 @@ class _MapleActionButtonState extends State<MapleActionButton> {
             borderRadius: BorderRadius.circular(6),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(disabled ? 0.2 : 0.45),
+                color: Colors.black.withValues(alpha: disabled ? 0.2 : 0.45),
                 blurRadius: 6,
                 offset: Offset(0, 3 - lift),
               ),
@@ -260,7 +260,7 @@ class MapleTitleLogo extends StatelessWidget {
               Text(
                 '079 复刻版',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 4,

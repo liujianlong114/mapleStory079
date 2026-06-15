@@ -1,0 +1,20 @@
+{
+  "part_id": 1040006,
+  "canvases": [
+    {
+      "name": "mail",
+      "origin_x": 11,
+      "origin_y": 9,
+      "map_anchors": {
+        "navel": {
+          "x": -8,
+          "y": 0
+        }
+      },
+      "z_slot": "mailChestBelowPants",
+      "width": 14,
+      "height": 13,
+      "z_index": 87
+    }
+  ]
+}

@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../models/mob.dart';
-import '../models/character.dart';
 import '../models/skill.dart';
 import 'game_provider.dart';
 
@@ -164,9 +163,9 @@ class CombatProvider with ChangeNotifier {
     final finalDamage = (damage * skillMult).toInt();
 
     if (skill != null) {
-      _addLog('🔮 ${skill.name} 造成 ${finalDamage}${isCritical ? ' (暴击!)' : ''} 点伤害');
+      _addLog('🔮 $skill.name 造成 $finalDamage${isCritical ? ' (暴击!)' : ''} 点伤害');
     } else {
-      _addLog('⚔️ 普通攻击造成 ${finalDamage}${isCritical ? ' (暴击!)' : ''} 点伤害');
+      _addLog('⚔️ 普通攻击造成 $finalDamage${isCritical ? ' (暴击!)' : ''} 点伤害');
     }
 
     if (_mobs.isNotEmpty) {

@@ -1,0 +1,20 @@
+{
+  "part_id": 30030,
+  "canvases": [
+    {
+      "name": "hair",
+      "origin_x": 14,
+      "origin_y": 12,
+      "map_anchors": {
+        "brow": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "z_slot": "hair",
+      "width": 35,
+      "height": 22,
+      "z_index": 136
+    }
+  ]
+}

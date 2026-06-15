@@ -90,7 +90,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     await StorageService().saveCharacterId(c.id);
     if (mounted) {
       await AudioManager().stopBgm();
-      Navigator.of(context).pushReplacementNamed('/game-scene');
+      if (mounted) Navigator.of(context).pushReplacementNamed('/game-scene');
     }
   }
 
@@ -271,7 +271,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                     AudioManager().playUiClick();
                     await AudioManager().stopBgm();
                     auth.logout();
-                    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+                    if (context.mounted) Navigator.of(context).pushReplacementNamed('/login');
                   },
                 ),
               ],

@@ -2,7 +2,7 @@
 
 > **用途**：以官方 079 客户端 WZ 资源 + `ms079-main` 服务端逻辑为基准，指导后续所有客户端/服务端/资源改动。  
 > **原则**：业务规则跟 Java 源码，画面跟 WZ，**不手搓假 UI**（禁止再用 `build_login_scene` 生成街机框背景）。
-> **最后更新**：2026-06-15（周期 #34：P1 #14 传送门地图切换（portal_name 触发 warp））
+> **最后更新**：2026-06-15（周期 #57：维护期例行健康检查；`go build ./cmd/server` ✅ exit 0；`flutter analyze client` ✅ **No issues found!**（0 error / 0 warning / 0 info，连续七轮零缺陷）；assets PNG 总量 12,222 张（与上轮持平，分布无变化）；项目主线已交付，进入持续维护期）
 
 ---
 
@@ -540,7 +540,7 @@ go run scripts/check_assets/main.go
 
 | # | 现象 | 根因 | 计划 |
 |---|------|------|------|
-| **A** | 人/怪/NPC 脚点与地砖视觉错位、悬空或埋地 | 多层 foothold（425/605）+ tile 层 zM 混渲；部分 tile 占位图 origin 不准 | 对照 `grassySoil.img.xml` 校验 origin；按 fhlayer 过滤或 Y 排序 tile；逐坐标验收 |
+| **A**（已完成，周期 #42 / #44 补全） | 人/怪/NPC 脚点与地砖视觉错位、悬空或埋地 | 多层 foothold（425/605）+ tile 层 zM 混渲；Mob 之前未按 layer 过滤，导致怪物在多平台场景跳层 | 玩家：`getFhidBelow(preferredLayer)` + `snapSpawn/groundYAt/landingYAt`；Mob：`MobComponent._preferredFhLayer` 生成时注入 + `addMob/_onServerMobSpawn` 用 `snapSpawn` 记录 layer；NPC：`snapSpawnY` 脚点 snap；`wz_map_foreground.dart` tile 按玩家层渲染；`go build` + `flutter analyze` 0 error |
 | **B** | 浏览器仍见旧顶栏 HUD（黄框属性条） | Flutter Web 缓存 / 未硬刷新 | 用户 Cmd+Shift+R；确认 `game_scene_page` 仅用 `MapleStatusBar` |
 | **C** | 部分怪物红块占位 | MobId 无对应 `sprites/mob/{id}.png` | `extract_mobs_npcs.py --id` 补提取 + manifest |
 | **D** | 地图边缘地砖呈「石墙满屏」 | enV0 竖边 tile 叠层 + 占位 PNG | 优先真实 WZ decode；失败项用 XML 尺寸占位并核对 ox/oy |
@@ -555,7 +555,7 @@ go run scripts/check_assets/main.go
 |---|------|------|------|------|
 | 1 | **完成（周期 #21）** | 彩虹村脚点/贴图逐段验收（spawn、希娜、out00） | HeavenClient FootholdTree + `000010000.img.xml` 对照 `100000000.json` footholds | foothold 无 id 时自动补；玩家脚底 snapSpawn；NPC 按 maplife Y；调试 overlay 可绘制 foothold/脚点十字 |
 | 2 | **完成（周期 #22）** | 补全/修正 tile PNG（enV0/enH0/edU 非占位） | `_ext_grassy_soil.py`（wz-python decode + 枚举 offset/尺寸/像素格式） | `maps/tiles/grassySoil/*.png` 22/22 非占位；json 仅存 ox/oy/w/h |
-| 3 | **完成（周期 #23）** | 怪物精灵补缺（蘑菇、野猪等新手怪） | `Mob.wz` + `extract_mobs_npcs.py --ids 100100,1110100,...`（first_canvas 处理 info/default + link 重定向） | `sprites/mob/{id}.png` 非 placeholder；彩虹村/新手岛关键 mob&npc 精灵 OK |
+| 3 | **完成（周期 #45）** | 怪物精灵 PNG 全量补缺 + link 重定向（§11.2 P0 第三项） | `extract_mobs_npcs.py --all --force`；`extract_mob` 新增 `info/link` 重定向处理（follow link → linked img → stand/move pose）+ move_frames 同样 follow link；WZ 扫描 403 个 link mob | `scripts/extract_wz_py/extract_mobs_npcs.py` link 处理；Mob 1584/1614 提取（+402）；`sprites/mob/` real PNG 3760 个（+791）；剩余 23 个 WZ decode 失败（均为 BOSS 精灵格式特殊，非游戏地图怪）；`go build` + `flutter analyze` 0 error；彩虹村蘑菇猪(100101)/绿水灵(120100)/绿蘑菇(1210102) 均可见真实 WZ sprite |
 | 4 | **完成（周期 #24）** | 下跳穿板 + 绳梯（rope/ladder obj） | HeavenClient `PhysicsObject::Flag::CHECKBELOW` + `Foothold::prev/next==0` 判定薄平台；WZ obj `l0=rope/ladder` 解析 | `game_world.dart` 下跳（仅薄平台/跳+↓）；`MapMetaFull._extractRopeLadders`；玩家靠近+↑攀爬、Space 跳离；ladder 锁 X / rope 允许微调 |
 
 #### P1 — 079 体验对齐
@@ -573,14 +573,20 @@ go run scripts/check_assets/main.go
 | 13 | **完成（周期 #33）** | NPC 转职正式流程（按职业分配 SP + 升级 MaxHP/MP 回写） | `npc_service.go` `JobChangeScript`：等级<10 提示"你还需要更多修炼"；`ExecuteAction` 按 079 标准计算 SP 补偿（超过 10 级部分 × 3 SP）；`applyJobInitialStats` 写入 `Class/STR/DEX/INT/LUK/MaxHP/MaxMP/HP/MP`；`DialogueEffect` 新增 `NewSP/NewMaxHP/NewMaxMP` 字段；`GainExp`/`LevelUpCharacter` API 返回 `sp/max_hp/max_mp`；Dart `GameState.updateFromJson` + `GameProvider.syncFromGameWorld` 支持 `sp` 同步 |
 | 14 | **完成（周期 #34）** | 传送门地图切换（portal_name 触发 warp，服务端落位 + 客户端重载场景） | `game_service.go` `spawnForMap` 扩展至 10 张以上主城镇（彩虹村/明珠港/射手村/魔法密林/勇士部落/废弃都市/冰峰雪域/玩具城/天空之城）+ 训练场/BOSS 地图；`npc_service.go` `PortalScript`：选项含各主城，`ExecuteAction` 解析 `mapId|portalName`，调用 `spawnForMap` 落位；`DialogueEffect` 新增 `NewPositionX/NewPositionY` 字段；`game_scene_page.dart` `_runDialogueLoop` 检测 `effects.new_map_id` → `GameProvider.warpToMap` → `pushReplacementNamed` 重载场景；`MapMetaFull.hasAsset/load` + `MapMeta.loadForMap` 扩展 ID 回退至已导出 JSON（1000000/20000/101000000/102000000/103000000/104000000/100000000） |
 | 15 | **完成（周期 #36）** | 怪物掉落系统（MapleItem 实体 + 初始弹跳 + 浮动 + 20s 超时 + 拾取入背包 + mesos 掉落通知） | 新增 `client/lib/game/engine/ground_loot_component.dart`（dropId/itemId/quantity/isMesos；`update` 前 0.6s 抛物线弹跳 + 之后 sin 浮动；`render` 绘制阴影 + `SpriteLoader.tryLoad('sprites/item/{id}.png')`，失败时占位方+文字，最后 3s 闪烁；`_baseY` + `_expired` 由 GameWorld 每帧清理）；新增 `client/lib/widgets/maple_pickup_notice.dart`（`MaplePickupNoticeState.notify/notifyItem/notifyMesos`，最多 4 条向上渐隐弹幕，`AnimationController` + `Opacity` + `Transform.translate`）；`game_world.dart` 引入 `ground_loot_component.dart`；删除内联旧 `GroundLootComponent`，`_tryAutoPickup` 增加 `loot.expired` 过期清理 |
+| 16 | **完成（周期 #38）** | 怪物 AI 状态机（idle → patrol → chase → attack + foothold 判定斜坡行走） | Go `MobInstance.AIState/Fhid` 字段（idle/patrol/chase/attack）；Flutter `MobAIState` 枚举 + `Mob.aiState/currentFhid`；`MobComponent.updateAI` 使用 `MapFootholds.groundYAt` 获取地面高度，支持斜坡行走；WS `mob_move` 同步 `ai_state/fhid`；`go build ./cmd/server` + `flutter analyze client` 通过 |
+| 17 | **完成（周期 #42）** | HUD 金币显示 + use-item 回写 mesos（P1 #9） | `MapleStatusBar` 左上新增 `金币 <mesos>`（千/百万缩写 k/m）；`game_handler.go` `UseItem` 响应新增 `mesos` 字段；`game_scene_page.dart` `_onUseItem` 调用 `gp.syncFromGameWorld(mesos:)` 同步金币；`go build ./cmd/server` 通过；`flutter analyze client` 0 error |
+| 18 | **完成（周期 #42）** | P0 §11.1 残留 — 玩家/怪物/NPC 脚点与地砖视觉错位（多层 foothold 场景） | `map_foothold.dart` `getFhidBelow` 新增 `preferredLayer` + `layerOf` + `snapSpawn/groundYAt/landingYAt` 支持 layer；`game_world.dart` 暴露 `playerFootholdLayer`，并在跳跃/行走/着陆传入 `preferredLayer`；`wz_map_foreground.dart` 每个 tile 按底部 y 估算对应 foothold layer，渲染时仅绘制 `footholdLayer == playerLayer` 的 tile（obj 全量绘制）；避免玩家站下层时上层 tile 从头顶盖下；`go build ./cmd/server` 通过；`flutter analyze client` 0 error |
 
 #### P2 — 登录与角色
 
 | # | 任务 | 说明 |
 |---|------|------|
-| 10 | MapLogin2 镜头平滑滚动 | 标题→选角非硬切 camera |
-| 11 | 全量 Character 部件缓存 | `extract_avatars.py --all` 或按需 |
+| 10 | **完成（周期 #39）** MapLogin2 镜头平滑滚动 | `MapLoginParallax.camera` 全局共享 `ValueNotifier`；`MapLoginParallax.setTarget(x, y, {duration})` 使用独立 `AnimationController` + `Curves.easeInOutCubic` 插值；`WzSceneScreen` 在挂载时 `addPostFrameCallback` 调用 `setTarget`；首次进入瞬时对齐，避免首屏抖动；切换间 650ms 平滑平移，而非硬切 |
+| 11 | **完成（周期 #40）** 全量 Character 部件缓存 + 本地合成 | `extract_parts.py --force`（32 个 JSON 元数据）+ `LocalCharacterComposer`（锚点链式定位 + z-map）+ `LookComposeImage` 四级回退（后端→LocalComposer→预烘焙→占位符）；`go build` + `flutter analyze` 通过 |
 | 12 | **完成（周期 #35）** UI.img 点击音效 | CharSelect/BtMouseClick 统一 `AudioManager.playUiClick`；Login/Gender/WorldSelect/CharSelect/NpcShopPanel 等 UI 按钮均接入音效 |
+| 13 | **完成（周期 #41）** `withOpacity` 全部替换为 `withValues`（lint 清理）+ 修复 `maplogin_parallax.dart` 缺失 `Ticker` import | 51 处 `Color.withOpacity(x)` 全部改为 `Color.withValues(alpha: x)`，覆盖 11 个文件；额外修复周期 #39 留下的 `import 'package:flutter/scheduler.dart'` 缺失（导致 3 个 error）；`flutter analyze` 0 error（52 issues，全部 info/warning） |
+| 14 | **完成（周期 #43）** P2 §11.2 lint 清理 — `MaterialState` → `WidgetState` + unused_field/import/unnecessary_cast | `app_theme.dart` 8 处 `MaterialStateProperty` → `WidgetStateProperty` + 3 处 `MaterialState.*` → `WidgetState.*`；删除 `combat_page._damageCounter`、`maple_avatar_view._fallbackAvatarPaths` + 未用 import、`wz_widgets._fallback()`、`skills_page` 未用 import、`game_world._cameraFootOffset`、`local_character_composer._CanvasRef` 未传 `topLeft` 参数、`combat_provider` 未用 import、`inventory_provider._characterId`、`skill_provider._characterId/_characterClass`、`maple_game_panels` 不必要 `as int?` cast、`skill_bar_widget` 未用 import；`flutter analyze` **0 error / 0 warning**（52 → 29，剩余全 info）；`go build ./cmd/server` 通过 |
+| 15 | **完成（周期 #51）** P2 §11.2 0-issue 收尾 — `character_select_page.dart:274` `use_build_context_synchronously` info（`mounted` → `context.mounted`） | 原 `if (mounted)` 是 State.mounted（与 widget `context` 不配对，analyzer 视为 "unrelated mounted check"）；改为 `if (context.mounted)`（BuildContext 层面 guard），与 `Navigator.of(context)` 配对；`flutter analyze client` → **No issues found!（0 error / 0 warning / 0 info）**；自周期 #43 以来首次达到真正零缺陷 |
 
 ### 11.3 已知 WZ 缺口
 
@@ -746,6 +752,14 @@ mapleStory079/
 ## 17. 变更记录
 
 | 日期 | 摘要 |
+|------|------|
+| 2026-06-15 | 周期 #57：维护期例行健康检查 — `go build ./cmd/server` ✅ exit 0；`flutter analyze client` ✅ **No issues found!**（0 error / 0 warning / 0 info，连续七轮零缺陷）；资源 12,222 real PNG 持平；项目保持稳定运行 |
+| 2026-06-15 | 周期 #51：维护期 0-issue 收尾 — 修复 `character_select_page.dart:274` `use_build_context_synchronously` info（`if (mounted)` → `if (context.mounted)`，让 BuildContext guard 与 widget context 配对）；`flutter analyze client` → **No issues found!**（0 error / 0 warning / 0 info），自周期 #43 以来首次；`go build ./cmd/server` ✅ exit 0；资源 12,222 real PNG 持平；§11.2 P2 #15 标记完成 |
+| 2026-06-15 | 周期 #38：怪物 AI 状态机：Go `MobInstance.AIState/Fhid` 字段（idle/patrol/chase/attack）；Flutter `MobAIState` 枚举 + `Mob.aiState/currentFhid`；`MobComponent.updateAI` 使用 `MapFootholds.groundYAt` 获取地面高度，支持斜坡行走；WS `mob_move` 同步 `ai_state/fhid`；`go build ./cmd/server` + `flutter analyze client` 通过；§11.2 P1 #16 标记完成 |
+| 2026-06-15 | 周期 #37：HP/MP 药水使用：Go `InventoryService.UseItem`（查找背包消耗品、扣除1个数量、读取 Item.HPRecovery/MPRecovery 返回恢复值），`GameHandler.UseItem`（调用 UseItem + `GameService.Restore`），`POST /game/use-item` 路由；Flutter `ApiService.useItem`（调用 `/game/use-item`），`MapleQuickSlotBar`（底部快捷道具栏，显示消耗品图标，点击调用 `_onUseItem` → `api.useItem` → 更新 GameProvider/GameWorld HP/MP → `MaplePickupNotice` 显示"恢复 HP+100 MP+50" → `GameWorld.playEffect('drink')`）；`go build ./cmd/server` + `flutter analyze client` 通过；§11.2 P1 #16 标记完成 |
+| 2026-06-15 | 周期 #42：P0 §11.1 残留脚点与 tile 错位修复：`map_foothold.dart` `getFhidBelow(x,y,preferredLayer:)` 同层优先 + fallback；`layerOf(fhid)` + `snapSpawn/groundYAt/landingYAt` 支持 `preferredLayer`；`game_world.dart` 暴露 `playerFootholdLayer`，跳跃/行走/着陆传入 `preferredLayer: layerOf(_playerFhid)`，保持玩家停留在进入层；`wz_map_foreground.dart` 每个 tile 按底部 y 估算对应 foothold layer，渲染时仅绘制 `footholdLayer == playerLayer` 的 tile（obj 全量绘制）；避免玩家站下层时上层 tile 从头顶盖下；`go build ./cmd/server` 通过；`flutter analyze client` 0 error；§11.2 #18 + §11.1 A 标记完成 |
+| 2026-06-15 | 周期 #41：51 处 `Color.withOpacity(x)` → `Color.withValues(alpha: x)`（11 个文件：game_world.dart / game_scene_page.dart / combat_page.dart / player_stats.dart / maple_island_map_layer.dart / maple_ui.dart / app_theme.dart / stateless_button.dart / skill_bar_widget.dart / npc_dialogue_widget.dart / game_chat.dart）；额外修复 `client/lib/features/maple/maplogin_parallax.dart` 周期 #39 留下的缺失 `import 'package:flutter/scheduler.dart'`（3 个 error：undefined Ticker / TickerCallback）；`flutter analyze client` 0 error（52 issues，全 info/warning）；§11.2 P2 #13 标记完成 |
+| 2026-06-15 | 周期 #43：P2 §11.2 lint 清理（info 收尾）：`app_theme.dart` 多处 `prefer_const_constructors`（AppBarTheme/iconTheme/BorderSide/TextStyle）；`character_select_page.dart` 加 `if(mounted)` guard；`chat_page.dart` `final`→`const`；`official_game_viewport.dart` 删除 `dart:ui` import；`maplogin_parallax.dart` `_MapLoginCameraValue`→`MapLoginCameraValue`（public 类型）+ 6 处 `const Offset`；`game_world.dart` `HasGameRef`→`HasGameReference`（Flame 2.x）；`map_render_utils.dart` 删除 `flame/components.dart`；`combat_provider.dart` `${finalDamage}`→`$finalDamage`；`skill_bar_widget.dart` 移除不必要字符串插值包裹；`game_scene_smoke_test.dart` `MaterialApp`→`const MaterialApp`；`flutter analyze client` 0 error / 0 warning / **1 info**（`character_select_page.dart:274` `use_build_context_synchronously` 误报）；`go build ./cmd/server` 通过；§11.2 P2 lint 完成 |
 |------|------|
 | 2026-06-15 | 周期 #36：新增 `client/lib/game/engine/ground_loot_component.dart`（地面掉落 MapleItem/meso：dropId/itemId/quantity/isMesos；前 0.6s 抛物线弹跳 + 之后 sin 浮动；20s 超时 `expired=true`；最后 3s 闪烁；render 含阴影 + `SpriteLoader.tryLoad('sprites/item/{id}.png')`，失败时占位方+文字；右下角 `×quantity` 标签）；新增 `client/lib/widgets/maple_pickup_notice.dart`（`MaplePickupNoticeState` 暴露 `notify/notifyItem/notifyMesos`；最多 4 条向上渐隐弹幕，`AnimationController` + `Opacity` + `Transform.translate`）；`game_world.dart` 引入 `ground_loot_component.dart`，删除内联旧 `GroundLootComponent`；`_tryAutoPickup` 增加 `loot.expired` 过期清理；`go build ./cmd/server` 通过；`flutter analyze client` 无新增 error；§11.2 P1 #15 标记完成 |
 |------|------|

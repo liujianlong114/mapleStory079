@@ -2,14 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/Advanced-MapleLauncher" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/HeavenClient" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/HeavenMS" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/MapleStory-Server-079" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/ZLHSS2" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/cc-079-ms" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/cc-079-ms-gitee" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/ellermister-MapleStory" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/examples/mxd079-gitee" vcs="Git" />
   </component>
 </project>

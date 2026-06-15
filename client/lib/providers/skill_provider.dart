@@ -7,8 +7,6 @@ import '../services/api_service.dart';
 class SkillProvider with ChangeNotifier {
   final ApiService _api = ApiService();
 
-  int _characterId = 0;
-  int _characterClass = 0;
   final List<Skill> _skills = [];
   final Map<int, int> _skillLevels = {};
   final Map<int, DateTime> _cooldowns = {};
@@ -39,8 +37,6 @@ class SkillProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> loadSkills(int characterId, int characterClass) async {
-    _characterId = characterId;
-    _characterClass = characterClass;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

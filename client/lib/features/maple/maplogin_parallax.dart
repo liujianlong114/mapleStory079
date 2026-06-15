@@ -3,15 +3,54 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+
+/// MapLogin2 镜头中心（世界坐标）。标题屏约 (22, -1785)，选角屏约 (290, -1220)。
+/// 通过 [MapLoginParallax.setTarget] 可在各页面间平滑平移镜头。
+class MapLoginCameraValue {
+  final double x;
+  final double y;
+  const MapLoginCameraValue(this.x, this.y);
+}
 
 /// 079 MapLogin2 视差背景（优先使用 WZ 提取的 back/*.png）
 class MapLoginParallax extends StatefulWidget {
   final int width;
   final int height;
-  /// MapLogin2 镜头中心（世界坐标）。选角屏约 (290, -1220)。
   final double cameraX;
   final double cameraY;
+  final Duration defaultDuration;
+
+  /// 全局共享的镜头状态；所有 [MapLoginParallax] 实例监听同一 notifier。
+  static final ValueNotifier<MapLoginCameraValue> camera =
+      ValueNotifier<MapLoginCameraValue>(const MapLoginCameraValue(22, -1785));
+  static bool _everAnimated = false;
+
+  /// 将镜头平滑平移到新目标。若不传 [duration] 则保持瞬时（或使用默认 650ms）。
+  static void setTarget(double x, double y, {Duration? duration}) {
+    final d = duration ?? const Duration(milliseconds: 650);
+    final from = camera.value;
+    final to = MapLoginCameraValue(x, y);
+    if ((from.x - to.x).abs() < 1e-6 && (from.y - to.y).abs() < 1e-6) return;
+    _everAnimated = true;
+    final ctrl = AnimationController(vsync: _MapLoginTickerProvider.instance, duration: d);
+    final tween = Tween<double>(begin: 0, end: 1)
+        .chain(CurveTween(curve: Curves.easeInOutCubic));
+    ctrl.addListener(() {
+      final t = tween.transform(ctrl.value);
+      camera.value = MapLoginCameraValue(
+        from.x + (to.x - from.x) * t,
+        from.y + (to.y - from.y) * t,
+      );
+    });
+    ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        ctrl.dispose();
+      }
+    });
+    ctrl.forward();
+  }
 
   const MapLoginParallax({
     super.key,
@@ -19,10 +58,17 @@ class MapLoginParallax extends StatefulWidget {
     this.height = 600,
     this.cameraX = 0,
     this.cameraY = 0,
+    this.defaultDuration = const Duration(milliseconds: 650),
   });
 
   @override
   State<MapLoginParallax> createState() => _MapLoginParallaxState();
+}
+
+class _MapLoginTickerProvider implements TickerProvider {
+  static final _MapLoginTickerProvider instance = _MapLoginTickerProvider();
+  @override
+  Ticker createTicker(TickerCallback onTick) => Ticker(onTick);
 }
 
 class _MapLoginParallaxState extends State<MapLoginParallax>
@@ -41,6 +87,15 @@ class _MapLoginParallaxState extends State<MapLoginParallax>
       })
       ..repeat();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 若已执行过至少一次 setTarget，则继续平滑；否则第一次进入直接对齐当前页，
+      // 避免首屏从默认 (22,-1785) 缓入到标题屏产生抖动。
+      if (MapLoginParallax._everAnimated) {
+        MapLoginParallax.setTarget(widget.cameraX, widget.cameraY, duration: widget.defaultDuration);
+      } else {
+        MapLoginParallax.camera.value = MapLoginCameraValue(widget.cameraX, widget.cameraY);
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -82,15 +137,21 @@ class _MapLoginParallaxState extends State<MapLoginParallax>
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(widget.width.toDouble(), widget.height.toDouble()),
-      painter: _MapLoginPainter(
-        layers: _layers,
-        t: _t,
-        backImages: _backImages,
-        cameraX: widget.cameraX,
-        cameraY: widget.cameraY,
-      ),
+    return AnimatedBuilder(
+      animation: MapLoginParallax.camera,
+      builder: (_, __) {
+        final cam = MapLoginParallax.camera.value;
+        return CustomPaint(
+          size: Size(widget.width.toDouble(), widget.height.toDouble()),
+          painter: _MapLoginPainter(
+            layers: _layers,
+            t: _t,
+            backImages: _backImages,
+            cameraX: cam.x,
+            cameraY: cam.y,
+          ),
+        );
+      },
     );
   }
 }
@@ -334,21 +395,21 @@ class _MapLoginPainter extends CustomPainter {
   void _drawMushroom(Canvas c, Offset o, int seed) {
     final rng = math.Random(seed + 79);
     final capR = 22.0 + rng.nextDouble() * 12;
-    c.drawCircle(o + Offset(0, -8), capR, Paint()..color = Color.lerp(const Color(0xFFCC3333), const Color(0xFFDD6644), rng.nextDouble())!);
+    c.drawCircle(o + const Offset(0, -8), capR, Paint()..color = Color.lerp(const Color(0xFFCC3333), const Color(0xFFDD6644), rng.nextDouble())!);
     c.drawRect(
-      Rect.fromCenter(center: o + Offset(0, 12), width: 14, height: 28),
+      Rect.fromCenter(center: o + const Offset(0, 12), width: 14, height: 28),
       Paint()..color = const Color(0xFFF5E6C8),
     );
   }
 
   void _drawTree(Canvas c, Offset o, double w, double h) {
     c.drawRect(
-      Rect.fromCenter(center: o + Offset(0, 20), width: 12, height: 40),
+      Rect.fromCenter(center: o + const Offset(0, 20), width: 12, height: 40),
       Paint()..color = const Color(0xFF5D4037),
     );
-    c.drawCircle(o + Offset(0, -10), 28, Paint()..color = const Color(0xFF2E7D32));
-    c.drawCircle(o + Offset(-12, 0), 20, Paint()..color = const Color(0xFF388E3C));
-    c.drawCircle(o + Offset(12, 0), 20, Paint()..color = const Color(0xFF43A047));
+    c.drawCircle(o + const Offset(0, -10), 28, Paint()..color = const Color(0xFF2E7D32));
+    c.drawCircle(o + const Offset(-12, 0), 20, Paint()..color = const Color(0xFF388E3C));
+    c.drawCircle(o + const Offset(12, 0), 20, Paint()..color = const Color(0xFF43A047));
   }
 
   void _drawVignette(Canvas c, Size size) {

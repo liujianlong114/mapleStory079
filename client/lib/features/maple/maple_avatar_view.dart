@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/resources/avatar_assets.dart';
 import '../../models/char_look.dart';
-import '../character/beginner_creation_catalog.dart';
 import 'look_compose_image.dart';
 import 'wz_asset_image.dart';
 
@@ -64,19 +63,6 @@ class MapleAvatarView extends StatelessWidget {
       eyeAcc: eyeAcc,
       earring: earring,
       longcoat: longcoat,
-    );
-  }
-
-  List<String> get _fallbackAvatarPaths {
-    final d = BeginnerCreationCatalog.defaults(gender);
-    return AvatarAssets.candidatePaths(
-      gender: d.gender,
-      face: d.face,
-      hair: d.hair,
-      top: d.top,
-      bottom: d.bottom,
-      shoes: d.shoes,
-      weapon: d.weapon,
     );
   }
 

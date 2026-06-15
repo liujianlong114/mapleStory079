@@ -188,6 +188,19 @@ class MapleStatusBar extends StatelessWidget {
               alignment: Alignment.centerRight,
             ),
           ),
+          // 金币（Mesos）
+          Positioned(
+            left: 120,
+            top: 28,
+            child: Text(
+              '金币 ${_formatMesos(gp.mesos)}',
+              style: const TextStyle(
+                color: Color(0xFFc9a227),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           // 快捷键
           Positioned(
             left: 58,
@@ -241,5 +254,11 @@ class MapleStatusBar extends StatelessWidget {
       },
       child: Image.asset(asset, width: 43, height: 34, filterQuality: FilterQuality.none),
     );
+  }
+
+  static String _formatMesos(int mesos) {
+    if (mesos < 1000) return mesos.toString();
+    if (mesos < 1000000) return '${(mesos / 1000).toStringAsFixed(1)}k';
+    return '${(mesos / 1000000).toStringAsFixed(1)}m';
   }
 }

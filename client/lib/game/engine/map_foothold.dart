@@ -132,18 +132,30 @@ class MapFootholds {
     }
   }
 
-  /// HeavenClient FootholdTree::get_fhid_below — 脚下最近可站立面（Y ≥ fy 且最小）
-  int? getFhidBelow(double x, double y) {
+  /// 在 x 处，从 y 向上找第一个 Y ≥ y 且 layer 匹配的可站立面。
+  ///
+  /// preferredLayer 表示玩家所处"逻辑层"（从上次 fhid.layer 继承）。
+  /// —— 存在同 layer 段时优先返回，避免多层地图中玩家"飘"到上层平台或嵌入下层。
+  int? getFhidBelow(double x, double y, {int? preferredLayer}) {
     var bestId = 0;
     var bestY = borderBottom;
+    var fallbackId = 0;
+    var fallbackY = borderBottom;
     for (final fh in _walkableAtX(x)) {
       final gy = fh.groundBelow(x);
-      if (bestY >= gy && gy >= y) {
+      if (gy < y) continue;
+      if (gy < fallbackY) {
+        fallbackY = gy;
+        fallbackId = fh.id;
+      }
+      if (preferredLayer != null && fh.layer != preferredLayer) continue;
+      if (gy < bestY) {
         bestY = gy;
         bestId = fh.id;
       }
     }
-    return bestId > 0 ? bestId : null;
+    if (bestId > 0) return bestId;
+    return fallbackId > 0 ? fallbackId : null;
   }
 
   double? groundYOnFh(int fhid, double x) {
@@ -161,15 +173,15 @@ class MapFootholds {
     return out;
   }
 
-  double? groundYAt(double x, {double? feetY, double tolerance = 8}) {
+  double? groundYAt(double x, {double? feetY, double tolerance = 8, int? preferredLayer}) {
     final refY = feetY ?? fallbackY;
-    final fhid = getFhidBelow(x, refY - tolerance);
+    final fhid = getFhidBelow(x, refY - tolerance, preferredLayer: preferredLayer);
     if (fhid != null) return groundYOnFh(fhid, x);
     return null;
   }
 
-  double? landingYAt(double x, double feetY, {double tolerance = 6}) {
-    return groundYAt(x, feetY: feetY - tolerance);
+  double? landingYAt(double x, double feetY, {double tolerance = 6, int? preferredLayer}) {
+    return groundYAt(x, feetY: feetY - tolerance, preferredLayer: preferredLayer);
   }
 
   double? lowestWalkableYAt(double x) {
@@ -178,15 +190,21 @@ class MapFootholds {
     return ys.reduce(math.max);
   }
 
-  /// 出生/传送：优先 fhid 落点
-  ({int? fhid, double y}) snapSpawn(double x, double hintY) {
-    var fhid = getFhidBelow(x, hintY);
+  /// 出生/传送：优先 fhid 落点（含 layer 记忆）
+  ({int? fhid, double y}) snapSpawn(double x, double hintY, {int? preferredLayer}) {
+    var fhid = getFhidBelow(x, hintY, preferredLayer: preferredLayer);
     fhid ??= getFhidBelow(x, hintY - 120);
     if (fhid != null) {
       final gy = groundYOnFh(fhid, x);
       if (gy != null) return (fhid: fhid, y: gy);
     }
     return (fhid: null, y: lowestWalkableYAt(x) ?? hintY);
+  }
+
+  /// 给定 fhid，返回其 layer（若未知则 null）
+  int? layerOf(int? fhid) {
+    if (fhid == null || fhid <= 0) return null;
+    return byId[fhid]?.layer;
   }
 
   /// maplife 的 fh 字段 → 脚点 Y

@@ -1,0 +1,50 @@
+{
+  "part_id": 30027,
+  "canvases": [
+    {
+      "name": "hairOverHead",
+      "origin_x": 21,
+      "origin_y": 16,
+      "map_anchors": {
+        "brow": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "z_slot": "hairOverHead",
+      "width": 44,
+      "height": 38,
+      "z_index": 140
+    },
+    {
+      "name": "hair",
+      "origin_x": 14,
+      "origin_y": 12,
+      "map_anchors": {
+        "brow": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "z_slot": "hair",
+      "width": 35,
+      "height": 31,
+      "z_index": 136
+    },
+    {
+      "name": "hairBelowBody",
+      "origin_x": 12,
+      "origin_y": 12,
+      "map_anchors": {
+        "brow": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "z_slot": "hairBelowBody",
+      "width": 33,
+      "height": 41,
+      "z_index": 79
+    }
+  ]
+}

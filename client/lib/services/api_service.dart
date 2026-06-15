@@ -338,6 +338,25 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> useItem({
+    required int characterId,
+    required int itemId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/game/use-item'),
+        headers: _headers(),
+        body: jsonEncode({
+          'character_id': characterId,
+          'item_id': itemId,
+        }),
+      );
+      return await _handleResponse(response);
+    } catch (_) {
+      return {'success': false};
+    }
+  }
+
   Future<List<GameMap>> getAllMaps() async {
     final response = await http.get(
       Uri.parse('${AppConfig.apiBaseUrl}/maps'),

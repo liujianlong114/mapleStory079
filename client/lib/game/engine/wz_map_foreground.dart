@@ -7,12 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/resources/assets.dart';
+import 'game_world.dart';
+import 'map_foothold.dart';
 import 'map_render_utils.dart';
 import 'wz_map_layer.dart';
 
-/// 079 地图 Tile + Obj 前景层（HeavenClient MapTilesObjs）
+/// 079 地图 Tile + Obj 前景层（HeavenClient MapTilesObjs）。
 ///
-/// **世界坐标 1:1 像素**：`screen = world + viewpos`，origin 从锚点减去。
+/// tile 按"玩家所在 foothold layer"过滤渲染，避免多层地图中上层 tile
+/// 覆盖在玩家头上（视觉错位），同时保留 obj 全量绘制。
 class WzMapForegroundLayer extends PositionComponent
     with HasGameReference<FlameGame> {
   WzMapForegroundLayer({
@@ -32,6 +35,9 @@ class WzMapForegroundLayer extends PositionComponent
   final List<MapForegroundLayerDef> _layerDefs = [];
   final List<_DrawItem> _items = [];
 
+  /// 加载时从 GameWorld 取到的 foothold 树（可为空）
+  MapFootholds? _footholds;
+
   /// WZ 无法解码时，用相近真实贴图代替（禁止渲染 placeholder 色块）
   static const Map<String, String> _tileFallback = {
     'enH0': 'bsc',
@@ -50,6 +56,7 @@ class WzMapForegroundLayer extends PositionComponent
     final layers = full?.mapLayers ?? [];
     if (layers.isEmpty) return;
     _layerDefs.addAll(layers);
+    _footholds = full?.footholds;
 
     for (final layer in layers) {
       final tS = layer.tS.isNotEmpty ? layer.tS : 'grassySoil';
@@ -76,6 +83,15 @@ class WzMapForegroundLayer extends PositionComponent
       for (final t in layer.tiles) {
         final img = await _loadTileImage(tS, t.u, t.no);
         if (img == null) continue;
+        // 按 tile 底部 y 估算对应 foothold layer，供渲染时按玩家所在层过滤
+        final bottomY = (t.y + img.height - t.oy).toDouble();
+        final fx = t.x.toDouble();
+        int? fhLayer;
+        final fhs = _footholds;
+        if (fhs != null) {
+          final fhid = fhs.getFhidBelow(fx, bottomY - 8);
+          if (fhid != null) fhLayer = fhs.segmentById(fhid)?.layer;
+        }
         _items.add(
           _DrawItem(
             layerId: layer.id,
@@ -86,6 +102,7 @@ class WzMapForegroundLayer extends PositionComponent
             ox: t.ox.toDouble(),
             oy: t.oy.toDouble(),
             image: img,
+            footholdLayer: fhLayer,
           ),
         );
       }
@@ -161,32 +178,43 @@ class WzMapForegroundLayer extends PositionComponent
     final v = MapRenderUtils.msView(game);
     final paint = Paint()..filterQuality = FilterQuality.none;
 
-    // 079 Stage::draw：按 mapLayer id 0→7 逐层绘制（层内已 obj→tile 排序）
+    // 取玩家当前所在 foothold layer（用于 tile 过滤）
+    int? playerLayer;
+    if (game is GameWorld) {
+      playerLayer = (game as GameWorld).playerFootholdLayer;
+    }
+
+    // 079 Stage::draw：按 mapLayer id 0→7 逐层绘制
     for (final layerDef in _layerDefs) {
       for (final item in _items.where((i) => i.layerId == layerDef.id)) {
-      final left = item.x - item.ox;
-      final top = item.y - item.oy;
-      final iw = item.image.width.toDouble();
-      final ih = item.image.height.toDouble();
+        // tile：只渲染"与玩家同层"或"无 layer 信息"的 tile，
+        // 避免上层 tile 在玩家站下层时从头顶盖下来。
+        if (!item.isObj && playerLayer != null && item.footholdLayer != null) {
+          if (item.footholdLayer != playerLayer) continue;
+        }
+        final left = item.x - item.ox;
+        final top = item.y - item.oy;
+        final iw = item.image.width.toDouble();
+        final ih = item.image.height.toDouble();
 
-      // 视口外剔除（世界坐标）
-      final cam = v.cam;
-      if (left + iw < cam.x ||
-          left > cam.x + v.viewW ||
-          top + ih < cam.y ||
-          top > cam.y + v.viewH) {
-        continue;
-      }
+        // 视口外剔除（世界坐标）
+        final cam = v.cam;
+        if (left + iw < cam.x ||
+            left > cam.x + v.viewW ||
+            top + ih < cam.y ||
+            top > cam.y + v.viewH) {
+          continue;
+        }
 
-      if (!item.flip) {
-        canvas.drawImage(item.image, Offset(left, top), paint);
-        continue;
-      }
-      canvas.save();
-      canvas.translate(left + item.ox, top);
-      canvas.scale(-1, 1);
-      canvas.drawImage(item.image, Offset(-item.ox, 0), paint);
-      canvas.restore();
+        if (!item.flip) {
+          canvas.drawImage(item.image, Offset(left, top), paint);
+          continue;
+        }
+        canvas.save();
+        canvas.translate(left + item.ox, top);
+        canvas.scale(-1, 1);
+        canvas.drawImage(item.image, Offset(-item.ox, 0), paint);
+        canvas.restore();
       }
     }
   }
@@ -212,6 +240,7 @@ class _DrawItem {
     required this.oy,
     required this.image,
     this.flip = false,
+    this.footholdLayer,
   });
 
   final int layerId;
@@ -223,4 +252,5 @@ class _DrawItem {
   final double oy;
   final bool flip;
   final ui.Image image;
+  final int? footholdLayer;
 }

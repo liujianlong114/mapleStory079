@@ -69,19 +69,19 @@ class AppTheme {
           letterSpacing: 0.8,
         ),
       ),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: darkBrown,
         foregroundColor: Colors.white,
         elevation: 2,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 18,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
         ),
         iconTheme: IconThemeData(color: gold),
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(6)),
         ),
       ),
@@ -93,8 +93,8 @@ class AppTheme {
         fillColor: beige,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        labelStyle: TextStyle(color: darkBrown, fontSize: 14),
-        hintStyle: TextStyle(color: darkBrown.withOpacity(0.6), fontSize: 14),
+        labelStyle: const TextStyle(color: darkBrown, fontSize: 14),
+        hintStyle: TextStyle(color: darkBrown.withValues(alpha: 0.6), fontSize: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: darkBrown, width: 2),
@@ -105,16 +105,16 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: orange, width: 2),
+          borderSide: const BorderSide(color: orange, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Colors.red, width: 2),
         ),
       ),
-      iconTheme: IconThemeData(color: darkBrown, size: 22),
+      iconTheme: const IconThemeData(color: darkBrown, size: 22),
       dividerTheme: DividerThemeData(
-        color: darkBrown.withOpacity(0.3),
+        color: darkBrown.withValues(alpha: 0.3),
         thickness: 1,
         space: 16,
       ),
@@ -129,12 +129,12 @@ class AppTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: const Color(0xFFFAF3E0),
-        titleTextStyle: TextStyle(
+        titleTextStyle: const TextStyle(
           color: darkText,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
-        contentTextStyle: TextStyle(color: darkText, fontSize: 14),
+        contentTextStyle: const TextStyle(color: darkText, fontSize: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: const BorderSide(color: darkBrown, width: 2),
@@ -149,29 +149,29 @@ class AppTheme {
 
   static ButtonStyle mapleButtonStyle() {
     return ButtonStyle(
-      backgroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.disabled)) {
+      backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.disabled)) {
           return Colors.brown.shade300;
         }
         return orange;
       }),
-      foregroundColor: MaterialStateProperty.all(Colors.white),
-      elevation: MaterialStateProperty.resolveWith<double>((states) {
-        if (states.contains(MaterialState.pressed)) return 1;
-        if (states.contains(MaterialState.hovered)) return 4;
+      foregroundColor: WidgetStateProperty.all(Colors.white),
+      elevation: WidgetStateProperty.resolveWith<double>((states) {
+        if (states.contains(WidgetState.pressed)) return 1;
+        if (states.contains(WidgetState.hovered)) return 4;
         return 2;
       }),
-      padding: MaterialStateProperty.all(
+      padding: WidgetStateProperty.all(
         const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
-      minimumSize: MaterialStateProperty.all(const Size(120, 40)),
-      shape: MaterialStateProperty.all(
+      minimumSize: WidgetStateProperty.all(const Size(120, 40)),
+      shape: WidgetStateProperty.all(
         RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
           side: const BorderSide(color: darkBrown, width: 2),
         ),
       ),
-      textStyle: MaterialStateProperty.all(
+      textStyle: WidgetStateProperty.all(
         const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
@@ -192,8 +192,8 @@ class AppTheme {
       fillColor: beige,
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      labelStyle: TextStyle(color: darkBrown, fontSize: 14),
-      hintStyle: TextStyle(color: darkBrown.withOpacity(0.6), fontSize: 14),
+      labelStyle: const TextStyle(color: darkBrown, fontSize: 14),
+      hintStyle: TextStyle(color: darkBrown.withValues(alpha: 0.6), fontSize: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: darkBrown, width: 2),
@@ -204,7 +204,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: orange, width: 2),
+        borderSide: const BorderSide(color: orange, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

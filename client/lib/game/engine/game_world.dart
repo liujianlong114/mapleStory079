@@ -168,13 +168,13 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   bool _jumpHeldLast = false;
   static const double _gravity = 2000;
   static const double _jumpSpeed = -640;
-  static const double _cameraFootOffset = 300; // 由 _syncCamera 按 viewH/2 覆盖
 
   void Function()? onOpenKeyConfig;
 
   /// 当前玩家所在 x 的可走 foothold Y
   double get groundY => groundAt(player.position.x, feetY: player.position.y);
   List<FootholdSegment> get debugFootholdSegments => _footholds?.segments ?? const [];
+  int? get playerFootholdLayer => _footholds?.layerOf(_playerFhid);
 
   double? tryGroundAt(double x, {double? feetY}) {
     if (_footholds == null) return null;
@@ -576,12 +576,20 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       if (!player.isAttacking) {
         player.animationState = 'jump';
       }
-      final landing = _footholds?.landingYAt(player.position.x, player.position.y);
+      final landing = _footholds?.landingYAt(
+        player.position.x,
+        player.position.y,
+        preferredLayer: _footholds?.layerOf(_playerFhid),
+      );
       if (landing != null && player.position.y >= landing - 2 && _vy >= 0) {
         player.position.y = landing;
         _vy = 0;
         _onGround = true;
-        _playerFhid = _footholds?.getFhidBelow(player.position.x, player.position.y);
+        _playerFhid = _footholds?.getFhidBelow(
+          player.position.x,
+          player.position.y,
+          preferredLayer: _footholds?.layerOf(_playerFhid),
+        );
         if (!player.isAttacking) {
           if (down && !left && !right) {
             player.animationState = 'prone';
@@ -654,7 +662,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     // --- 怪物 AI（无 WS 同步时本地模拟）---
     if (!_serverMobSync) {
       for (final mob in mobs) {
-        mob.updateAI(dt, player, onDealDamage: (dmg) {
+        mob.updateAI(dt, player, _footholds, onDealDamage: (dmg) {
           if (!mob.mob.isAlive) return;
           hp -= dmg;
           if (hp < 0) hp = 0;
@@ -1185,7 +1193,11 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     }
     final templateId = (p['template_id'] as num?)?.toInt() ?? 0;
     final x = (p['x'] as num?)?.toDouble() ?? 0;
-    final y = groundAt(x, allowFallback: true);
+    final hintY = (p['y'] as num?)?.toDouble() ?? 0;
+    final snap = _footholds?.snapSpawn(x, hintY > 0 ? hintY : _spawnY);
+    final y = snap?.y ?? groundAt(x, allowFallback: true);
+    final snapFhid = snap?.fhid;
+    final preferredLayer = (snapFhid != null && _footholds != null) ? _footholds!.segmentById(snapFhid)?.layer : null;
     final rx0 = (p['rx0'] as num?)?.toDouble() ?? (x - 100);
     final rx1 = (p['rx1'] as num?)?.toDouble() ?? (x + 100);
     final mob = Mob(
@@ -1205,8 +1217,14 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
       rx1: rx1,
       spawnY: y,
       speed: (p['speed'] as num?)?.toInt() ?? 60,
+      currentFhid: snapFhid,
     );
-    final component = MobComponent(mob: mob, position: Vector2(x, y), planeY: y);
+    final component = MobComponent(
+      mob: mob,
+      position: Vector2(x, y),
+      planeY: y,
+      preferredFhLayer: preferredLayer,
+    );
     component.applyServerState(p);
     mobs.add(component);
     world.add(component);
@@ -1278,13 +1296,19 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     if (_mobByInstanceId(mob.id) != null) return;
     final x = position?.x ?? mob.posX;
     final hintY = mob.posY > 0 ? mob.posY : mob.spawnY;
-    final y = _footholds?.groundYAt(x, feetY: hintY) ??
-        _snapSpawnY(x, hintY > 0 ? hintY : _spawnY);
+    // 生成时记录 layer，之后行走时保留同层
+    final snap = _footholds?.snapSpawn(x, hintY);
+    final snapY = snap?.y ?? _snapSpawnY(x, hintY > 0 ? hintY : _spawnY);
+    final snapFhid = snap?.fhid;
+    final preferredLayer = (snapFhid != null && _footholds != null) ? _footholds!.segmentById(snapFhid)?.layer : null;
+    final y = snapY;
     mob.posY = y;
+    mob.currentFhid = snapFhid;
     final component = MobComponent(
       mob: mob,
       position: Vector2(x, y),
       planeY: y,
+      preferredFhLayer: preferredLayer,
     );
     mobs.add(component);
     world.add(component);
@@ -1439,7 +1463,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 }
 
 /// ==================== 世界背景 ====================
-class _WorldBackground extends Component with HasGameRef {
+class _WorldBackground extends Component with HasGameReference {
   final double width;
   final double height;
 
@@ -1457,7 +1481,7 @@ class _WorldBackground extends Component with HasGameRef {
     canvas.drawRect(rect, paint);
 
     final grid = Paint()
-      ..color = Colors.white.withOpacity(0.04)
+      ..color = Colors.white.withValues(alpha: 0.04)
       ..strokeWidth = 1;
     const step = 80.0;
     for (double x = 0; x < width; x += step) {
@@ -1808,7 +1832,7 @@ class PlayerComponent extends PositionComponent {
         width: size.x * 0.7,
         height: 10,
       ),
-      Paint()..color = Colors.black.withOpacity(0.35),
+      Paint()..color = Colors.black.withValues(alpha: 0.35),
     );
 
     // 身体
@@ -1889,7 +1913,7 @@ class PlayerComponent extends PositionComponent {
   void _renderAttackGlow(Canvas canvas) {
     if (_attackTimer > 0) {
       final glow = Paint()
-        ..color = Colors.yellow.withOpacity((_attackTimer / 0.8).clamp(0.0, 1.0) * 0.8);
+        ..color = Colors.yellow.withValues(alpha: (_attackTimer / 0.8).clamp(0.0, 1.0) * 0.8);
       canvas.drawCircle(
         Offset(direction * 24.0, -size.y * 0.45),
         size.x * 0.3,
@@ -1951,7 +1975,7 @@ class NPCComponent extends PositionComponent with TapCallbacks {
         width: size.x * 0.7,
         height: 10,
       ),
-      Paint()..color = Colors.black.withOpacity(0.3),
+      Paint()..color = Colors.black.withValues(alpha: 0.3),
     );
 
     // 身体
@@ -2008,9 +2032,14 @@ class MobComponent extends PositionComponent {
   double _targetX = 0;
   double _targetY = 0;
   bool _serverMoving = false;
+  final int? _preferredFhLayer; // 生成时所在的 foothold layer（多层地图避免错位）
 
-  MobComponent({required this.mob, required Vector2 position, this.planeY})
-      : super(
+  MobComponent({
+    required this.mob,
+    required Vector2 position,
+    this.planeY,
+    this._preferredFhLayer,
+  }) : super(
           position: position,
           size: Vector2(64, 64),
           anchor: Anchor.bottomCenter,
@@ -2091,13 +2120,21 @@ class MobComponent extends PositionComponent {
     }
   }
 
-  void updateAI(double dt, PlayerComponent player, {void Function(int dmg)? onDealDamage}) {
+  void updateAI(double dt, PlayerComponent player, MapFootholds? footholds, {void Function(int dmg)? onDealDamage}) {
     if (!mob.isAlive) return;
 
     _attackCooldown -= dt;
-    final lockY = planeY ?? mob.spawnY;
-    position.y = lockY;
-    mob.posY = lockY;
+
+    // 使用 foothold 获取当前 X 位置的地面高度（支持斜坡），并传入
+    // _preferredFhLayer 保持怪物在其所在层，避免多层地图错位
+    double groundY;
+    if (footholds != null) {
+      groundY = footholds.groundYAt(position.x, feetY: position.y, preferredLayer: _preferredFhLayer) ?? (planeY ?? mob.spawnY);
+    } else {
+      groundY = planeY ?? mob.spawnY;
+    }
+    position.y = groundY;
+    mob.posY = groundY;
 
     final dx = player.position.x - position.x;
     final dy = player.position.y - position.y;
@@ -2107,8 +2144,11 @@ class MobComponent extends PositionComponent {
     final attackRange = mob.attackRange > 0 ? mob.attackRange : 55.0;
     final speed = mob.moveSpeedPx;
 
+    // AI 状态机：idle → patrol → chase → attack
+    // 攻击范围：停止移动，执行攻击
     if (horizDist <= attackRange && dy.abs() <= vertTolerance) {
       mob.status = MobStatus.attacking;
+      mob.aiState = MobAIState.attack;
       if (_attackCooldown <= 0) {
         _attackCooldown = mob.attackCooldown / 1000.0;
         if (_attackCooldown <= 0) _attackCooldown = 1.0;
@@ -2118,15 +2158,33 @@ class MobComponent extends PositionComponent {
       return;
     }
 
+    // 追击范围：朝玩家移动
     if (horizDist < aggroRange && horizDist > attackRange && dy.abs() <= vertTolerance) {
       mob.status = MobStatus.moving;
+      mob.aiState = MobAIState.chase;
       _facing = dx > 0 ? 1 : -1;
-      position.x += _facing * speed * dt;
+      final newX = position.x + _facing * speed * dt;
+      // 更新 Y 到新位置的地面高度
+      if (footholds != null) {
+        final newGroundY = footholds.groundYAt(newX, feetY: position.y, preferredLayer: _preferredFhLayer) ?? groundY;
+        position.y = newGroundY;
+        mob.posY = newGroundY;
+      }
+      position.x = newX;
     } else {
+      // 巡逻：在 rx0–rx1 范围来回移动
       mob.status = MobStatus.moving;
+      mob.aiState = MobAIState.patrol;
       if (position.x >= _rx1 - 4) _facing = -1;
       if (position.x <= _rx0 + 4) _facing = 1;
-      position.x += _facing * speed * dt * 0.55;
+      final newX = position.x + _facing * speed * dt * 0.55;
+      // 更新 Y 到新位置的地面高度（走斜坡）
+      if (footholds != null) {
+        final newGroundY = footholds.groundYAt(newX, feetY: position.y, preferredLayer: _preferredFhLayer) ?? groundY;
+        position.y = newGroundY;
+        mob.posY = newGroundY;
+      }
+      position.x = newX;
     }
 
     position.x = position.x.clamp(_rx0, _rx1);
@@ -2168,18 +2226,18 @@ class MobComponent extends PositionComponent {
         width: size.x * 0.8,
         height: 10,
       ),
-      Paint()..color = Colors.black.withOpacity(0.4),
+      Paint()..color = Colors.black.withValues(alpha: 0.4),
     );
 
     // 身体
     final color = mob.isAlive
         ? const Color(0xFFc0392b)
-        : Colors.grey.withOpacity(0.4);
+        : Colors.grey.withValues(alpha: 0.4);
     final bodyPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color, color.withOpacity(0.6)],
+        colors: [color, color.withValues(alpha: 0.6)],
       ).createShader(Offset.zero & Size(size.x, size.y));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -2221,7 +2279,7 @@ class MobComponent extends PositionComponent {
     final hpRatio = mob.maxHp > 0 ? mob.hp / mob.maxHp : 0.0;
     canvas.drawRect(
       Rect.fromLTWH(0, -12, size.x, 6),
-      Paint()..color = Colors.black.withOpacity(0.5),
+      Paint()..color = Colors.black.withValues(alpha: 0.5),
     );
     canvas.drawRect(
       Rect.fromLTWH(1, -11, (size.x - 2) * hpRatio.clamp(0.0, 1.0), 4),
@@ -2253,7 +2311,7 @@ class MobComponent extends PositionComponent {
 /// ==================== TileMap 背景层 ====================
 /// 程序化生成的 Tile 图案 —— 不依赖外部图片即可显示有层次感的"地图纹理"。
 /// 不同的 mapId 会采用不同的配色（例如 10000 射手村森林 / 20000 勇士部落岩石）。
-class TileMapLayer extends Component with HasGameRef {
+class TileMapLayer extends Component with HasGameReference {
   final double width;
   final double height;
   final double tileSize;
@@ -2330,14 +2388,14 @@ class TileMapLayer extends Component with HasGameRef {
         );
         canvas.drawRect(
           rect,
-          Paint()..color = color.withOpacity(0.85),
+          Paint()..color = color.withValues(alpha: 0.85),
         );
         // 每格内的小装饰点，增加像素感
         if ((x + y) % 2 == 0) {
           canvas.drawCircle(
             Offset(x * tileSize + tileSize / 2, y * tileSize + tileSize / 2),
             3,
-            Paint()..color = color.withOpacity(0.4),
+            Paint()..color = color.withValues(alpha: 0.4),
           );
         }
       }
@@ -2424,7 +2482,7 @@ class RemotePlayerComponent extends PositionComponent {
         width: size.x * 0.7,
         height: 10,
       ),
-      Paint()..color = Colors.black.withOpacity(0.3),
+      Paint()..color = Colors.black.withValues(alpha: 0.3),
     );
 
     // 身体（紫色系，与本地玩家区分）

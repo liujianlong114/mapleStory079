@@ -1,4 +1,7 @@
 
+/// 怪物 AI 状态（079 HeavenClient 对照）
+enum MobAIState { idle, patrol, chase, attack }
+
 enum MobStatus { idle, moving, attacking, hit, dead }
 
 class Mob {
@@ -18,11 +21,13 @@ class Mob {
   final double rx1;
   final double spawnY;
   MobStatus status;
+  MobAIState aiState; // AI 状态机
   final int speed;
   final double attackRange;
   final int attackCooldown;
   DateTime? _lastAttack;
   final String sprite;
+  int? currentFhid; // 当前脚点 ID（用于服务端同步）
 
   Mob({
     required this.id,
@@ -41,10 +46,12 @@ class Mob {
     this.rx1 = 0,
     double? spawnY,
     this.status = MobStatus.idle,
+    this.aiState = MobAIState.idle,
     this.speed = 60,
     this.attackRange = 50.0,
     this.attackCooldown = 1500,
     this.sprite = '',
+    this.currentFhid,
   }) : spawnY = spawnY ?? posY;
 
   /// 079 Mob.Speed → 像素/秒（与 ms079 体感接近）
@@ -63,6 +70,11 @@ class Mob {
   bool get isAlive => hp > 0;
 
   factory Mob.fromJson(Map<String, dynamic> json) {
+    final aiStateStr = (json['ai_state'] ?? 'idle') as String;
+    MobAIState aiState = MobAIState.idle;
+    try {
+      aiState = MobAIState.values.firstWhere((e) => e.name == aiStateStr);
+    } catch (_) {}
     return Mob(
       id: (json['id'] ?? json['mob_id'] ?? 0) as int,
       mobId: (json['mob_id'] ?? json['id'] ?? 0) as int,
@@ -85,6 +97,8 @@ class Mob {
       attackRange: ((json['attack_range'] ?? 50.0) as num).toDouble(),
       attackCooldown: (json['attack_cooldown'] ?? 1500) as int,
       sprite: (json['sprite'] ?? '') as String,
+      aiState: aiState,
+      currentFhid: (json['fhid'] as num?)?.toInt(),
     );
   }
 
@@ -103,6 +117,8 @@ class Mob {
       'position_x': posX,
       'position_y': posY,
       'status': status.name,
+      'ai_state': aiState.name,
+      'fhid': currentFhid,
       'hp_percent': hpPercent,
       'is_alive': isAlive,
     };

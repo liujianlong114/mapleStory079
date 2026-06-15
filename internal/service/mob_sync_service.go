@@ -19,6 +19,8 @@ type MobMoveUpdate struct {
 	Y          float64
 	Facing     int
 	Moving     bool
+	AIState    MobAIState
+	Fhid       int
 }
 
 // MobEventNotifier 怪物 WS 广播回调（由 handler 注入，避免循环依赖）。
@@ -57,6 +59,8 @@ func StartMobSimulation(instances *MobInstanceService) {
 						"y":           u.Y,
 						"facing":      u.Facing,
 						"moving":      u.Moving,
+						"ai_state":    u.AIState,
+						"fhid":        u.Fhid,
 					})
 				}
 			}
@@ -95,6 +99,8 @@ func mobInstanceFields(inst *MobInstance) map[string]interface{} {
 		"speed":       inst.Speed,
 		"facing":      inst.Facing,
 		"alive":       inst.Alive,
+		"ai_state":    inst.AIState,
+		"fhid":        inst.Fhid,
 	}
 }
 

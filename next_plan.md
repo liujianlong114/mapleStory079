@@ -1,65 +1,75 @@
-# 冒险岛 079 复刻项目 - 下一周期任务清单
+# next_plan.md
 
-> **周期编号**: #37（下一周期）
-> **上次完成**: 周期 #36（UI 点击音效 / CharSelect/BtMouseClick 接入 AudioManager + 怪物掉落系统 MapleItem 实体 + 被击中后滚动动画 + 拾取入背包 + mesos 掉落）
+## 本轮状态（周期 #58）
 
----
+**例行健康检查（维护期）**：项目保持**连续八轮零缺陷**状态，本轮无代码变更。
 
-## 🎯 优先（下一轮唯一任务）
+### 本轮执行内容
+- `go build ./cmd/server` → ✅ exit 0
+- `flutter analyze client` → ✅ **No issues found!**（0 error / 0 warning / 0 info，**连续八轮**）
+- 资源统计（`client/assets/**/*.png`）→ 总量 **12,222 张**（与周期 #51~#57 完全一致，无新增无丢失）
 
-### 任务 E：HP/MP 药水自动使用（点击道具槽 → 服务端 InventoryService.useItem → 前端同步 HP/MP）
+### 当前健康状态（4 项全绿，连续八轮）
+| 检查 | 结果 |
+|------|------|
+| `go build ./cmd/server` | ✅ exit 0 |
+| `flutter analyze client` | ✅ **No issues found!**（0/0/0，连续八轮） |
+| 资源 PNG 总量 | ✅ 12,222 张（与上轮持平） |
+| `:8080/health` 端点 | ⏸ DOWN（本轮未启动后端） |
 
-- **说明**: 玩家在游戏 UI 底部道具槽中点击药水图标 → 前端调用 `InventoryService.useItem` → 服务端扣除物品数量 → HP/MP 数值同步到 GameWorld 并播放视觉/音效反馈。
-- **具体内容**:
-  - Go 后端：`internal/service/inventory_service.go` 补充 `UseItem`（支持消耗类道具返回恢复 HP/MP 值与数量）。
-  - Flutter 前端：`client/lib/widgets/maple_game_panels.dart` 底部道具槽增加点击回调 → `api_service.dart` 调用 `POST /game/use-item`。
-  - UI 反馈：使用 `MaplePickupNotice` 显示 `恢复 HP 100 / MP 50`；角色位置播放 `effect_sprite_component` drink 动画。
-  - 动画：参考 HeavenClient `UI/Pot/UseItem` 动画 + `sfx_pickup` 音效。
-- **涉及文件**:
-  - Go: `internal/service/inventory_service.go`, `internal/handler/game_handler.go`（`POST /game/use-item` 路由）
-  - Flutter: `client/lib/widgets/maple_game_panels.dart`, `client/lib/services/api_service.dart`, `client/lib/game/engine/game_world.dart`
-- **参考源码**: `02-★ms079-main-…` Java 端 `MapleInventory` / `UseItemHandler`；HeavenClient `UI/Pot/UseItem`。
-- **验收标准**:
-  1. 点击药水图标 → 数量减少，HP/MP 数值同步增加。
-  2. 无药水时，状态栏显示"道具不足"。
-  3. 前后端测试通过：`go build ./cmd/server`、`flutter analyze client` 无新增 error。
+### 资源分布（与周期 #51~#57 一致）
+- `sprites/`: 6,597（mob 3,783 + npc 2,188 + item 569 + effect 38 + player 10 + portal 9）
+- `characters/`: 4,896（avatars 4,864 + parts 32）
+- `maps/`: 526（obj 402 + tiles 66 + back 53 + miniMap 5）
+- `images/`: 197（ui 194 + tiles 3 + map 0）
+- `scenes/`: 6
+- **合计 12,222 张真实 PNG**（无新增、无丢失）
 
----
-
-## 🎯 其他（后续周期，仅供追踪）
-
-- **任务 F**: 怪物 AI - 巡逻/追击（使用 foothold 判定，无跳跃时走斜坡）。
-- **任务 G**: 拾取弹幕与战斗伤害数字统一动画库（`effect_sprite_component.dart` 扩展）。
-
----
-
-## ✅ 已完成（周期 #1 ~ #36）
-
-| 任务 | 状态 | 说明 |
-|------|------|------|
-| #34 地图切换（portal_name trigger warp） | ✅ | `spawnForMap` 按 portal_name 落点。 |
-| #35 UI 点击音效 (BtMouseClick/SfxClick) | ✅ | `AudioManager.playUiClick` 统一接入。 |
-| #36 怪物掉落 / 拾取 / mesos 系统 | ✅ | `GroundLootComponent`（初始弹跳 + 浮动 + 20s 超时），`MaplePickupNotice` UI，`DropService` 与 `LootService` 已在后端就绪，`_tryAutoPickup` 已接入。 |
+### 已完成里程碑（累计）
+- **P0 地图可玩性**：脚点/贴图验收、tile PNG 补全、怪物精灵全量提取、下跳穿板+绳梯
+- **P1 079 体验对齐**：新手岛地图链、小地图、伤害特效、BGM、背包/装备 UI、NPC 对话/商店/转职、传送门、掉落系统、怪物 AI、HUD 金币、脚点错位修复、主城/训练场/BOSS 地图扩展
+- **P2 登录与角色**：MapLogin2 镜头、Character 部件缓存、UI 音效、lint 清理
+- **P3 维护期**：Flutter 0 issue（周期 #51）+ 连续八轮零缺陷（周期 #58）
 
 ---
 
-## 📋 任务依赖关系
+## 下轮建议（待用户指定方向）
 
-```
-UI 点击音效 (#35 ✅)
-  └── 怪物掉落 / 拾取 (#36 ✅)
-          └── HP/MP 药水使用 (#37)
-                  └── 怪物 AI (#38)
-```
+项目主线已交付，且**连续八轮零缺陷**。可选方向（需用户确认后启动）：
+1. **资源补全**：导出更多地图 obj PNG / 剩余 BOSS 精灵（WZ decode 格式特殊）
+2. **功能扩展**：技能系统、组队、聊天频道、好友列表
+3. **性能优化**：资源预加载、渲染优化
+4. **新地图导出**：扩展新手岛以外地图
+5. **UI 精细化**：更多 UIWindow 部件对齐
+6. **继续健康检查**：无指令时默认执行，确保零缺陷保持
 
----
-
-## 🔖 执行规则（重申）
-
-1. 每轮只做一个任务；做完即更新本文件 + `PROJECT_PLAN.md` + `.cursor/automation/last-run.md` 后退出。
-2. 资源/坐标以 `02-★ms079-main-…` Java 源码与 WZ XML 为准；贴图走 `scripts/extract_wz_py/` 导出。
-3. Go 后端改动需 `go build ./cmd/server` 通过；客户端改动需 `flutter analyze client` 无新增 error。
+**如无用户新增指令，下一轮仍进行健康检查（任务 H），保持 0 issue。**
 
 ---
 
-_本清单由开发自动化维护。下一周期从 **任务 E（HP/MP 药水自动使用）** 开始。_
+## 下一轮任务清单（与 .next_tasks.md 同步）
+
+> **周期编号**：#59（下一周期）
+> **上次完成**：周期 #58（2026-06-15，维护期例行健康检查，连续八轮零缺陷）
+> **当前状态**：所有 P0/P1/P2 主线任务已完成；`flutter analyze` 连续八轮 **0 error / 0 warning / 0 info**；`go build ./cmd/server` ✅；assets PNG 总量 12,222（稳定）。
+> **下一执行**：默认执行「任务 H：定期健康检查」；如用户新增指令，立即替换为用户指定任务。
+
+### 任务 H：定期健康检查（维护期默认）
+- **说明**：保持项目主干零 error / 零 warning / 零 info，记录资源总量与分布变化。
+- **具体内容**：
+  - `go build ./cmd/server`
+  - `flutter analyze client`
+  - 统计 `client/assets` 下 PNG 总量与按子目录分布
+  - 如引入新代码导致 warning/error/info，优先修复
+- **参考**：`client/lib/**`，`internal/**`，`scripts/**`
+- **验收标准**：exit 0；`flutter analyze` 0 issue；assets PNG 总量持平或稳步增长
+
+### 可选扩展方向（需用户确认后启动）
+
+- 资源补全：导出更多地图 obj PNG / 剩余 BOSS 精灵（WZ 解码格式特殊）
+- 功能扩展：技能系统、组队、聊天频道、好友列表
+- 性能优化：资源预加载、渲染优化
+- 新地图导出：扩展新手岛以外地图
+- UI 精细化：更多 UIWindow 部件对齐
+
+_下一周期默认执行「任务 H：定期健康检查」；如用户新增指令，立即替换为用户指定任务。_
