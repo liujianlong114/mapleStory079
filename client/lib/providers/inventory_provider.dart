@@ -156,7 +156,7 @@ class InventoryProvider with ChangeNotifier {
   }
 
   void removeMesos(int amount) {
-    _mesos = (_mesos - amount).clamp(0, _mesos);
+    _mesos = (_mesos - amount).clamp(0, 1 << 30);
     notifyListeners();
   }
 

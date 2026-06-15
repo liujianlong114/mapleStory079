@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/resources/assets.dart';
 import '../maple/wz_scene.dart';
 
 /// ms079 Login.img/WorldSelect — 选区选频道
@@ -24,15 +25,18 @@ class _WorldSelectPageState extends State<WorldSelectPage> {
   }
 
   void _enter() {
+    AudioManager().playUiClick();
     Navigator.of(context).pushReplacementNamed('/character-select');
   }
 
   void _onButton(String id) {
     if (id.startsWith('world_')) {
+      AudioManager().playUiClick();
       setState(() => _world = int.tryParse(id.substring(6)) ?? 0);
       return;
     }
     if (id.startsWith('ch_')) {
+      AudioManager().playUiClick();
       setState(() => _channel = int.tryParse(id.substring(3)) ?? 1);
       return;
     }
@@ -40,6 +44,7 @@ class _WorldSelectPageState extends State<WorldSelectPage> {
       case 'enter':
         _enter();
       case 'cancel':
+        AudioManager().playUiClick();
         Navigator.of(context).pushReplacementNamed('/login');
     }
   }

@@ -15,30 +15,44 @@ class AssetPaths {
 }
 
 /// ms079 MapLogin2 — 全登录流程统一 BGM: BgmUI/Title
+/// 所有资源在 assets/audio/（bgm 子目录用于精确地图映射），
+/// 实际格式为 .wav（079 Sound.wz / Bgm00 提取产物）。
 class BgmAssets {
   static const String login = 'audio/title.mp3';
   static const String loginWav = 'audio/title.wav';
-  static const String title = login;
+  static const String title = loginWav;
   static const String titleWav = loginWav;
-  static const String charSelect = login;
+  static const String charSelect = loginWav;
   static const String charSelectWav = loginWav;
-  static const String mapleIsland  = 'audio/00001000.ogg';
-  static const String lithHarbor   = 'audio/00002000.ogg';
-  static const String nautilus     = 'audio/00002001.ogg';
-  static const String perion       = 'audio/00100000.ogg';
-  static const String ellinia      = 'audio/00101000.ogg';
-  static const String henesys      = 'audio/00102000.ogg';
-  static const String kerningCity  = 'audio/00103000.ogg';
-  static const String elNath       = 'audio/00200000.ogg';
-  static const String orbis        = 'audio/00200001.ogg';
-  static const String ludibrium    = 'audio/00300000.ogg';
-  static const String aquaRoad     = 'audio/00500000.ogg';
-  static const String koreanFolk   = 'audio/00600000.ogg';
-  static const String muLung       = 'audio/00900000.ogg';
-  static const String herbTown     = 'audio/01000000.ogg';
+  static const String mapleIsland  = 'audio/00001000.wav';
+  static const String lithHarbor   = 'audio/00002000.wav';
+  static const String nautilus     = 'audio/00002001.wav';
+  static const String perion       = 'audio/00100000.wav';
+  static const String ellinia      = 'audio/00101000.wav';
+  static const String henesys      = 'audio/00102000.wav';
+  static const String kerningCity  = 'audio/00103000.wav';
+  static const String elNath       = 'audio/00200000.wav';
+  static const String orbis        = 'audio/00200001.wav';
+  static const String ludibrium    = 'audio/00300000.wav';
+  static const String aquaRoad     = 'audio/00500000.wav';
+  static const String koreanFolk   = 'audio/00600000.wav';
+  static const String muLung       = 'audio/00900000.wav';
+  static const String herbTown     = 'audio/01000000.wav';
 
+  /// 返回指定 mapId 对应的 BGM 资源路径。
+  /// 优先使用 assets/audio/bgm/{mapId}.wav（mapId 精确匹配），
+  /// 其次按大区范围映射到 audio/ 下的通用 BGM 文件。
+  /// 所有返回路径使用 .wav 扩展名（与 Sound.wz 提取结果一致）。
   static String? byMapId(int mapId) {
-    if (mapId == 104000000 || mapId == 10300 || mapId == 10400) return lithHarbor;
+    const exactMapIds = {
+      1000000: 'audio/bgm/1000000.wav',
+      20000: 'audio/bgm/20000.wav',
+      30000: 'audio/bgm/30000.wav',
+      100000000: 'audio/bgm/100000000.wav',
+      101000000: 'audio/bgm/101000000.wav',
+    };
+    if (exactMapIds.containsKey(mapId)) return exactMapIds[mapId]!;
+
     if (mapId >= 990000000) return 'audio/boss_zakum.wav';
     if (mapId >= 220000000) return 'audio/00300000.wav';
     if (mapId >= 201000000) return 'audio/00200001.wav';
@@ -78,7 +92,7 @@ class SpriteDirs {
   static String playerStand() => '${player}stand.png';
   static String playerWalk() => '${player}walk.png';
   static String tileGrass() => '${tiles}grass.png';
-  static String itemPath(int itemId) => '${item}${itemId}.png';
+  static String itemPath(int itemId) => '$item$itemId.png';
   static String tileDirt() => '${tiles}dirt.png';
 }
 
@@ -88,7 +102,17 @@ class AudioManager {
   factory AudioManager() => _instance;
 
   final AudioPlayer _bgm = AudioPlayer()..setReleaseMode(ReleaseMode.loop);
-  final AudioPlayer _sfx = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+
+  /// UI 点击音效专用通道（短小，优先级高；可并行其他 SFX）
+  final AudioPlayer _uiSfx = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+
+  /// 通用 SFX 通道池（避免新音效立即被挤掉：取空闲或最旧复用）
+  static const int _sfxPoolSize = 4;
+  final List<AudioPlayer> _sfxPool = List.generate(
+    _sfxPoolSize,
+    (_) => AudioPlayer()..setReleaseMode(ReleaseMode.stop),
+  );
+  int _sfxCursor = 0;
 
   double _bgmVolume = 0.6;
   double _sfxVolume = 0.8;
@@ -114,6 +138,7 @@ class AudioManager {
       fallbacks.add(primary.replaceAll('.mp3', '.wav'));
     }
     if (_currentBgm != null && fallbacks.contains(_currentBgm)) return;
+    await stopBgm();
     for (final path in fallbacks) {
       try {
         await _bgm.setVolume(_bgmVolume);
@@ -131,11 +156,23 @@ class AudioManager {
     } catch (_) {}
   }
 
+  /// UI 按钮点击专用（079 BtMouseClick）。短、低延迟，与战斗 SFX 互不干扰
+  Future<void> playUiClick() async {
+    if (_muted) return;
+    try {
+      await _uiSfx.setVolume(_sfxVolume);
+      await _uiSfx.play(AssetSource(SfxAssets.click));
+    } catch (_) {}
+  }
+
+  /// 通用 SFX（战斗/拾取/升级等），用轮换池并行播放
   Future<void> playSfx(String asset) async {
     if (_muted) return;
     try {
-      await _sfx.setVolume(_sfxVolume);
-      await _sfx.play(AssetSource(asset));
+      final player = _sfxPool[_sfxCursor % _sfxPoolSize];
+      _sfxCursor = (_sfxCursor + 1) % _sfxPoolSize;
+      await player.setVolume(_sfxVolume);
+      await player.play(AssetSource(asset));
     } catch (_) {}
   }
 
@@ -146,7 +183,10 @@ class AudioManager {
 
   Future<void> setSfxVolume(double v) async {
     _sfxVolume = v.clamp(0.0, 1.0);
-    await _sfx.setVolume(_sfxVolume);
+    for (final p in _sfxPool) {
+      try { await p.setVolume(_sfxVolume); } catch (_) {}
+    }
+    try { await _uiSfx.setVolume(_sfxVolume); } catch (_) {}
   }
 
   Future<void> toggleMute() async {
@@ -160,7 +200,8 @@ class AudioManager {
 
   void dispose() {
     _bgm.dispose();
-    _sfx.dispose();
+    _uiSfx.dispose();
+    for (final p in _sfxPool) { p.dispose(); }
   }
 }
 

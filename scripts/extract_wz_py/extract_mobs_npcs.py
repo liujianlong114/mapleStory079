@@ -19,16 +19,17 @@ from wzpy.wz_file import WzFile
 
 MIN_REAL_PNG = 400
 
-# 彩虹村 / 新手地图 + seed NPC + 默认刷怪池
+# 彩虹村 / 新手地图 + 常见刷怪池（注意：必须在 Mob.wz 中存在）
+# 通过 Mob.wz.images 扫描得到的存在 ID 才进入列表
 PRIORITY_MOBS = {
-    100100, 100101, 100102, 100200, 100400, 100800,
-    110100, 120100, 130100, 100401, 100700, 100900, 101000, 109000,
-    130101, 2100100, 2100101, 1210100, 1210101,
+    100100, 100101, 120100, 130100, 130101,
+    1210100, 1210101, 2100100, 2100101,
+    1110100, 1110101, 1120100, 1130100,
 }
 
 PRIORITY_NPCS = {
     # 彩虹岛新手链（WZ life）
-    2101, 2100, 2000, 2102, 2001, 2002, 2004,
+    2101, 2100, 2007, 2000, 2102, 2001, 2002, 2004,
     12000, 10000, 12101, 2103, 12100, 20100, 20001, 22000,
     # 城镇 / 转职
     1012008, 1012101, 1032105, 2040010, 1090000,
@@ -54,16 +55,71 @@ def npc_img_key(npc_id: int) -> str:
     return f"{npc_id:07d}.img"
 
 
-def first_canvas(node: Optional[WzSubProperty], frame: str = "0") -> Optional[WzCanvasProperty]:
+def candidate_keys_for_id(img_id: int) -> List[str]:
+    """Mob.wz/Npc.wz 中同一张图可能保存为 `100100.img` 也可能 `0100100.img`
+    （6 位或 7 位或无前导零），这里枚举常见格式供查找。"""
+    raw = str(img_id)
+    padded7 = f"{img_id:07d}"
+    padded6 = f"{img_id:06d}" if img_id < 10_000_000 else raw
+    keys: List[str] = []
+    seen = set()
+    for k in (padded7, padded6, raw, f"{img_id}"):
+        name = f"{k}.img"
+        if name not in seen:
+            seen.add(name)
+            keys.append(name)
+    return keys
+
+
+def find_img_by_id(wf: WzFile, img_id: int) -> Optional[object]:
+    # 优先精确匹配
+    for key in (f"{img_id:07d}.img", f"{img_id:06d}.img", f"{img_id:05d}.img",
+                f"{img_id:04d}.img", f"{img_id:03d}.img", f"{img_id}.img"):
+        node = wf.root.get(key)
+        if node is not None:
+            return node
+    # 回退扫描全部 images
+    for name in getattr(wf.root, "images", []):
+        m = re.match(r"0*(\d+)\.img$", name)
+        if m and int(m.group(1)) == img_id:
+            node = wf.root.get(name)
+            if node is not None:
+                return node
+    return None
+
+
+def first_canvas(node: Optional[WzSubProperty], frame: str = "0", region: str = "EMS") -> Optional[WzCanvasProperty]:
     if node is None:
         return None
-    c = node.get(frame)
-    if isinstance(c, WzCanvasProperty):
-        return c
+    # 候选 frame 名：优先给定的 frame，然后是 default/0/1
+    candidates: List[str] = [frame, "default", "0", "1"]
+    seen: set = set()
+    for fname in candidates:
+        if fname in seen:
+            continue
+        seen.add(fname)
+        c = node.get(fname)
+        if isinstance(c, WzCanvasProperty):
+            try:
+                im = decode_canvas(c, region=region)
+            except Exception:
+                im = None
+            if im is not None and im.width >= 3 and im.height >= 3:
+                return c
+    # 回退：遍历所有子节点，找尺寸最大的 canvas
+    candidate: Optional[WzCanvasProperty] = None
+    max_area = 0
     for child in node.children():
         if isinstance(child, WzCanvasProperty):
-            return child
-    return None
+            try:
+                im2 = decode_canvas(child, region=region)
+            except Exception:
+                continue
+            area = im2.width * im2.height
+            if area > max_area and im2.width >= 3 and im2.height >= 3:
+                candidate = child
+                max_area = area
+    return candidate
 
 
 def collect_frames(pose: Optional[WzSubProperty], max_frames: int = 12) -> List[WzCanvasProperty]:
@@ -113,8 +169,7 @@ def parse_img_id(name: str) -> Optional[int]:
 
 
 def extract_mob(wf: WzFile, mob_id: int, out_mob: str, region: str, force: bool) -> bool:
-    key = mob_img_key(mob_id)
-    img = wf.root.get(key)
+    img = find_img_by_id(wf, mob_id)
     if img is None:
         return False
     img.parse()
@@ -122,10 +177,10 @@ def extract_mob(wf: WzFile, mob_id: int, out_mob: str, region: str, force: bool)
     move_path = os.path.join(out_mob, f"{mob_id}_move.png")
     if not force and os.path.isfile(stand_path) and os.path.getsize(stand_path) >= MIN_REAL_PNG:
         return True
-    stand = first_canvas(img.get("stand"))
+    stand = first_canvas(img.get("stand"), region=region)
     if stand is None:
-        for alt in ("fly", "hit1", "regen"):
-            stand = first_canvas(img.get(alt))
+        for alt in ("fly", "hit1", "regen", "info", "move"):
+            stand = first_canvas(img.get(alt), region=region)
             if stand:
                 break
     if stand is None:
@@ -141,20 +196,41 @@ def extract_mob(wf: WzFile, mob_id: int, out_mob: str, region: str, force: bool)
 
 
 def extract_npc(wf: WzFile, npc_id: int, out_npc: str, region: str, force: bool) -> bool:
-    key = npc_img_key(npc_id)
-    img = wf.root.get(key)
+    img = find_img_by_id(wf, npc_id)
     if img is None:
         return False
     img.parse()
     out_path = os.path.join(out_npc, f"{npc_id}.png")
     if not force and os.path.isfile(out_path) and os.path.getsize(out_path) >= MIN_REAL_PNG:
         return True
-    stand = first_canvas(img.get("stand"))
+    # 依次尝试常见 pose
+    stand = first_canvas(img.get("stand"), region=region)
     if stand is None:
-        for alt in ("say", "eye", "blink", "info"):
-            stand = first_canvas(img.get(alt))
+        for alt in ("say", "eye", "blink", "info", "move"):
+            stand = first_canvas(img.get(alt), region=region)
             if stand:
                 break
+    # 如果当前 img 只有 link，跳转到链接对应的 img
+    if stand is None:
+        info = img.get("info")
+        if info is not None:
+            link_prop = info.get("link")
+            if hasattr(link_prop, "value") and link_prop.value:
+                link_str = str(link_prop.value)
+                link_key = f"{link_str}.img"
+                linked = wf.root.get(link_key)
+                if linked is None:
+                    # 再试 0 前缀
+                    for key in (f"{int(link_str):07d}.img", f"{int(link_str):06d}.img"):
+                        linked = wf.root.get(key)
+                        if linked is not None:
+                            break
+                if linked is not None:
+                    linked.parse()
+                    for alt in ("stand", "say", "eye", "blink", "info", "move"):
+                        stand = first_canvas(linked.get(alt), region=region)
+                        if stand:
+                            break
     if stand is None:
         return False
     return save_canvas(stand, region, out_path)

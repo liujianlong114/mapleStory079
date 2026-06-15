@@ -35,7 +35,10 @@ class MapleMiniMap extends StatelessWidget {
     this.mapId = 1000000,
     this.npcDots = const [],
     this.mobDots = const [],
+    this.miniMapAsset,
   });
+
+  final String? miniMapAsset;
 
   static const double _frameW = 196;
   static const double _frameH = 154;
@@ -44,7 +47,8 @@ class MapleMiniMap extends StatelessWidget {
   double get _vrW => (vrRight - vrLeft).clamp(1, 99999);
   double get _vrH => (vrBottom - vrTop).clamp(1, 99999);
 
-  String get _mapThumbAsset => 'assets/images/ui/hud/minimap_$mapId.png';
+  String get _mapThumbAsset =>
+      miniMapAsset ?? 'assets/images/ui/hud/minimap_$mapId.png';
 
   @override
   Widget build(BuildContext context) {

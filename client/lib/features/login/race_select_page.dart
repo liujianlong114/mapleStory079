@@ -32,7 +32,7 @@ class _RaceSelectPageState extends State<RaceSelectPage> {
       );
       return;
     }
-    AudioManager().playSfx(SfxAssets.click);
+    AudioManager().playUiClick();
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => NewCharPage(jobType: jobType)),
     );

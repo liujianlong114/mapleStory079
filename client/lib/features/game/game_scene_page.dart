@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
+import '../../core/resources/assets.dart';
 import '../../main.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/game_provider.dart';
@@ -19,6 +20,24 @@ import '../../models/mob.dart';
 import 'key_config_dialog.dart';
 import 'npc_shop_panel.dart';
 import 'official_game_viewport.dart';
+
+/// 对话返回结果：用户选择了哪个分支/下一步/关闭
+class _DialogueOutcome {
+  final NpcDialogueChoice? choice;
+  final int? choiceIndex;
+  final bool isNext;
+  final bool isClose;
+  const _DialogueOutcome({
+    this.choice,
+    this.choiceIndex,
+    this.isNext = false,
+    this.isClose = false,
+  });
+  factory _DialogueOutcome.choice(NpcDialogueChoice c, int idx) =>
+      _DialogueOutcome(choice: c, choiceIndex: idx);
+  factory _DialogueOutcome.next() => const _DialogueOutcome(isNext: true);
+  factory _DialogueOutcome.close() => const _DialogueOutcome(isClose: true);
+}
 
 /// 游戏场景页（Flutter 壳 + Flame [GameWorld]）
 ///
@@ -111,6 +130,8 @@ class _GameScenePageState extends State<GameScenePage> {
   bool _shopOpen = false;
   GameUiPanel? _openPanel;
   NPCComponent? _shopNpc;
+  bool _debugShowFh = false;
+  bool _debugShowFoot = false;
 
   @override
   void initState() {
@@ -351,6 +372,7 @@ class _GameScenePageState extends State<GameScenePage> {
           choices: const [NpcDialogueChoice(text: '再见', action: 'close')],
         ),
         onChoice: (_, __) => Navigator.of(ctx).pop(),
+        onNext: () => Navigator.of(ctx).pop(),
         onClose: () => Navigator.of(ctx).pop(),
       ),
     );
@@ -358,42 +380,81 @@ class _GameScenePageState extends State<GameScenePage> {
 
   Future<void> _runDialogueLoop(int npcId, NpcDialogueNode node) async {
     while (mounted) {
-      final choice = await showDialog<NpcDialogueChoice>(
+      final result = await showDialog<_DialogueOutcome>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => NpcDialoguePanel(
           node: node,
-          onChoice: (c, _) => Navigator.of(ctx).pop(c),
-          onClose: () => Navigator.of(ctx).pop(),
+          onChoice: (c, idx) => Navigator.of(ctx).pop(_DialogueOutcome.choice(c, idx)),
+          onNext: () => Navigator.of(ctx).pop(_DialogueOutcome.next()),
+          onClose: () => Navigator.of(ctx).pop(_DialogueOutcome.close()),
         ),
       );
-      if (!mounted || choice == null) return;
-      if (choice.action == 'close' || choice.nextId == 'end') return;
+      if (!mounted) return;
+      if (result == null) return;
 
-      final idx = node.choices.indexOf(choice);
+      if (result.isClose) return;
+
+      // 纯台词节点的"下一步"：带 nextId 时按 nextId 推进；无 nextId 时按 choiceIndex=-1 走默认分支
+      // choice 节点的某个选项：按 choiceIndex 走
       final api = ApiService();
       try {
+        String? effectiveNextId;
+        if (result.isNext) {
+          if (node.nextId != null && node.nextId!.isNotEmpty) {
+            effectiveNextId = node.nextId;
+          } else if (node.choices.isNotEmpty) {
+            effectiveNextId = node.choices.first.nextId;
+          }
+        }
         final res = await api.continueNpcDialogue(
           npcId: npcId,
           characterId: widget.characterId,
           nodeId: node.id,
-          choiceIndex: idx < 0 ? 0 : idx,
+          choiceIndex: result.choiceIndex ?? -1,
+          nextId: effectiveNextId,
         );
         if (!mounted) return;
-        final effects = res['effects'] as Map<String, dynamic>?;
-        if (effects != null) {
+        final effectsPayload = res['effects'] as Map<String, dynamic>? ??
+            (res['data'] as Map<String, dynamic>?)?['effects'] as Map<String, dynamic>?;
+        if (effectsPayload != null) {
           final gp = context.read<GameProvider>();
-          final mesos = (effects['new_mesos'] as num?)?.toInt();
-          final hp = (effects['new_hp'] as num?)?.toInt();
-          final mp = (effects['new_mp'] as num?)?.toInt();
+          final mesos = (effectsPayload['new_mesos'] as num?)?.toInt();
+          final hp = (effectsPayload['new_hp'] as num?)?.toInt();
+          final mp = (effectsPayload['new_mp'] as num?)?.toInt();
           gp.syncFromGameWorld(mesos: mesos, hp: hp, mp: mp);
           _gameWorld.onStatChange?.call(mesos: mesos, hp: hp, mp: mp);
+          // 传送门：检测到新地图 id 时调用 warpToMap 并刷新场景
+          final newMapId = (effectsPayload['new_map_id'] as num?)?.toInt();
+          if (newMapId != null && newMapId > 0) {
+            final px = (effectsPayload['new_position_x'] as num?)?.toDouble();
+            final py = (effectsPayload['new_position_y'] as num?)?.toDouble();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('传送中 → 地图 $newMapId')),
+              );
+            }
+            // 先尝试走 /game/change-map（确保服务端坐标落位）
+            final ok = await gp.warpToMap(newMapId);
+            if (!mounted) return;
+            if (ok) {
+              if (px != null || py != null) {
+                gp.syncFromGameWorld(posX: px, posY: py);
+              }
+              Navigator.of(context).pushReplacementNamed(Routes.gameScene);
+              return;
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('目标地图尚未就绪')),
+              );
+            }
+          }
         }
         final data = res['data'] as Map<String, dynamic>? ?? res;
         final nodeJson = data['node'] as Map<String, dynamic>?;
         if (nodeJson == null) return;
         node = NpcDialogueNode.fromJson(nodeJson);
-        if (node.isEnd && node.choices.isEmpty) return;
+        if (node.isEnd && node.choices.isEmpty && node.nodeType != 'say') return;
       } catch (_) {
         return;
       }
@@ -433,6 +494,7 @@ class _GameScenePageState extends State<GameScenePage> {
   }
 
   void _togglePanel(GameUiPanel panel) {
+    AudioManager().playUiClick();
     setState(() {
       _openPanel = _openPanel == panel ? null : panel;
     });
@@ -444,10 +506,12 @@ class _GameScenePageState extends State<GameScenePage> {
   void _closePanel() => setState(() => _openPanel = null);
 
   void _openMenu(String route) {
+    AudioManager().playUiClick();
     Navigator.pushNamed(context, route);
   }
 
   void _showGameMenu(BuildContext context) {
+    AudioManager().playUiClick();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF2d1f10),
@@ -459,6 +523,7 @@ class _GameScenePageState extends State<GameScenePage> {
               leading: const Icon(Icons.keyboard, color: Color(0xFFffe08a)),
               title: const Text('键盘设置', style: TextStyle(color: Colors.white)),
               onTap: () {
+                AudioManager().playUiClick();
                 Navigator.pop(ctx);
                 KeyConfigDialog.show(context);
               },
@@ -467,6 +532,7 @@ class _GameScenePageState extends State<GameScenePage> {
               leading: const Icon(Icons.inventory_2, color: Color(0xFFffe08a)),
               title: const Text('背包', style: TextStyle(color: Colors.white)),
               onTap: () {
+                AudioManager().playUiClick();
                 Navigator.pop(ctx);
                 _openMenu(Routes.inventory);
               },
@@ -475,6 +541,7 @@ class _GameScenePageState extends State<GameScenePage> {
               leading: const Icon(Icons.auto_awesome, color: Color(0xFFffe08a)),
               title: const Text('技能', style: TextStyle(color: Colors.white)),
               onTap: () {
+                AudioManager().playUiClick();
                 Navigator.pop(ctx);
                 _openMenu(Routes.skills);
               },
@@ -483,6 +550,7 @@ class _GameScenePageState extends State<GameScenePage> {
               leading: const Icon(Icons.people, color: Color(0xFFffe08a)),
               title: const Text('社交', style: TextStyle(color: Colors.white)),
               onTap: () {
+                AudioManager().playUiClick();
                 Navigator.pop(ctx);
                 _openMenu(Routes.social);
               },
@@ -550,6 +618,7 @@ class _GameScenePageState extends State<GameScenePage> {
                     playerY: _gameWorld.playerPosition.y,
                     mapName: widget.mapName,
                     mapId: widget.mapId,
+                    miniMapAsset: _gameWorld.miniMapAsset,
                     npcDots: _gameWorld.npcs
                         .map((n) => Offset(n.position.x, n.position.y))
                         .toList(),
@@ -576,6 +645,38 @@ class _GameScenePageState extends State<GameScenePage> {
                   ),
                 ),
               ),
+              Positioned(
+                right: 10,
+                top: 10,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _minimapTick,
+                  builder: (_, __, ___) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _debugChip('FH', _debugShowFh, (v) {
+                          setState(() {
+                            _debugShowFh = v;
+                            GameWorld.debugShowFootholds = v;
+                          });
+                        }),
+                        const SizedBox(width: 6),
+                        _debugChip('脚点', _debugShowFoot, (v) {
+                          setState(() {
+                            _debugShowFoot = v;
+                            GameWorld.debugShowFootPoint = v;
+                          });
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
             ),
           ),
@@ -583,4 +684,22 @@ class _GameScenePageState extends State<GameScenePage> {
       ),
     );
   }
+
+  Widget _debugChip(String label, bool value, void Function(bool) onChange) {
+    return GestureDetector(
+      onTap: () => onChange(!value),
+      child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: value ? Colors.green.withOpacity(0.8) : Colors.grey.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 11),
+      ),
+    ),
+  );
+}
+
 }

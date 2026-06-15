@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/resources/assets.dart';
 import '../../providers/auth_provider.dart';
 import '../maple/wz_scene.dart';
 
@@ -27,6 +28,7 @@ class _GenderPageState extends State<GenderPage> {
   Future<void> _pick(int gender) async {
     setState(() => _busy = true);
     try {
+      AudioManager().playUiClick();
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final ok = await auth.setGender(gender);
       if (ok && mounted) {

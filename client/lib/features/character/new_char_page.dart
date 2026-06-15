@@ -70,7 +70,7 @@ class _NewCharPageState extends State<NewCharPage> {
 
   void _toggleScroll() {
     setState(() => _scrollOpen = !_scrollOpen);
-    AudioManager().playSfx(SfxAssets.click);
+    AudioManager().playUiClick();
   }
 
   void _cycleOption(int delta) {
@@ -84,7 +84,7 @@ class _NewCharPageState extends State<NewCharPage> {
     setState(() {
       _look = BeginnerCreationCatalog.withTabValue(_look, _tab, opts[idx]);
     });
-    AudioManager().playSfx(SfxAssets.click);
+    AudioManager().playUiClick();
   }
 
   void _randomize() {
@@ -92,7 +92,7 @@ class _NewCharPageState extends State<NewCharPage> {
       _look = BeginnerCreationCatalog.random(_look.gender)
           .copyWith(name: _nameController.text);
     });
-    AudioManager().playSfx(SfxAssets.click);
+    AudioManager().playUiClick();
   }
 
   Future<void> _confirm() async {
@@ -315,7 +315,7 @@ class _NewCharPageState extends State<NewCharPage> {
                                 label: BeginnerCreationCatalog.tabLabels[i],
                                 selected: i == _tab,
                                 onTap: () {
-                                  AudioManager().playSfx(SfxAssets.click);
+                                  AudioManager().playUiClick();
                                   setState(() => _tab = i);
                                 },
                               ),

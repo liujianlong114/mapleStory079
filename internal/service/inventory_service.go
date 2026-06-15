@@ -15,6 +15,16 @@ func (s *InventoryService) AddItem(characterID uint, itemID int, quantity int) e
 	if quantity <= 0 {
 		return errors.New("quantity must be positive")
 	}
+	items, err := repository.GetCharacterInventory(characterID, "")
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if items[i].ItemID == itemID {
+			items[i].Quantity += quantity
+			return repository.UpdateCharacterItem(&items[i])
+		}
+	}
 	inventory := &database.CharacterInventory{
 		CharacterID: characterID,
 		ItemID:      itemID,

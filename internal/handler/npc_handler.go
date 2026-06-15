@@ -13,6 +13,7 @@ type NPCRequest struct {
 	CharacterID uint   `json:"characterId" binding:"required"`
 	NodeID      string `json:"nodeId"`
 	ChoiceIndex int    `json:"choiceIndex"`
+	NextID      string `json:"nextId"`
 }
 
 type NPCInteractRequest struct {
@@ -109,7 +110,7 @@ func (h *NPCHandler) Continue(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-	result, err := h.svc.ContinueDialogue(req.NPCID, req.CharacterID, req.NodeID, req.ChoiceIndex)
+	result, err := h.svc.ContinueDialogue(req.NPCID, req.CharacterID, req.NodeID, req.ChoiceIndex, req.NextID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

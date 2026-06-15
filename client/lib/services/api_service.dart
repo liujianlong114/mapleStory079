@@ -675,16 +675,19 @@ class ApiService {
     required int characterId,
     required String nodeId,
     required int choiceIndex,
+    String? nextId,
   }) async {
+    final body = <String, dynamic>{
+      'npcId': npcId,
+      'characterId': characterId,
+      'nodeId': nodeId,
+      'choiceIndex': choiceIndex,
+    };
+    if (nextId != null && nextId.isNotEmpty) body['nextId'] = nextId;
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/npc/dialogue/continue'),
       headers: _headers(),
-      body: jsonEncode({
-        'npcId': npcId,
-        'characterId': characterId,
-        'nodeId': nodeId,
-        'choiceIndex': choiceIndex,
-      }),
+      body: jsonEncode(body),
     );
     return await _handleResponse(response);
   }
@@ -695,8 +698,13 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _handleResponse(response);
+    if (data['success'] == true && data['items'] is List) {
+      return (data['items'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
     final list = data['items'] as List? ?? [];
-    return list.map((e) => e as Map<String, dynamic>).toList();
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   Future<int> buyShopItem({
@@ -715,6 +723,12 @@ class ApiService {
       }),
     );
     final data = await _handleResponse(response);
-    return (data['mesos'] as num?)?.toInt() ?? 0;
+    if (data['success'] == true) {
+      return (data['mesos'] as num?)?.toInt() ?? 0;
+    }
+    if (data['error'] != null) {
+      throw Exception('${data['error']}');
+    }
+    return 0;
   }
 }

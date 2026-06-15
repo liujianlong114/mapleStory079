@@ -43,12 +43,17 @@ type DialogueResult struct {
 
 // DialogueEffect 对话执行的副作用
 type DialogueEffect struct {
-	NewClass   int    `json:"new_class,omitempty"`
-	NewMapID   int    `json:"new_map_id,omitempty"`
-	NewHP      int    `json:"new_hp,omitempty"`
-	NewMP      int    `json:"new_mp,omitempty"`
-	NewMesos   int64  `json:"new_mesos,omitempty"`
-	ItemGained string `json:"item_gained,omitempty"`
+	NewClass     int    `json:"new_class,omitempty"`
+	NewMapID     int    `json:"new_map_id,omitempty"`
+	NewHP        int    `json:"new_hp,omitempty"`
+	NewMP        int    `json:"new_mp,omitempty"`
+	NewMaxHP     int    `json:"new_max_hp,omitempty"`
+	NewMaxMP     int    `json:"new_max_mp,omitempty"`
+	NewMesos     int64  `json:"new_mesos,omitempty"`
+	ItemGained   string `json:"item_gained,omitempty"`
+	NewSP        int    `json:"new_sp,omitempty"` // 技能点（转职后补偿）
+	NewPositionX int    `json:"new_position_x,omitempty"`
+	NewPositionY int    `json:"new_position_y,omitempty"`
 }
 
 // NPCScript 已注册的NPC脚本接口
@@ -134,12 +139,14 @@ func (s *NPCService) StartDialogue(npcID uint, characterID uint) (*DialogueResul
 	}, nil
 }
 
-// ContinueDialogue 继续对话（根据选择进入下一节点）
-func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID string, choiceIndex int) (*DialogueResult, error) {
+// ContinueDialogue 继续对话（根据选择或 next_id 进入下一节点）
+// choiceIndex < 0 表示当前节点是纯台词（say），按 nextID / node.NextID 推进；
+// 否则按 choice 索引进入。
+func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID string, choiceIndex int, nextID string) (*DialogueResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	npc, err := repository.GetNPCByID(npcID)
+	_, err := repository.GetNPCByID(npcID)
 	if err != nil {
 		return nil, errors.New("npc not found")
 	}
@@ -152,10 +159,8 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 	if nodeID == "end" {
 		return &DialogueResult{
 			NPCID:   npcID,
-			NPCName: npc.Name,
 			Node: &DialogueNode{
 				ID:       "end",
-				Speaker:  npc.Name,
 				Text:     "期待下次再见，祝你好运！",
 				NodeType: "end",
 				Action:   "close",
@@ -167,11 +172,9 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 	script, ok := s.scripts[int(npcID)]
 	if !ok {
 		return &DialogueResult{
-			NPCID:   npcID,
-			NPCName: npc.Name,
+			NPCID: npcID,
 			Node: &DialogueNode{
 				ID:       "end",
-				Speaker:  npc.Name,
 				Text:     "再见，冒险者！",
 				NodeType: "end",
 				Action:   "close",
@@ -184,15 +187,22 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 		return nil, err
 	}
 
-	// 如果是 choice 节点，读取对应选项
-	var nextNodeID, action, data string
-	if node.NodeType == "choice" && choiceIndex >= 0 && choiceIndex < len(node.Choices) {
+	// 决定要推进到哪个节点以及要执行的动作
+	var advanceNodeID, action, data string
+	if choiceIndex >= 0 && choiceIndex < len(node.Choices) {
 		choice := node.Choices[choiceIndex]
-		nextNodeID = choice.NextID
+		advanceNodeID = choice.NextID
 		action = choice.Action
 		data = choice.Data
 	} else {
-		nextNodeID = node.NextID
+		// 纯台词节点：优先使用调用方传入的 nextID，其次节点本身的 NextID，最后按 action
+		if nextID != "" {
+			advanceNodeID = nextID
+		} else if node.NextID != "" {
+			advanceNodeID = node.NextID
+		} else {
+			advanceNodeID = "end"
+		}
 		action = node.Action
 		data = node.Data
 	}
@@ -205,17 +215,15 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 			return nil, err
 		}
 		if effect != nil {
-			// 持久化角色修改
 			_ = repository.UpdateCharacter(character)
 		}
 	}
 
 	// 获取下一个节点
-	nextNode, err := script.GetNode(nextNodeID, character)
+	nextNode, err := script.GetNode(advanceNodeID, character)
 	if err != nil {
 		nextNode = &DialogueNode{
 			ID:       "end",
-			Speaker:  npc.Name,
 			Text:     "对话结束。",
 			NodeType: "end",
 		}
@@ -223,7 +231,6 @@ func (s *NPCService) ContinueDialogue(npcID uint, characterID uint, nodeID strin
 
 	result := &DialogueResult{
 		NPCID:   npcID,
-		NPCName: npc.Name,
 		Node:    nextNode,
 		Effects: effect,
 	}
@@ -258,7 +265,7 @@ func (s *JobChangeScript) GetNode(nodeID string, character *database.Character) 
 			return &DialogueNode{
 				ID:       "level_low",
 				Speaker:  "转职官",
-				Text:     fmt.Sprintf("你当前等级为 %d，需要达到 10 级才能进行转职。", character.Level),
+				Text:     "你还需要更多修炼。",
 				NodeType: "choice",
 				Choices: []DialogueChoice{
 					{Text: "好的，我会努力升级", NextID: "end", Action: "close"},
@@ -327,9 +334,25 @@ func (s *JobChangeScript) ExecuteAction(action string, data string, character *d
 		if _, ok := utils.JobNames[newClass]; !ok {
 			return nil, errors.New("invalid job class")
 		}
-		character.Class = newClass
+
+		oldLevel := character.Level
 		applyJobInitialStats(character, newClass)
-		return &DialogueEffect{NewClass: newClass}, nil
+
+		// SP 补偿（079 标准）：1 转时若等级 > 10，每超过 1 级补偿 3 SP
+		spCompensation := 0
+		if newClass%100 == 0 && oldLevel > 10 {
+			spCompensation = (oldLevel - 10) * 3
+		}
+		character.SkillPoint = spCompensation
+
+		return &DialogueEffect{
+			NewClass: newClass,
+			NewMaxHP: character.MaxHP,
+			NewMaxMP: character.MaxMP,
+			NewHP:    character.HP,
+			NewMP:    character.MP,
+			NewSP:    character.SkillPoint,
+		}, nil
 	}
 	return nil, nil
 }
@@ -348,6 +371,7 @@ func simpleConfirmNode(text string, classData int) *DialogueNode {
 }
 
 func applyJobInitialStats(character *database.Character, class int) {
+	character.Class = class
 	stats, ok := utils.JobInitialStatsMap[class]
 	if !ok {
 		return
@@ -376,10 +400,11 @@ func (s *PortalScript) GetNode(nodeID string, character *database.Character) (*D
 			Text:     fmt.Sprintf("你现在位于地图 %d，选择要前往的目的地：", character.MapID),
 			NodeType: "choice",
 			Choices: []DialogueChoice{
-				{Text: "前往新手村", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapMapleIsland)},
-				{Text: "前往明珠港", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapSouthPerry)},
-				{Text: "前往魔法密林", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapEllinia)},
-				{Text: "前往射手村", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d", utils.MapHenesys)},
+				{Text: "前往新手村（彩虹村）", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d|in00", utils.MapMapleIsland)},
+				{Text: "前往明珠港", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d|in00", utils.MapSouthPerry)},
+				{Text: "前往射手村", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d|in00", utils.MapHenesys)},
+				{Text: "前往魔法密林", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d|in00", utils.MapEllinia)},
+				{Text: "前往勇士部落", NextID: "teleport", Action: "teleport", Data: fmt.Sprintf("%d|in00", utils.MapPerion)},
 				{Text: "不去了", NextID: "end", Action: "close"},
 			},
 		}, nil
@@ -387,7 +412,7 @@ func (s *PortalScript) GetNode(nodeID string, character *database.Character) (*D
 		return &DialogueNode{
 			ID:       "teleport",
 			Speaker:  "传送门",
-			Text:     fmt.Sprintf("已成功将你传送到地图 %d。", character.MapID),
+			Text:     fmt.Sprintf("一道光芒闪过，你已经到达地图 %d。", character.MapID),
 			NodeType: "end",
 			Action:   "close",
 		}, nil
@@ -405,15 +430,28 @@ func (s *PortalScript) GetNode(nodeID string, character *database.Character) (*D
 
 func (s *PortalScript) ExecuteAction(action string, data string, character *database.Character) (*DialogueEffect, error) {
 	if action == "teleport" {
+		// data 格式："mapId|portalName" 或单纯 "mapId"
 		var mapID int
-		_, err := fmt.Sscanf(data, "%d", &mapID)
-		if err != nil {
+		portalName := ""
+		if n, err := fmt.Sscanf(data, "%d|%s", &mapID, &portalName); err == nil && n >= 1 {
+			// ok
+		} else if n, err := fmt.Sscanf(data, "%d", &mapID); err == nil && n == 1 {
+			// ok
+		} else {
 			return nil, errors.New("invalid map id")
 		}
+		if mapID <= 0 {
+			return nil, errors.New("invalid map id")
+		}
+		px, py := spawnForMap(uint(mapID), portalName)
 		character.MapID = uint(mapID)
-		character.PositionX = 0
-		character.PositionY = 0
-		return &DialogueEffect{NewMapID: mapID}, nil
+		character.PositionX = px
+		character.PositionY = py
+		return &DialogueEffect{
+			NewMapID:     mapID,
+			NewPositionX: px,
+			NewPositionY: py,
+		}, nil
 	}
 	return nil, nil
 }

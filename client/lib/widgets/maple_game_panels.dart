@@ -52,7 +52,10 @@ class MapleGamePanel extends StatelessWidget {
               right: 6,
               top: 4,
               child: GestureDetector(
-                onTap: onClose,
+                onTap: () {
+                  AudioManager().playUiClick();
+                  onClose();
+                },
                 child: Image.asset(
                   'assets/images/ui/windows/btn_close_normal.png',
                   width: 85,
@@ -109,7 +112,10 @@ class _MapleInventoryPanelState extends State<MapleInventoryPanel> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 1),
                   child: GestureDetector(
-                    onTap: () => setState(() => _tab = i),
+                    onTap: () {
+                      AudioManager().playUiClick();
+                      setState(() => _tab = i);
+                    },
                     child: Image.asset(asset, filterQuality: FilterQuality.none),
                   ),
                 );

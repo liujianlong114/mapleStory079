@@ -102,11 +102,16 @@ class WzMapForegroundLayer extends PositionComponent
 
   Future<ui.Image?> _loadTileImage(String tS, String u, int no) async {
     final primary = AssetPaths.bundle('maps/tiles/$tS/${u}_$no.png');
-    final img = await _loadImage(primary);
+    // 先尝试 primary（即使 placeholder 也尝试，因为可能有 fallback）
+    var img = await _loadImage(primary, skipPlaceholder: false);
     if (img != null) return img;
+    // primary 失败或不存在，尝试 fallback
     final alt = _tileFallback[u];
-    if (alt == null) return null;
-    return _loadImage(AssetPaths.bundle('maps/tiles/$tS/${alt}_$no.png'));
+    if (alt != null) {
+      img = await _loadImage(AssetPaths.bundle('maps/tiles/$tS/${alt}_$no.png'));
+      if (img != null) return img;
+    }
+    return null;
   }
 
   Future<bool> _isPlaceholderAsset(String bundledPath) async {
@@ -134,12 +139,12 @@ class WzMapForegroundLayer extends PositionComponent
     }
   }
 
-  Future<ui.Image?> _loadImage(String bundledPath) async {
+  Future<ui.Image?> _loadImage(String bundledPath, {bool skipPlaceholder = true}) async {
     if (_images.containsKey(bundledPath)) return _images[bundledPath];
     try {
       final data = await rootBundle.load(bundledPath);
       if (data.lengthInBytes < _minTileBytes) return null;
-      if (await _isPlaceholderAsset(bundledPath)) return null;
+      if (skipPlaceholder && await _isPlaceholderAsset(bundledPath)) return null;
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
       _images[bundledPath] = frame.image;

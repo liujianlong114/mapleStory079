@@ -68,10 +68,26 @@ class MapFootholds {
   factory MapFootholds.fromJson(List<dynamic>? list, {required double fallbackY}) {
     final segs = <FootholdSegment>[];
     final byId = <int, FootholdSegment>{};
+    var autoId = 1000;
     for (final raw in list ?? const []) {
-      final seg = FootholdSegment.fromJson(raw as Map<String, dynamic>);
+      var seg = FootholdSegment.fromJson(raw as Map<String, dynamic>);
+      // JSON 可能缺 id/prev/next（仅导出 x1,y1,x2,y2）——自动补唯一 id，
+      // 保证 segmentById 与 getFhidBelow 返回值可用于 groundYOnFh/advanceFhid。
+      if (seg.id <= 0) {
+        autoId += 1;
+        seg = FootholdSegment(
+          id: autoId,
+          layer: seg.layer,
+          prev: seg.prev,
+          next: seg.next,
+          x1: seg.x1,
+          y1: seg.y1,
+          x2: seg.x2,
+          y2: seg.y2,
+        );
+      }
       segs.add(seg);
-      if (seg.id > 0) byId[seg.id] = seg;
+      byId[seg.id] = seg;
     }
 
     final idsByX = <int, List<int>>{};
@@ -82,9 +98,8 @@ class MapFootholds {
       if (segBottom > borderBottom) borderBottom = segBottom;
       final start = s.minX.floor();
       final end = s.maxX.ceil();
-      final keyId = s.id > 0 ? s.id : segs.indexOf(s) + 1;
       for (var xi = start; xi <= end; xi++) {
-        idsByX.putIfAbsent(xi, () => []).add(keyId);
+        idsByX.putIfAbsent(xi, () => []).add(s.id);
       }
     }
 
@@ -182,18 +197,34 @@ class MapFootholds {
   }
 
   /// 079 下跳：脚下是否有更低平台（HeavenClient enablejd + groundbelow）
+  ///
+  /// 关键约束：仅"薄平台"(thin platform, foothold.prev==0 或 foothold.next==0)
+  /// 才能向下穿过；完整墙体/地面段(prev!=0 && next!=0)禁止穿下去。
   static const double maxJumpDownGap = 600;
+
+  /// 当前 fhid 对应段是否是薄平台(可向下穿越)
+  bool isThinPlatform(int? fhid) {
+    if (fhid == null || fhid <= 0) return false;
+    final fh = byId[fhid];
+    if (fh == null) return false;
+    return fh.prev == 0 || fh.next == 0;
+  }
 
   ({bool enabled, double dropY}) jumpDownInfo(int? fhid, double x) {
     if (fhid == null || fhid <= 0) return (enabled: false, dropY: 0);
+    final fh = byId[fhid];
+    if (fh == null) return (enabled: false, dropY: 0);
+    // 薄平台才允许下跳
+    if (fh.prev != 0 && fh.next != 0) return (enabled: false, dropY: 0);
     final ground = groundYOnFh(fhid, x);
     if (ground == null) return (enabled: false, dropY: 0);
     final belowId = getFhidBelow(x, ground + 1);
     if (belowId == null || belowId == fhid) {
-      return (enabled: false, dropY: ground + 1);
+      // 没有下一层，直接掉落(允许掉到 borderBottom 再重生)
+      return (enabled: true, dropY: ground + 1);
     }
     final belowGround = groundYOnFh(belowId, x);
-    if (belowGround == null) return (enabled: false, dropY: ground + 1);
+    if (belowGround == null) return (enabled: true, dropY: ground + 1);
     final enabled = (belowGround - ground) < maxJumpDownGap;
     return (enabled: enabled, dropY: ground + 1);
   }

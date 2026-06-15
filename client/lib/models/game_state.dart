@@ -102,6 +102,7 @@ class GameState {
     if (json['int'] != null) intl = json['int'] as int;
     if (json['luk'] != null) luk = json['luk'] as int;
     if (json['ability_points'] != null) ap = json['ability_points'] as int;
+    if (json['sp'] != null) sp = json['sp'] as int;
     if (json['mesos'] != null) mesos = json['mesos'] as int;
 
     hpPercent = maxHp > 0 ? (hp / maxHp * 100) : 0;

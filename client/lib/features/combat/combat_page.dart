@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/resources/assets.dart';
 import '../../providers/game_provider.dart';
 import '../../providers/skill_provider.dart';
 import '../../models/skill.dart';
@@ -230,7 +231,10 @@ class _CombatPageState extends State<CombatPage> {
                             itemBuilder: (context, index) {
                               final skill = skillProvider.skills[index];
                               return GestureDetector(
-                                onTap: () => _attackMob(skill),
+                                onTap: () {
+                                  AudioManager().playUiClick();
+                                  _attackMob(skill);
+                                },
                                 child: Container(
                                   width: 64,
                                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -259,7 +263,10 @@ class _CombatPageState extends State<CombatPage> {
                           children: [
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () => _attackMob(),
+                                onPressed: () {
+                                  AudioManager().playUiClick();
+                                  _attackMob();
+                                },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orangeAccent,
                                   foregroundColor: Colors.white,
@@ -271,7 +278,10 @@ class _CombatPageState extends State<CombatPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: _endCombat,
+                                onPressed: () {
+                                  AudioManager().playUiClick();
+                                  _endCombat();
+                                },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.grey[700],
                                   foregroundColor: Colors.white,
@@ -288,7 +298,10 @@ class _CombatPageState extends State<CombatPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _startCombat,
+                        onPressed: () {
+                          AudioManager().playUiClick();
+                          _startCombat();
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.redAccent,
                           foregroundColor: Colors.white,

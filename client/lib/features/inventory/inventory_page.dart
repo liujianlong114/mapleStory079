@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/resources/assets.dart';
 import '../../models/item.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/game_provider.dart';
@@ -110,6 +111,7 @@ class _InventoryPageState extends State<InventoryPage> with SingleTickerProvider
               return GestureDetector(
                 onTap: () {
                   if (item != null) {
+                    AudioManager().playUiClick();
                     _showItemDialog(item);
                   }
                 },
@@ -184,6 +186,7 @@ class _InventoryPageState extends State<InventoryPage> with SingleTickerProvider
                               minimumSize: Size.zero,
                             ),
                             onPressed: () {
+                              AudioManager().playUiClick();
                               final hp = item.stats['hp'] ?? 0;
                               final mp = item.stats['mp'] ?? 0;
                               inventory.useItem(item);
@@ -300,12 +303,16 @@ class _InventoryPageState extends State<InventoryPage> with SingleTickerProvider
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                AudioManager().playUiClick();
+                Navigator.pop(context);
+              },
               child: const Text('关闭', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
               onPressed: () {
+                AudioManager().playUiClick();
                 Navigator.pop(context);
                 final inventory = Provider.of<InventoryProvider>(context, listen: false);
                 inventory.equipItem(item);

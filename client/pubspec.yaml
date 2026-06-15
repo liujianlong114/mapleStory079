@@ -35,6 +35,7 @@ flutter:
     - assets/images/ui/login/back/
     - assets/scenes/
     - assets/maps/
+    - assets/maps/miniMap/
     - assets/maplife/
     - assets/maps/back/
     - assets/maps/back/Rien/
@@ -70,12 +71,14 @@ flutter:
     - assets/maps/obj/signboard/
     - assets/maps/obj/vehicle/
     - assets/audio/
+    - assets/audio/bgm/
     # Flutter 目录声明不含子目录，必须分别列出
     - assets/sprites/mob/
     - assets/sprites/npc/
     - assets/sprites/player/
     - assets/sprites/item/
     - assets/sprites/portal/
+    - assets/sprites/effect/
     - assets/images/tiles/
     - assets/characters/parts/
     - assets/characters/avatars/

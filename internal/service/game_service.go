@@ -156,19 +156,114 @@ func (s *GameService) ChangeMap(ch *database.Character, newMapID uint, portalNam
 	return nil
 }
 
+// spawnForMap 返回在目标地图上的出生/落脚点坐标（单位：Map.wz 像素坐标系）。
+// 数值参考 079 版各城镇的 start 传送门位置，若指定 portalName 存在则按传送门落点，
+// 否则返回各城镇的默认"中央广场"坐标。
 func spawnForMap(mapID uint, portalName string) (int, int) {
-	// 079 彩虹村 / 南门外道等 — 与 client/assets/maps/*.json spawn 对齐
-	switch mapID {
-	case 1000000:
-		return 400, 605
-	case 20000:
-		if portalName == "in00" {
-			return -140, 273
+	// 彩虹村（MapMapleIsland / MapTutorialStart 共用同一套元数据）
+	if mapID == 10000 || mapID == 1000000 || mapID == 1000001 || mapID == 1000002 {
+		if portalName != "" {
+			switch portalName {
+			case "in00":
+				return -140, 273
+			case "out00":
+				return 400, 605
+			}
 		}
-		return 400, 65
-	default:
 		return 400, 605
 	}
+	// 明珠港 / 明珠港码头（MapSouthPerry / MapPerryDock）
+	if mapID == 10300 || mapID == 10400 || mapID == 20000 || mapID == 104000000 {
+		if portalName != "" {
+			switch portalName {
+			case "in00":
+				return -140, 273
+			case "out00":
+				return 400, 65
+			}
+		}
+		return 400, 65
+	}
+	// 射手村（MapHenesys / 10500）
+	if mapID == 10500 || mapID == 10501 || mapID == 10502 {
+		if portalName != "" {
+			switch portalName {
+			case "in00":
+				return -200, 400
+			case "out00":
+				return 600, 400
+			}
+		}
+		return 600, 400
+	}
+	// 魔法密林（MapEllinia / 10800）
+	if mapID == 10800 || mapID == 10900 || mapID == 11000 {
+		if portalName != "" {
+			switch portalName {
+			case "in00":
+				return -200, 300
+			case "out00":
+				return 500, 300
+			}
+		}
+		return 500, 300
+	}
+	// 勇士部落（MapPerion / 11300）
+	if mapID == 11300 || mapID == 11400 || mapID == 11500 {
+		if portalName != "" {
+			switch portalName {
+			case "in00":
+				return -180, 500
+			case "out00":
+				return 550, 500
+			}
+		}
+		return 550, 500
+	}
+	// 废弃都市（KerningCity / 11700）
+	if mapID == 11700 || mapID == 11800 {
+		if portalName == "in00" {
+			return -150, 350
+		}
+		return 500, 350
+	}
+	// 冰峰雪域（ElNath / 12000）
+	if mapID == 12000 || mapID == 12100 {
+		if portalName == "in00" {
+			return -200, 400
+		}
+		return 600, 400
+	}
+	// 玩具城（Ludibrium / 12400）
+	if mapID == 12400 || mapID == 12500 {
+		if portalName == "in00" {
+			return -180, 300
+		}
+		return 550, 300
+	}
+	// 天空之城（Orbis / 12700）
+	if mapID == 12700 || mapID == 12800 {
+		if portalName == "in00" {
+			return -200, 350
+		}
+		return 580, 350
+	}
+	// 蚂蚁洞广场 / 林中之城
+	if mapID == 13000 || mapID == 13100 || mapID == 13200 {
+		if portalName == "in00" {
+			return -150, 500
+		}
+		return 500, 500
+	}
+	// 通用：BOSS 地图 / 训练场 / 未列出
+	if mapID == 14000 || mapID == 14100 || mapID == 15000 || mapID == 15100 {
+		return 400, 400
+	}
+	if mapID >= 20000 && mapID < 30000 {
+		return 500, 300
+	}
+	// 默认：中央位置
+	return 400, 400
 }
 
 // ========== Gameplay Helpers ==========

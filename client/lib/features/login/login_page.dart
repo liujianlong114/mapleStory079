@@ -60,6 +60,7 @@ class _LoginPageState extends State<LoginPage> {
         }
         final ok = await auth.loginByCredentials(username, password);
         if (ok && mounted) {
+          AudioManager().playUiClick();
           _navigateAfterLogin(auth);
         } else {
           _errorMessage = auth.errorMessage ?? '登录失败';
@@ -82,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
         }
         final ok = await auth.register(username, password, '');
         if (ok && mounted) {
+          AudioManager().playUiClick();
           setState(() {
             _isLogin = true;
             _registerUsernameController.clear();
@@ -110,8 +112,10 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onSceneButton(String id) {
     if (id == 'login') {
+      AudioManager().playUiClick();
       _submit();
     } else if (id == 'quit') {
+      AudioManager().playUiClick();
       AudioManager().stopBgm();
     }
   }
@@ -206,7 +210,12 @@ class _LoginPageState extends State<LoginPage> {
                         right: 0,
                         bottom: 8,
                         child: GestureDetector(
-                          onTap: _isLoading ? null : () => setState(() => _isLogin = !_isLogin),
+                          onTap: _isLoading
+                              ? null
+                              : () {
+                                  AudioManager().playUiClick();
+                                  setState(() => _isLogin = !_isLogin);
+                                },
                           child: Text(
                             _isLogin ? '注册新账号' : '返回登录',
                             textAlign: TextAlign.center,

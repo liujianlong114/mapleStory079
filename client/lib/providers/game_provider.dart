@@ -71,6 +71,7 @@ class GameProvider with ChangeNotifier {
   int get intl => _state.intl;
   int get luk => _state.luk;
   int get ap => _state.ap;
+  int get sp => _state.sp;
   int get mesos => _state.mesos;
 
   void selectCharacter(Character character) {
@@ -335,6 +336,7 @@ class GameProvider with ChangeNotifier {
     int? level,
     int? exp,
     int? mesos,
+    int? sp,
     double? posX,
     double? posY,
   }) {
@@ -365,6 +367,10 @@ class GameProvider with ChangeNotifier {
     }
     if (mesos != null && _state.mesos != mesos) {
       _state.mesos = mesos;
+      changed = true;
+    }
+    if (sp != null && _state.sp != sp) {
+      _state.sp = sp;
       changed = true;
     }
     if (posX != null && _state.posX != posX) {

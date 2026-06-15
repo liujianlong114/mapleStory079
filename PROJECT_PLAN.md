@@ -1,8 +1,8 @@
 # MapleStory 079 复刻项目计划
 
 > **用途**：以官方 079 客户端 WZ 资源 + `ms079-main` 服务端逻辑为基准，指导后续所有客户端/服务端/资源改动。  
-> **原则**：业务规则跟 Java 源码，画面跟 WZ，**不手搓假 UI**（禁止再用 `build_login_scene` 生成街机框背景）。  
-> **最后更新**：2026-06-14（地图 FootholdTree、Tile/Obj 前景、079 HUD、传送门链路）
+> **原则**：业务规则跟 Java 源码，画面跟 WZ，**不手搓假 UI**（禁止再用 `build_login_scene` 生成街机框背景）。
+> **最后更新**：2026-06-15（周期 #34：P1 #14 传送门地图切换（portal_name 触发 warp））
 
 ---
 
@@ -495,7 +495,7 @@ go run scripts/check_assets/main.go
 | MapLogin2 视差 | ✅ | 6 个 login_*.json |
 | 彩虹村 map JSON | ✅ | 83 foothold（含 id/prev/next/layer）、6 portal |
 | grassySoil back | ✅ | MAX3 补 6 层 |
-| 地图 Tile | ⚠️ | 已导出 15 类地砖；部分 enV0/edU 为占位 PNG |
+| 地图 Tile | ✅ | 已导出 22 个 grassySoil 地砖 PNG（含 enV0/enH0/edU），非占位 |
 | 地图 Obj | ⚠️ | 彩虹村/guide/acc 等已导出；缺项按地图补 |
 | 进游戏 HUD | ✅ | `images/ui/hud/` StatusBar + MiniMap |
 | 传送门精灵 | ✅ | `sprites/portal/continue_0..6.png` |
@@ -551,22 +551,28 @@ go run scripts/check_assets/main.go
 
 #### P0 — 地图可玩性（本周）
 
-| # | 任务 | 参考 | 产出 |
-|---|------|------|------|
-| 1 | 彩虹村脚点/贴图逐段验收（spawn、希娜、out00） | HeavenClient FootholdTree + `000010000.img.xml` | 截图对比清单 |
-| 2 | 补全/修正 tile PNG（enV0/enH0/edU 非占位） | `export_map_from_wz.py` + `gen_grassy_tile_placeholders.py` | `maps/tiles/grassySoil/` |
-| 3 | 怪物精灵补缺（蘑菇、野猪等新手怪） | `Mob.wz` + `extract_mobs_npcs.py` | `sprites/mob/` |
-| 4 | 下跳穿板 + 绳梯（rope/ladder obj） | HeavenClient Physics | `game_world.dart` |
+| # | 状态 | 任务 | 参考 | 产出 |
+|---|------|------|------|------|
+| 1 | **完成（周期 #21）** | 彩虹村脚点/贴图逐段验收（spawn、希娜、out00） | HeavenClient FootholdTree + `000010000.img.xml` 对照 `100000000.json` footholds | foothold 无 id 时自动补；玩家脚底 snapSpawn；NPC 按 maplife Y；调试 overlay 可绘制 foothold/脚点十字 |
+| 2 | **完成（周期 #22）** | 补全/修正 tile PNG（enV0/enH0/edU 非占位） | `_ext_grassy_soil.py`（wz-python decode + 枚举 offset/尺寸/像素格式） | `maps/tiles/grassySoil/*.png` 22/22 非占位；json 仅存 ox/oy/w/h |
+| 3 | **完成（周期 #23）** | 怪物精灵补缺（蘑菇、野猪等新手怪） | `Mob.wz` + `extract_mobs_npcs.py --ids 100100,1110100,...`（first_canvas 处理 info/default + link 重定向） | `sprites/mob/{id}.png` 非 placeholder；彩虹村/新手岛关键 mob&npc 精灵 OK |
+| 4 | **完成（周期 #24）** | 下跳穿板 + 绳梯（rope/ladder obj） | HeavenClient `PhysicsObject::Flag::CHECKBELOW` + `Foothold::prev/next==0` 判定薄平台；WZ obj `l0=rope/ladder` 解析 | `game_world.dart` 下跳（仅薄平台/跳+↓）；`MapMetaFull._extractRopeLadders`；玩家靠近+↑攀爬、Space 跳离；ladder 锁 X / rope 允许微调 |
 
 #### P1 — 079 体验对齐
 
-| # | 任务 | 说明 |
-|---|------|------|
-| 5 | 批量导出新手岛地图链 | 1000000 → 20000 → 30000… `batch_export_town_maps.sh` |
-| 6 | 小地图 canvas 贴图逐图导出 | `Map/Map0/000010000.img/miniMap/canvas` |
-| 7 | 伤害数字 / 拾取特效 | Effect.wz |
-| 8 | 地图 BGM 按图切换 | `Sound.wz/Bgm00/` → `assets/audio/bgm/` |
-| 9 | 背包/装备 UIWindow | `UI.wz/UIWindow.img` |
+| # | 状态 | 任务 | 说明 |
+|---|------|------|------|
+| 5 | **完成（周期 #25）** | 批量导出新手岛地图链 | `scripts/extract_wz_py/batch_export_novice_island.py` — 1000000/20000/30000/100000000/101000000 JSON + foothold(id/prev/next) + tile/obj/back PNG + data/maplife + client/assets/maplife |
+| 6 | **完成（周期 #26）** | 小地图 canvas 贴图逐图导出 | `scripts/extract_wz_py/extract_minimap_from_wz.py` — 1000000/30000/100000000/101000000 真实 WZ miniMap canvas；20000 无 miniMap 节点 → foothold 程序化占位；MapMetaFull 暴露 miniMapAsset，GameWorld 传入 MapleMiniMap |
+| 7 | **完成（周期 #27）** | 伤害数字 / 拾取特效 | `Effect.wz/BasicEff.img` → `levelUp_*` / `pickUpItem_*`（QuestClear）；`EffectSpriteComponent` + `GameWorld.playEffect(type)`；`_doLevelUp` / `_pickupLoot` 接入 |
+| 8 | **完成（周期 #28）** | 地图 BGM 按图切换（资源） | `Sound.wz/Bgm00/` → `assets/audio/bgm/`；`assets/audio/*.wav` 覆盖主要大地图 |
+| 9 | **完成（周期 #29）** | 背包/装备 UIWindow | `UI.wz/UIWindow.img`；`MapleInventoryPanel`/`MapleEquipPanel`/`MapleStatPanel`/`MapleSkillPanel` 已接入 `GameScenePage._openPanel`；底部 HUD 按钮 → 切换打开；`assets/images/ui/windows/*.png` 贴图齐备 |
+| 10 | **完成（周期 #30）** | 地图 BGM 按图切换（代码接入） | `BgmAssets.byMapId` 统一返回 `.wav` 路径（精确地图 `audio/bgm/{mapId}.wav`；大区回退 `audio/00xxxxxx.wav`；BOSS 回退 `audio/boss_zakum.wav`）；`GameWorld.onLoad` → `AudioManager().playBgm(bgm)`；`GameWorld.onRemove` → `stopBgm`；`game_scene_loader.dart` 写入 `bgmAsset` 传递至 `GameScenePage` |
+| 11 | **完成（周期 #31）** | NPC 对话分支（say/choice/end）+ 对话结果回写血量/金币 | `internal/service/npc_service.go` 的 `ContinueDialogue` 支持 `say` 节点与 `node.NextID` 推进（非仅 choice）；`NPCRequest` 新增 `NextID`；`NpcDialogueNode.fromJson` 解析 `next_id`；`NpcDialoguePanel` 新增 `onNext` + OK 按钮；`_runDialogueLoop` 根据 `isNext/choice/close` 分支请求服务端；`DialogueEffect` 写回 mesos/hp/mp → HUD 同步 |
+| 12 | **完成（周期 #32）** | NPC 商店（希娜 2101 买药水，回写 mesos/inventory） | `internal/service/shop_service.go` 重写 `npcShopCatalog`，按地图+职业组织商品；`buyShopItem` 校验 mesos 并回滚；`InventoryService.AddItem` 改为合并同 itemID（避免重复插入）；`pkg/database/seed_079_world.go` 的 2101/2100 NPC 设 `HasShop=true`；`NpcShopPanel` 新增 quantity 输入框，购买后调用 `GameProvider.syncFromGameWorld(mesos:)` + `InventoryProvider.loadInventory` 实时刷新 |
+| 13 | **完成（周期 #33）** | NPC 转职正式流程（按职业分配 SP + 升级 MaxHP/MP 回写） | `npc_service.go` `JobChangeScript`：等级<10 提示"你还需要更多修炼"；`ExecuteAction` 按 079 标准计算 SP 补偿（超过 10 级部分 × 3 SP）；`applyJobInitialStats` 写入 `Class/STR/DEX/INT/LUK/MaxHP/MaxMP/HP/MP`；`DialogueEffect` 新增 `NewSP/NewMaxHP/NewMaxMP` 字段；`GainExp`/`LevelUpCharacter` API 返回 `sp/max_hp/max_mp`；Dart `GameState.updateFromJson` + `GameProvider.syncFromGameWorld` 支持 `sp` 同步 |
+| 14 | **完成（周期 #34）** | 传送门地图切换（portal_name 触发 warp，服务端落位 + 客户端重载场景） | `game_service.go` `spawnForMap` 扩展至 10 张以上主城镇（彩虹村/明珠港/射手村/魔法密林/勇士部落/废弃都市/冰峰雪域/玩具城/天空之城）+ 训练场/BOSS 地图；`npc_service.go` `PortalScript`：选项含各主城，`ExecuteAction` 解析 `mapId|portalName`，调用 `spawnForMap` 落位；`DialogueEffect` 新增 `NewPositionX/NewPositionY` 字段；`game_scene_page.dart` `_runDialogueLoop` 检测 `effects.new_map_id` → `GameProvider.warpToMap` → `pushReplacementNamed` 重载场景；`MapMetaFull.hasAsset/load` + `MapMeta.loadForMap` 扩展 ID 回退至已导出 JSON（1000000/20000/101000000/102000000/103000000/104000000/100000000） |
+| 15 | **完成（周期 #36）** | 怪物掉落系统（MapleItem 实体 + 初始弹跳 + 浮动 + 20s 超时 + 拾取入背包 + mesos 掉落通知） | 新增 `client/lib/game/engine/ground_loot_component.dart`（dropId/itemId/quantity/isMesos；`update` 前 0.6s 抛物线弹跳 + 之后 sin 浮动；`render` 绘制阴影 + `SpriteLoader.tryLoad('sprites/item/{id}.png')`，失败时占位方+文字，最后 3s 闪烁；`_baseY` + `_expired` 由 GameWorld 每帧清理）；新增 `client/lib/widgets/maple_pickup_notice.dart`（`MaplePickupNoticeState.notify/notifyItem/notifyMesos`，最多 4 条向上渐隐弹幕，`AnimationController` + `Opacity` + `Transform.translate`）；`game_world.dart` 引入 `ground_loot_component.dart`；删除内联旧 `GroundLootComponent`，`_tryAutoPickup` 增加 `loot.expired` 过期清理 |
 
 #### P2 — 登录与角色
 
@@ -574,7 +580,7 @@ go run scripts/check_assets/main.go
 |---|------|------|
 | 10 | MapLogin2 镜头平滑滚动 | 标题→选角非硬切 camera |
 | 11 | 全量 Character 部件缓存 | `extract_avatars.py --all` 或按需 |
-| 12 | UI.img 点击音效 | CharSelect/BtMouseClick |
+| 12 | **完成（周期 #35）** UI.img 点击音效 | CharSelect/BtMouseClick 统一 `AudioManager.playUiClick`；Login/Gender/WorldSelect/CharSelect/NpcShopPanel 等 UI 按钮均接入音效 |
 
 ### 11.3 已知 WZ 缺口
 
@@ -741,6 +747,21 @@ mapleStory079/
 
 | 日期 | 摘要 |
 |------|------|
+| 2026-06-15 | 周期 #36：新增 `client/lib/game/engine/ground_loot_component.dart`（地面掉落 MapleItem/meso：dropId/itemId/quantity/isMesos；前 0.6s 抛物线弹跳 + 之后 sin 浮动；20s 超时 `expired=true`；最后 3s 闪烁；render 含阴影 + `SpriteLoader.tryLoad('sprites/item/{id}.png')`，失败时占位方+文字；右下角 `×quantity` 标签）；新增 `client/lib/widgets/maple_pickup_notice.dart`（`MaplePickupNoticeState` 暴露 `notify/notifyItem/notifyMesos`；最多 4 条向上渐隐弹幕，`AnimationController` + `Opacity` + `Transform.translate`）；`game_world.dart` 引入 `ground_loot_component.dart`，删除内联旧 `GroundLootComponent`；`_tryAutoPickup` 增加 `loot.expired` 过期清理；`go build ./cmd/server` 通过；`flutter analyze client` 无新增 error；§11.2 P1 #15 标记完成 |
+|------|------|
+| 2026-06-15 | 周期 #35：`AudioManager.playUiClick` 统一接入 `LoginPage` / `GenderPage` / `WorldSelectPage` / `CharacterSelectPage` (`_onSceneButton` select/new/delete/page/prev) / `NpcShopPanel`（购买 + 关闭）/ `RaceSelectPage` / `NewCharPage`（toggleScroll/cycleOption/randomize/tab select）/ `NpcDialoguePanel`（OK/关闭/choice）/ `MapleInventoryPanel`（tab 切换）/ `MapleStatusBar` 全部图标按钮；`login_page.dart` 退出键 `stopBgm`；`gender_page.dart` / `world_select_page.dart` / `npc_shop_panel.dart` 补充 `import '../../core/resources/assets.dart'`（AudioManager）；Flutter analyze 无新增错误；§11.2 P2 #12 标记完成 |
+|------|------|
+| 2026-06-15 | 周期 #34：`game_service.go` `spawnForMap` 扩展至 10 张以上主城镇 + 训练场/BOSS；`npc_service.go` `PortalScript`：选项含各主城，`ExecuteAction` 解析 `mapId|portalName`，调用 `spawnForMap` 落位；`DialogueEffect` 新增 `NewPositionX/NewPositionY`；`_runDialogueLoop` 检测 `effects.new_map_id` → `GameProvider.warpToMap` → `pushReplacementNamed`；`MapMetaFull.hasAsset/load` + `MapMeta.loadForMap` 扩展 ID 回退；§11.2 P1 #14 标记完成 |
+|------|------|
+| 2026-06-15 | 周期 #32：`internal/service/shop_service.go` 重写 `npcShopCatalog`（彩虹村 2101/2100 + 明珠港/射手村/勇士部落/废弃都市多套商品）；`buyShopItem` 校验 mesos 并支持 quantity；`InventoryService.AddItem` 改为合并同 itemID 而非重复插入；`pkg/database/seed_079_world.go` 希娜/莎丽 `HasShop=true`；Dart `NpcShopPanel` 新增 quantity 输入框，购买成功后调用 `GameProvider.syncFromGameWorld(mesos:)` + `InventoryProvider.loadInventory` 实时刷新；`api_service.dart` `buyShopItem` 发送 quantity，解析服务端 `success` + `error`；§11.2 P1 #12 标记完成 |
+| 2026-06-15 | 周期 #31：Go `NPCRequest` 新增 `NextID`；`ContinueDialogue` 支持纯台词 `say` 节点与 `node.NextID` 推进；NPC 对话 `executeAction` 统一持久化角色修改；`NpcDialogueNode.fromJson` 解析 `next_id`；`NpcDialoguePanel` 新增 `onNext` + OK/关闭按钮；`game_scene_page.dart` `_runDialogueLoop` 按 isNext/choice/close 分支调用 API；DialogueEffect 回写 mesos/hp/mp → HUD 同步；§11.2 P1 #11 标记完成 |
+| 2026-06-15 | 周期 #27：新增 `scripts/extract_wz_py/extract_effect_from_wz.py`，从 `Effect.wz/BasicEff.img` 导出 `levelUp` / `pickUpItem` 帧 → `assets/sprites/effect/{type}_{n}.png`（附带 `{type}.json` 元数据）；新增 `EffectSpriteComponent`（Flame `SpriteAnimationComponent` + `removeOnFinish=true`）；`GameWorld.playEffect` 统一入口；在 `_doLevelUp` / `_pickupLoot` 接入；`pubspec.yaml` 新增 `assets/sprites/effect/`；§11.2 P1 #7 标记完成 |
+| 2026-06-15 | 周期 #26：新增 `scripts/extract_wz_py/extract_minimap_from_wz.py`（含 `--fallback-footholds`），导出 1000000/30000/100000000/101000000 真实 miniMap canvas；20000 无 miniMap 节点 → foothold 程序化占位；`MapMetaFull.miniMapAsset` 暴露给 `MapleMiniMap`；`pubspec.yaml` 新增 `assets/maps/miniMap/`；§11.2 P1 #6 标记完成 |
+| 2026-06-15 | 周期 #25：`batch_export_novice_island.py` 导出 5 张新手地图 JSON（footholds id/prev/next + portals） + tile/obj PNG + MAX3 补 grassySoil back PNG；新增 `extract_maplife_from_wz.py`（`data/maplife/` 与 `client/assets/maplife/` 同步覆盖 5 图）；§11.2 P1 #5 标记完成 |
+| 2026-06-15 | 周期 #24：`map_foothold.dart` 新增 `isThinPlatform` + 下跳仅薄平台有效；`MapMetaFull._extractRopeLadders` 从 WZ obj `l0=rope/ladder` 解析攀爬段；`game_world.dart` 下跳穿板（↓+Alt/Space）+ 攀爬状态机（↑ 进入、Space 跳离、ladder 锁 X / rope 微调）；`game_controls.dart` 新增 `anyMoveUp`；§11.2 P0 #4 标记完成 |
+| 2026-06-15 | 周期 #23：怪物精灵补缺（新手怪蘑菇/野猪等）；`scripts/extract_wz_py/extract_mobs_npcs.py` `first_canvas` 处理 link 重定向；补充 `sprites/mob/{id}.png` 非 placeholder |
+| 2026-06-15 | 周期 #22：grassySoil tile PNG 重新 decode（wz-python + 枚举 offset/尺寸/像素格式），22/22 非占位；`scripts/extract_wz_py/_ext_grassy_soil.py`；§11.2 P0 #2 标记完成 |
+| 2026-06-15 | 周期 #21：FootholdTree JSON 缺 id/prev/next 时 `map_foothold.dart` 自动补唯一 id；`GameWorld.renderTree` 新增调试 overlay（FH / 脚点十字）；HUD 层增加两个切换按钮；§11.2 P0 #1 标记完成 |
 | 2026-06-14 | 进游戏：FootholdTree(id/prev/next)、Tile/Obj 前景、079 HUD、传送门+change-map；更新 §2.5/§2.6 参考与解析路径表；重写 §11 问题与计划 |
 | 2026-06-14 | 示例代码迁出：`examples/` 删除，统一至同级 `mapleStory079-external/`；新增 §2 路径总表 |
 | 2026-06-14 | 重写本文档：以官方 extracted_client + MAX3 为资源基准；MapLogin2 视差登录；彩虹村 foothold/back；弃用 build_login_scene |

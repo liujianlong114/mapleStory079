@@ -79,6 +79,9 @@ class GameControls {
   static bool isMoveDown(LogicalKeyboardKey key) =>
       key == moveDown || key == LogicalKeyboardKey.keyS;
 
+  static bool isMoveUp(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.keyW;
+
   static bool isAttack(LogicalKeyboardKey key) =>
       key == attack || key == LogicalKeyboardKey.controlRight;
 
@@ -99,6 +102,9 @@ class GameControls {
 
   static bool anyMoveDown(Set<LogicalKeyboardKey> pressed) =>
       pressed.any(isMoveDown);
+
+  static bool anyMoveUp(Set<LogicalKeyboardKey> pressed) =>
+      pressed.any(isMoveUp);
 
   static bool anyJump(Set<LogicalKeyboardKey> pressed) => pressed.any(isJump);
 

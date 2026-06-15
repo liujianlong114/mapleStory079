@@ -225,14 +225,20 @@ class MapleStatusBar extends StatelessWidget {
 
   Widget _keyBtn(String asset, VoidCallback? onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap == null ? null : () {
+        AudioManager().playUiClick();
+        onTap();
+      },
       child: Image.asset(asset, height: 20, filterQuality: FilterQuality.none),
     );
   }
 
   Widget _iconBtn(String asset, VoidCallback? onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap == null ? null : () {
+        AudioManager().playUiClick();
+        onTap();
+      },
       child: Image.asset(asset, width: 43, height: 34, filterQuality: FilterQuality.none),
     );
   }

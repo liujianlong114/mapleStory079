@@ -433,7 +433,7 @@ class _WzSceneScreenState extends State<WzSceneScreen>
                 ? null
                 : (_) {
                     setState(() => _pressedButton = null);
-                    AudioManager().playSfx(SfxAssets.click);
+                    AudioManager().playUiClick();
                     widget.onButton?.call(btn.id);
                   },
             onTapCancel: () => setState(() => _pressedButton = null),

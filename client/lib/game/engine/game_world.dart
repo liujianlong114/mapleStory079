@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'dart:ui' as ui;
 import 'dart:math' as math;
 
 import 'package:flame/camera.dart';
@@ -19,12 +19,14 @@ import '../../models/mob.dart';
 import '../../services/api_service.dart';
 import '../../services/websocket_service.dart';
 import 'game_controls.dart';
+import 'ground_loot_component.dart';
 import 'map_foothold.dart';
 import 'maple_island_map_layer.dart';
 import 'portal_component.dart';
 import 'wz_map_layer.dart';
 import 'wz_map_foreground.dart';
 import 'sprite_loader.dart';
+import 'effect_sprite_component.dart';
 
 /// 079 横版游戏主世界（Flame Game）
 ///
@@ -119,9 +121,15 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   /// 地图默认出生点 Y（仅初始落点回退）
   final double _spawnY;
   MapFootholds? _footholds;
+  List<RopeLadderDef> _ropeLadders = const [];
   int? _playerFhid;
+  int? _climbingRopeId;
   final List<PortalComponent> _portals = [];
   double _portalCooldown = 0;
+
+  /// 调试：在世界上画 foothold 段与玩家脚点十字（默认关闭）
+  static bool debugShowFootholds = false;
+  static bool debugShowFootPoint = false;
   double _vrLeft = 0;
   double _vrRight = 1600;
   double _vrTop = 0;
@@ -136,6 +144,8 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   /// 079 固定逻辑视口（不读 game.size，避免布局前断言崩溃）
   double get viewportW => MapMeta.officialViewportW;
   double get viewportH => MapMeta.officialViewportH;
+  String? _miniMapAsset;
+  String? get miniMapAsset => _miniMapAsset;
 
   /// 小地图 / HUD 刷新（相机跟随每帧，延迟到帧末避免 build 中 setState）
   VoidCallback? onViewChanged;
@@ -164,6 +174,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   /// 当前玩家所在 x 的可走 foothold Y
   double get groundY => groundAt(player.position.x, feetY: player.position.y);
+  List<FootholdSegment> get debugFootholdSegments => _footholds?.segments ?? const [];
 
   double? tryGroundAt(double x, {double? feetY}) {
     if (_footholds == null) return null;
@@ -179,6 +190,30 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   double _snapSpawnY(double x, double hintY) =>
       _footholds?.snapSpawn(x, hintY).y ?? hintY;
+
+  // === rope/ladder 辅助（079 攀爬） ===
+  static const double _climbSpeed = 180.0; // 上下攀爬像素/秒
+  static const double _ropeHorizontalSpeed = 80.0;
+
+  /// 找玩家当前位置附近可攀爬段
+  RopeLadderDef? _findNearbyLadder(double px, double py) {
+    for (final rl in _ropeLadders) {
+      if (rl.containsPoint(px, py)) return rl;
+    }
+    return null;
+  }
+
+  /// 尝试进入攀爬状态：需靠近某 rope/ladder + 按 ↑/↓（调用方已判定输入）
+  bool _tryStartClimb(double px, double py) {
+    final rl = _findNearbyLadder(px, py);
+    if (rl == null) return false;
+    _climbingRopeId = rl.id;
+    return true;
+  }
+
+  void _exitClimb() {
+    _climbingRopeId = null;
+  }
 
   // ===== 角色属性 =====
   final int characterId;
@@ -312,6 +347,8 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
     final mapFull = await MapMetaFull.load(mapId);
     _footholds = mapFull?.footholds;
+    _ropeLadders = mapFull?.ropeLadders ?? const [];
+    _miniMapAsset = mapFull?.miniMapAsset;
     if (mapFull != null) {
       _vrLeft = mapFull.meta.vrLeft.toDouble();
       _vrRight = mapFull.meta.vrRight.toDouble();
@@ -442,32 +479,97 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     final left = GameControls.anyMoveLeft(_keysPressed);
     final right = GameControls.anyMoveRight(_keysPressed);
     final down = GameControls.anyMoveDown(_keysPressed);
-    if (left && !right) {
-      player.moveHorizontal(-1, dt, onGround: _onGround);
-      moved = true;
-    } else if (right && !left) {
-      player.moveHorizontal(1, dt, onGround: _onGround);
-      moved = true;
-    }
-    player.position.x = player.position.x.clamp(_vrLeft + 16, _vrRight - 16);
+    final up = GameControls.anyMoveUp(_keysPressed);
 
-    final jumpNow = GameControls.anyJump(_keysPressed);
-    if (jumpNow && !_jumpHeldLast && _onGround) {
-      final jd = _footholds?.jumpDownInfo(_playerFhid, player.position.x);
-      if (down && jd != null && jd.enabled) {
-        player.position.y = jd.dropY;
-        _onGround = false;
-        _playerFhid = null;
-        _vy = 0;
-        if (!player.isAttacking) player.animationState = 'jump';
-      } else {
-        _vy = _jumpSpeed;
-        _onGround = false;
-        player.animationState = 'jump';
+    // --- rope/ladder 攀爬状态机（079：靠近+按↑进入，Space/←/→ 脱离） ---
+    final activeClimb = _climbingRopeId != null
+        ? _ropeLadders.firstWhere((r) => r.id == _climbingRopeId, orElse: () => _ropeLadders.first)
+        : null;
+    if (_climbingRopeId != null && activeClimb == null) {
+      _exitClimb();
+    }
+    if (activeClimb != null) {
+      // 已在攀爬中：↑/↓ 上下，Space 跳离，ladder 锁水平/rope 允许微调
+      if (up) {
+        player.position.y -= _climbSpeed * dt;
+        player.animationState = 'walk'; // 用 walk 帧作简单"攀爬"动画
+      } else if (down) {
+        player.position.y += _climbSpeed * dt;
+        player.animationState = 'walk';
       }
-    }
-    _jumpHeldLast = jumpNow;
+      // ladder 锁定中心 X；rope 允许左右微调
+      if (activeClimb.isLadder) {
+        player.position.x = activeClimb.x;
+      } else {
+        if (left && !right) {
+          player.position.x -= _ropeHorizontalSpeed * dt;
+          moved = true;
+        } else if (right && !left) {
+          player.position.x += _ropeHorizontalSpeed * dt;
+          moved = true;
+        }
+        player.position.x = player.position.x.clamp(
+          activeClimb.x - 40,
+          activeClimb.x + 40,
+        );
+      }
+      // 越界检查（顶/底或超出段范围→脱离）
+      final jumpNow = GameControls.anyJump(_keysPressed);
+      if (player.position.y < activeClimb.yTop - 8 ||
+          player.position.y > activeClimb.yBottom + 8) {
+        _exitClimb();
+        _onGround = false;
+        _vy = 0;
+      } else {
+        if (jumpNow && !_jumpHeldLast) {
+          // 跳离攀爬
+          _exitClimb();
+          _vy = _jumpSpeed;
+          _onGround = false;
+          player.animationState = 'jump';
+        }
+      }
+      _jumpHeldLast = jumpNow;
+    } else {
+      // 非攀爬状态：靠近 rope/ladder 时按 ↑ 可进入
+      if (up && !_jumpHeldLast) {
+        final near = _findNearbyLadder(player.position.x, player.position.y);
+        if (near != null) {
+          _tryStartClimb(player.position.x, player.position.y);
+          player.position.x = near.x;
+          if (!player.isAttacking) player.animationState = 'idle';
+        }
+      }
 
+      if (left && !right) {
+        player.moveHorizontal(-1, dt, onGround: _onGround);
+        moved = true;
+      } else if (right && !left) {
+        player.moveHorizontal(1, dt, onGround: _onGround);
+        moved = true;
+      }
+      player.position.x = player.position.x.clamp(_vrLeft + 16, _vrRight - 16);
+
+      final jumpNow = GameControls.anyJump(_keysPressed);
+      if (jumpNow && !_jumpHeldLast && _onGround) {
+        final jd = _footholds?.jumpDownInfo(_playerFhid, player.position.x);
+        if (down && jd != null && jd.enabled) {
+          player.position.y = jd.dropY;
+          _onGround = false;
+          _playerFhid = null;
+          _vy = 0;
+          if (!player.isAttacking) player.animationState = 'jump';
+        } else {
+          _vy = _jumpSpeed;
+          _onGround = false;
+          player.animationState = 'jump';
+        }
+      }
+      _jumpHeldLast = jumpNow;
+    } // 结束非攀爬分支
+
+    // 重力/着陆（攀爬状态中禁用重力）
+    if (_climbingRopeId == null) {
     if (!_onGround) {
       _vy += _gravity * dt;
       player.position.y += _vy * dt;
@@ -521,6 +623,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
         }
       }
     }
+    } // 结束 _climbingRopeId == null
 
     _syncCamera();
     _checkPortalWarp();
@@ -770,6 +873,13 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
   }
 
   void _tryAutoPickup({bool force = false}) {
+    // 清理已过期（超过 lifetime）的掉落物
+    for (final entry in _groundLoots.entries.toList()) {
+      final loot = entry.value;
+      if (loot.expired) {
+        removeGroundLoot(entry.key);
+      }
+    }
     const pickupRange = 70.0;
     const r2 = pickupRange * pickupRange;
     for (final entry in _groundLoots.entries.toList()) {
@@ -788,6 +898,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     try {
       AudioManager().playSfx(SfxAssets.pickup);
     } catch (_) {}
+    unawaited(playEffect('pickUpItem', position: player.position.clone()));
     if (api != null) {
       await api!.pickupLoot(
         characterId: characterId,
@@ -842,6 +953,7 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     try {
       AudioManager().playSfx(SfxAssets.levelUp);
     } catch (_) {}
+    unawaited(playEffect('levelUp'));
     onLevelUp?.call(level);
     onStatChange?.call(
       hp: hp,
@@ -1244,6 +1356,23 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
     world.add(DamagePopup(damage: damage, origin: origin, isCritical: critical));
   }
 
+  /// 在指定世界坐标播放一个一次性贴图动画（升级闪光 / 拾取闪光等）。
+  ///
+  /// 动画不存在时静默跳过。动画结束后自动从 world 移除。
+  Future<void> playEffect(String type, {Vector2? position, double stepTime = 0.1}) async {
+    final pos = position ?? player.position.clone();
+    try {
+      final comp = await EffectSpriteComponent.load(
+        type,
+        position: pos,
+        defaultStepTime: stepTime,
+      );
+      if (comp != null) world.add(comp);
+    } catch (_) {
+      // ignore: 特效缺失不应影响游戏主循环
+    }
+  }
+
   void updatePlayerStats({int? hp, int? maxHp, int? mp, int? maxMp, int? level}) {
     if (hp != null) this.hp = hp;
     if (maxHp != null) this.maxHp = maxHp;
@@ -1254,6 +1383,59 @@ class GameWorld extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
   @override
   Color backgroundColor() => const Color(0xFF5BA3D9);
+
+  /// 调试：在整个世界渲染完后，在最上层画 foothold 线/玩家脚点
+  @override
+  void renderTree(Canvas canvas) {
+    super.renderTree(canvas);
+    if (!debugShowFootholds && !debugShowFootPoint) return;
+    final fh = _footholds;
+    if (fh == null) return;
+
+    final cam = camera.viewfinder.position;
+    final paint = Paint()
+      ..color = const Color(0xFF00FF88)
+      ..strokeWidth = 1.5;
+    final edge = Paint()
+      ..color = const Color(0xFFD0D0D0)
+      ..strokeWidth = 1.0;
+    final foot = Paint()
+      ..color = const Color(0xFF00FFFF)
+      ..strokeWidth = 2.0;
+    const textColor = Color(0xFF9AFF9A);
+
+    if (debugShowFootholds) {
+      for (final s in fh.segments) {
+        final x1 = s.x1 - cam.x;
+        final y1 = s.y1 - cam.y;
+        final x2 = s.x2 - cam.x;
+        final y2 = s.y2 - cam.y;
+        if (x1 < -20 || x2 > viewportW + 20 || y1 < -20 || y2 > viewportH + 20) continue;
+        canvas.drawLine(
+          Offset(x1, y1),
+          Offset(x2, y2),
+          s.isWalkable ? paint : edge,
+        );
+      }
+      // 忽略文字：Flame 框架内置 textPainter 不在本轮必需
+      final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+        textAlign: TextAlign.left,
+        fontSize: 10,
+        maxLines: 1,
+      ))
+        ..pushStyle(ui.TextStyle(color: textColor))
+        ..addText('segments=${fh.segments.length}  walkable=${fh.segments.where((e) => e.isWalkable).length}');
+      final pg = builder.build()..layout(const ui.ParagraphConstraints(width: 400));
+      canvas.drawParagraph(pg, const Offset(8, 80));
+    }
+
+    if (debugShowFootPoint) {
+      final px = player.position.x - cam.x;
+      final py = player.position.y - cam.y;
+      canvas.drawLine(Offset(px - 8, py), Offset(px + 8, py), foot);
+      canvas.drawLine(Offset(px, py - 8), Offset(px, py + 8), foot);
+    }
+  }
 }
 
 /// ==================== 世界背景 ====================
@@ -2065,62 +2247,6 @@ class MobComponent extends PositionComponent {
       )..layout();
       tp.paint(canvas, Offset(size.x / 2 - tp.width / 2, -tp.height - 16));
     }
-  }
-}
-
-/// ==================== 地面掉落组件 ====================
-class GroundLootComponent extends PositionComponent {
-  GroundLootComponent({
-    required this.dropId,
-    required this.itemId,
-    required this.quantity,
-    required Vector2 position,
-  }) : super(
-          position: position,
-          size: Vector2(28, 28),
-          anchor: Anchor.center,
-        );
-
-  final String dropId;
-  final int itemId;
-  final int quantity;
-  double _bob = 0;
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    _bob += dt * 3;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    final bobY = math.sin(_bob) * 3;
-    canvas.save();
-    canvas.translate(0, bobY);
-    final paint = Paint()
-      ..shader = LinearGradient(
-        colors: itemId > 0
-            ? [const Color(0xFFf1c40f), const Color(0xFFe67e22)]
-            : [const Color(0xFFf9e79f), const Color(0xFFf4d03f)],
-      ).createShader(Rect.fromLTWH(0, 0, size.x, size.y));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        const Radius.circular(6),
-      ),
-      paint,
-    );
-    if (itemId > 0) {
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '$itemId',
-          style: const TextStyle(color: Colors.white, fontSize: 8),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: size.x);
-      tp.paint(canvas, Offset(2, size.y / 2 - tp.height / 2));
-    }
-    canvas.restore();
   }
 }
 

@@ -96,12 +96,16 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
 
   void _onSceneButton(String id) async {
     if (id == 'select') {
+      AudioManager().playUiClick();
       await _enterGame();
     } else if (id == 'new') {
+      AudioManager().playUiClick();
       await _openCreatePage();
     } else if (id == 'delete') {
+      AudioManager().playUiClick();
       await _deleteCharacter();
     } else if (id == 'page_prev' && _page > 0) {
+      AudioManager().playUiClick();
       setState(() {
         _page--;
         if (_selectedSlot != null && _selectedSlot! < _pageStart) {
@@ -109,6 +113,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
         }
       });
     } else if (id == 'page_next' && (_page + 1) * _slotsPerPage < _maxSlots) {
+      AudioManager().playUiClick();
       setState(() {
         _page++;
         if (_selectedSlot != null && _selectedSlot! >= _pageStart + _slotsPerPage) {
@@ -167,7 +172,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
       final c = _characters[global];
       return GestureDetector(
         onTap: () {
-          AudioManager().playSfx(SfxAssets.click);
+          AudioManager().playUiClick();
           setState(() => _selectedSlot = global);
         },
         child: Column(
@@ -255,11 +260,15 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh, color: Color(0xFFFFD700), size: 20),
-                  onPressed: _loadCharacters,
+                  onPressed: () {
+                    AudioManager().playUiClick();
+                    _loadCharacters();
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.logout, color: Color(0xFFFFD700), size: 20),
                   onPressed: () async {
+                    AudioManager().playUiClick();
                     await AudioManager().stopBgm();
                     auth.logout();
                     if (mounted) Navigator.of(context).pushReplacementNamed('/login');

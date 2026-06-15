@@ -313,12 +313,43 @@ class MapObjDef {
       );
 }
 
+/// 079 WZ obj: l0=rope/ladder — 可攀爬段
+/// length 通过 obj.y → 下方最近 foothold 推断。
+class RopeLadderDef {
+  final int id;
+  final double x; // 中心 X（obj.x 为左上角，+~30 中心偏移已由 WZ 约定，客户端用 obj.x+ox 近似）
+  final double yTop; // obj.y + oy（顶部像素）
+  final double yBottom; // 下方最近的地面 foothold.y
+  final String type; // "rope" / "ladder"
+  /// ladder：玩家水平被锁在梯子 x 上；rope：允许水平微调但仍上下移动
+  bool get isLadder => type == 'ladder';
+  bool get isRope => type == 'rope';
+
+  const RopeLadderDef({
+    required this.id,
+    required this.x,
+    required this.yTop,
+    required this.yBottom,
+    required this.type,
+  });
+
+  double get length => yBottom - yTop;
+
+  bool containsPoint(double px, double py, {double tolX = 40, double tolY = 16}) {
+    if (px < x - tolX || px > x + tolX) return false;
+    if (py < yTop - tolY || py > yBottom + tolY) return false;
+    return true;
+  }
+}
+
 class MapMetaFull {
   final MapMeta meta;
   final List<MapLayerDef> layers;
   final List<MapForegroundLayerDef> mapLayers;
   final MapFootholds? footholds;
   final List<MapPortalDef> portals;
+  final List<RopeLadderDef> ropeLadders;
+  final String? miniMapAsset;
 
   MapMetaFull({
     required this.meta,
@@ -326,17 +357,85 @@ class MapMetaFull {
     required this.mapLayers,
     this.footholds,
     this.portals = const [],
+    this.ropeLadders = const [],
+    this.miniMapAsset,
   });
+
+  static List<RopeLadderDef> _extractRopeLadders(
+    List<MapForegroundLayerDef> mapLayers,
+    MapFootholds? fh,
+  ) {
+    final out = <RopeLadderDef>[];
+    int rid = 1;
+    for (final layer in mapLayers) {
+      for (final obj in layer.objs) {
+        if (obj.l0 != 'rope' && obj.l0 != 'ladder') continue;
+        // WZ obj 的位置：显示左上角 = (obj.x, obj.y)，图像锚点 = (ox, oy)
+        // 对于 rope/ladder，攀爬轴从 obj.y+oy 向下延伸至下一个 foothold
+        final x = (obj.x + obj.ox).toDouble();
+        final yTop = (obj.y + obj.oy).toDouble();
+        // 找下方最近的可站立面
+        double? yBottom;
+        if (fh != null) {
+          final belowFh = fh.getFhidBelow(x, yTop + 4);
+          if (belowFh != null) {
+            yBottom = fh.groundYOnFh(belowFh, x);
+          }
+        }
+        yBottom ??= yTop + 200; // 默认长度兜底
+        if (yBottom <= yTop + 4) yBottom = yTop + 200;
+        out.add(RopeLadderDef(
+          id: rid++,
+          x: x,
+          yTop: yTop,
+          yBottom: yBottom,
+          type: obj.l0,
+        ));
+      }
+    }
+    return out;
+  }
+
+  static Future<String?> _tryMiniMapAsset(int mapId) async {
+    final candidates = [
+      'assets/maps/miniMap/$mapId.png',
+      'assets/images/ui/hud/minimap_$mapId.png',
+    ];
+    for (final c in candidates) {
+      try {
+        await rootBundle.load(c);
+        return c;
+      } catch (_) {}
+    }
+    return null;
+  }
 
   static Future<MapMetaFull?> load(int mapId) async {
     final paths = <String>{
       'assets/maps/$mapId.json',
+      // 彩虹村/新手村
       if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
       if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
-      if (mapId == 20000) 'assets/maps/20000.json',
+      // 明珠港
       if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
+      // 射手村 → 101000000
+      if (mapId == 10500 || mapId == 10501 || mapId == 10502 || mapId == 101000000) 'assets/maps/101000000.json',
+      // 魔法密林 → 102000000
+      if (mapId == 10800 || mapId == 10900 || mapId == 11000 || mapId == 102000000) 'assets/maps/102000000.json',
+      // 勇士部落 → 103000000
+      if (mapId == 11300 || mapId == 11400 || mapId == 11500 || mapId == 103000000) 'assets/maps/103000000.json',
+      // 废弃都市/冰峰雪域/玩具城/天空之城/林中 → 100000000
+      if (mapId == 11700 || mapId == 11800 || mapId == 11900) 'assets/maps/100000000.json',
+      if (mapId == 12000 || mapId == 12100 || mapId == 12200 || mapId == 12300) 'assets/maps/100000000.json',
+      if (mapId == 12400 || mapId == 12500 || mapId == 12600) 'assets/maps/100000000.json',
+      if (mapId == 12700 || mapId == 12800 || mapId == 12900) 'assets/maps/100000000.json',
+      if (mapId == 13000 || mapId == 13100 || mapId == 13200 || mapId == 13300) 'assets/maps/100000000.json',
+      // BOSS/训练场/其他
+      if (mapId >= 14000 && mapId < 20000) 'assets/maps/20000.json',
+      if (mapId >= 20000 && mapId < 30000) 'assets/maps/20000.json',
       if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
     };
+    final mini = await _tryMiniMapAsset(mapId);
     for (final p in paths) {
       try {
         final raw = await rootBundle.loadString(p);
@@ -360,12 +459,15 @@ class MapMetaFull {
                 ?.map((e) => MapPortalDef.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [];
+        final ropeLadders = _extractRopeLadders(mapLayers, fh);
         return MapMetaFull(
           meta: meta,
           layers: layers,
           mapLayers: mapLayers,
           footholds: fh,
           portals: portals,
+          ropeLadders: ropeLadders,
+          miniMapAsset: mini,
         );
       } catch (_) {}
     }
@@ -376,10 +478,26 @@ class MapMetaFull {
   static Future<bool> hasAsset(int mapId) async {
     final paths = <String>{
       'assets/maps/$mapId.json',
+      // 彩虹村/新手村
       if (mapId == 1000000 || mapId == 10000) 'assets/maps/1000000.json',
       if (mapId == 1000001 || mapId == 1000002) 'assets/maps/1000000.json',
-      if (mapId == 20000) 'assets/maps/20000.json',
+      // 明珠港
       if (mapId == 104000000 || mapId == 10300 || mapId == 10400) 'assets/maps/104000000.json',
+      // 射手村 → 回退到已导出的 101000000
+      if (mapId == 10500 || mapId == 10501 || mapId == 10502 || mapId == 101000000) 'assets/maps/101000000.json',
+      // 魔法密林 → 回退到已导出的 102000000
+      if (mapId == 10800 || mapId == 10900 || mapId == 11000 || mapId == 102000000) 'assets/maps/102000000.json',
+      // 勇士部落 → 回退到已导出的 103000000
+      if (mapId == 11300 || mapId == 11400 || mapId == 11500 || mapId == 103000000) 'assets/maps/103000000.json',
+      // 废弃都市/冰峰雪域/玩具城/天空之城/林中 → 回退到 100000000
+      if (mapId == 11700 || mapId == 11800 || mapId == 11900) 'assets/maps/100000000.json',
+      if (mapId == 12000 || mapId == 12100 || mapId == 12200 || mapId == 12300) 'assets/maps/100000000.json',
+      if (mapId == 12400 || mapId == 12500 || mapId == 12600) 'assets/maps/100000000.json',
+      if (mapId == 12700 || mapId == 12800 || mapId == 12900) 'assets/maps/100000000.json',
+      if (mapId == 13000 || mapId == 13100 || mapId == 13200 || mapId == 13300) 'assets/maps/100000000.json',
+      // BOSS/训练场/其他
+      if (mapId >= 14000 && mapId < 20000) 'assets/maps/20000.json',
+      if (mapId >= 20000 && mapId < 30000) 'assets/maps/20000.json',
       if (mapId == 100000000 || mapId == 10000000) 'assets/maps/100000000.json',
     };
     for (final p in paths) {

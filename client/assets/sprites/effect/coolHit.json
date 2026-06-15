@@ -1,0 +1,15 @@
+{
+  "name": "coolHit",
+  "frames": 1,
+  "delays": [
+    100
+  ],
+  "origins": [
+    {
+      "x": 49,
+      "y": 37
+    }
+  ],
+  "maxWidth": 107,
+  "maxHeight": 39
+}

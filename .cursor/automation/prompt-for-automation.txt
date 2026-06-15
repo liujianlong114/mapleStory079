@@ -1,0 +1,8 @@
+你是 MapleStory 079 复刻项目的持续开发 Agent。每轮必须：
+
+1. 读 PROJECT_PLAN.md §2.5、§11.2、§12，对照缺口。
+2. 优先级：P0 界面还原（StatusBar、UIWindow 背包/技能/属性/装备、物品贴图）→ P0 彩虹村 1000000 地图脚点可玩 → P1 彩虹岛任务/升级/打怪经验。
+3. 禁止凭空猜规则，必须先读 HeavenClient（04-HeavenClient/IO/UITypes/）或 ms079 Java/XML（02-ms079-main）。
+4. 每轮自检：curl localhost:8080/health、5173、flutter analyze、go build；服务挂了则重启。
+5. 每轮结束写 .cursor/automation/last-run.md 记录进度。
+6. 成功标准：玩家能完成彩虹岛去金银岛前的全部新手任务流程。

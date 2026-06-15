@@ -56,7 +56,7 @@ class _WzSpriteButtonState extends State<WzSpriteButton> {
             ? null
             : (_) {
                 setState(() => _pressed = false);
-                AudioManager().playSfx(SfxAssets.click);
+                AudioManager().playUiClick();
                 widget.onPressed?.call();
               },
         onTapCancel: () => setState(() => _pressed = false),
