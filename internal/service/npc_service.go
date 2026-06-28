@@ -80,11 +80,16 @@ func NewNPCService() *NPCService {
 
 // 注册内置的默认NPC脚本（转职官、传送门、商人等）
 func (s *NPCService) registerDefaultScripts() {
-	s.scripts[1010000] = &JobChangeScript{}
-	s.scripts[1010001] = &JobChangeScript{}
-	s.scripts[1010002] = &JobChangeScript{}
-	s.scripts[1010003] = &JobChangeScript{}
-	s.scripts[1010004] = &JobChangeScript{}
+	// 转职官（全职业 1~4 转）
+	for _, id := range []int{1010000, 1010001, 1010002, 1010003, 1010004} {
+		s.scripts[id] = NewJobAdvancementScript(id, "转职官")
+	}
+	// 各职业导师
+	s.scripts[1022000] = NewJobAdvancementScript(1022000, "武术教练")
+	s.scripts[1032001] = NewJobAdvancementScript(1032001, "汉斯")
+	s.scripts[1012000] = NewJobAdvancementScript(1012000, "射手村中巴")
+	s.scripts[1052000] = NewJobAdvancementScript(1052000, "阿勒斯")
+	s.scripts[1090000] = NewJobAdvancementScript(1090000, "凯琳")
 	s.scripts[9900001] = &PortalScript{}
 	s.scripts[9900002] = &MerchantScript{}
 }

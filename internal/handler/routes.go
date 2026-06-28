@@ -46,7 +46,9 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 	service.StartMobSimulation(service.DefaultMobInstanceService)
 	npcHandler := NewNPCHandler()
 	shopHandler := NewShopHandler()
+	cashShopHandler := NewCashShopHandler()
 	invHandler := NewInventoryHandler()
+	equipHandler := NewEquipHandler()
 	skillHandler := NewSkillHandler()
 	chatHandler := NewChatHandler()
 	socialHandler := NewSocialHandler()
@@ -62,7 +64,9 @@ func SetupRouter(services *ServiceBundle) *gin.Engine {
 			registerGameRoutes(v1, gameHandler)
 			registerNPCRoutes(v1, npcHandler)
 			registerShopRoutes(v1, shopHandler)
+			registerCashShopRoutes(v1, cashShopHandler)
 			registerInventoryRoutes(v1, invHandler)
+			registerEquipRoutes(v1, equipHandler)
 			registerSkillRoutes(v1, skillHandler)
 			registerChatRoutes(v1, chatHandler)
 			registerSocialRoutes(v1, socialHandler)
@@ -208,6 +212,28 @@ func registerLookRoutes(r *gin.RouterGroup, h *AvatarHandler) {
 	lookGroup := r.Group("/look")
 	{
 		lookGroup.GET("/compose.png", h.Compose)
+	}
+}
+
+
+func registerCashShopRoutes(r *gin.RouterGroup, h *CashShopHandler) {
+	cs := r.Group("/cash-shop")
+	{
+		cs.GET("/items", h.List)
+		cs.POST("/purchase", h.Purchase)
+		cs.GET("/balance/:characterId", h.Balance)
+	}
+}
+
+
+func registerEquipRoutes(r *gin.RouterGroup, h *EquipHandler) {
+	equip := r.Group("/equip")
+	{
+		equip.GET("/:characterId", h.List)
+		equip.POST("/equip", h.Equip)
+		equip.POST("/unequip", h.Unequip)
+		equip.GET("/stats/:characterId", h.Stats)
+		equip.GET("/slot/:itemId", h.SlotInfo)
 	}
 }
 

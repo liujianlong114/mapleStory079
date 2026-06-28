@@ -202,6 +202,23 @@ func (s *CombatService) MobAttackPlayer(player *database.Character, mob *databas
 }
 
 // GetCombatStats 返回角色战斗属性（攻击力、防御、HP百分比等）。
+// getEquipAttackBonus 计算角色已装备物品提供的攻击力加成
+func (s *CombatService) getEquipAttackBonus(characterID uint) (pad, mad, pdd, mdd int) {
+	var items []database.CharacterInventory
+	database.GetDB().Where("character_id = ? AND is_equipped = ?", characterID, true).Find(&items)
+	for _, inv := range items {
+		var item database.Item
+		if err := database.GetDB().First(&item, inv.ItemID).Error; err != nil {
+			continue
+		}
+		pad += item.PAD
+		mad += item.MAD
+		pdd += item.PDD
+		mdd += item.MDD
+	}
+	return
+}
+
 func (s *CombatService) GetCombatStats(player *database.Character) map[string]interface{} {
 	attack := player.STR + player.DEX/2 + player.Level*2
 	defense := player.DEX/5 + player.STR/10
@@ -213,17 +230,25 @@ func (s *CombatService) GetCombatStats(player *database.Character) map[string]in
 	if player.MaxMP > 0 {
 		mpPercent = float64(player.MP) / float64(player.MaxMP) * 100
 	}
+	// 装备加成
+	eqPad, eqMad, eqPdd, eqMdd := s.getEquipAttackBonus(player.ID)
 	return map[string]interface{}{
-		"attack":     attack,
-		"defense":    defense,
-		"hp":         player.HP,
-		"max_hp":     player.MaxHP,
-		"mp":         player.MP,
-		"max_mp":     player.MaxMP,
-		"hp_percent": hpPercent,
-		"mp_percent": mpPercent,
-		"level":      player.Level,
-		"class":      player.Class,
+		"attack":      attack + eqPad,
+		"defense":     defense + eqPdd,
+		"magic_attack": eqMad,
+		"magic_defense": eqMdd,
+		"hp":          player.HP,
+		"max_hp":      player.MaxHP,
+		"mp":          player.MP,
+		"max_mp":      player.MaxMP,
+		"hp_percent":  hpPercent,
+		"mp_percent":  mpPercent,
+		"level":       player.Level,
+		"class":       player.Class,
+		"equip_pad":   eqPad,
+		"equip_mad":   eqMad,
+		"equip_pdd":   eqPdd,
+		"equip_mdd":   eqMdd,
 	}
 }
 

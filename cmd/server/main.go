@@ -46,6 +46,8 @@ func main() {
 		&database.NPC{},
 		&database.Mob{},
 		&database.MobDrop{},
+		&database.CashShopItem{},
+		&database.CashShopPurchase{},
 		&database.Guild{},
 		&database.Party{},
 		&database.Friend{},

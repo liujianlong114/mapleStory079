@@ -44,6 +44,7 @@ type Character struct {
 	AbilityPoint int       `gorm:"not null;default:0" json:"ability_point"`
 	SkillPoint   int       `gorm:"not null;default:0" json:"skill_point"`
 	Mesos        int       `gorm:"not null;default:0" json:"mesos"`
+	MaplePoints  int       `gorm:"not null;default:0" json:"maple_points"`
 	MapID        uint      `gorm:"not null;default:1" json:"map_id"`
 	PositionX    int       `gorm:"default:0" json:"position_x"`
 	PositionY    int       `gorm:"default:0" json:"position_y"`
@@ -82,13 +83,43 @@ type CharacterInventory struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+
+// CashShopItem 商城物品表
+type CashShopItem struct {
+	ID          uint      `gorm:"primary_key" json:"id"`
+	ItemID      int       `gorm:"not null;index" json:"item_id"`
+	Category    string    `gorm:"size:32;default:'equip'" json:"category"` // equip/use/setup/etc/pet
+	Price       int       `gorm:"default:0" json:"price"`                   // 价格（枫叶点）
+	PriceMesos  int64     `gorm:"default:0" json:"price_mesos"`             // 金币价格（0=不可用金币购买）
+	Stock       int       `gorm:"default:-1" json:"stock"`                  // -1=无限
+	IsFeatured  bool      `gorm:"default:false" json:"is_featured"`
+	IsNew       bool      `gorm:"default:false" json:"is_new"`
+	IsOnSale    bool      `gorm:"default:false" json:"is_on_sale"`
+	SalePrice   int       `gorm:"default:0" json:"sale_price"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// CashShopPurchase 商城购买记录表
+type CashShopPurchase struct {
+	ID          uint      `gorm:"primary_key" json:"id"`
+	CharacterID uint      `gorm:"not null;index" json:"character_id"`
+	ItemID      int       `gorm:"not null" json:"item_id"`
+	Price       int       `gorm:"not null" json:"price"`       // 实际支付的枫叶点
+	PriceMesos  int64     `gorm:"default:0" json:"price_mesos"` // 实际支付的金币
+	Quantity    int       `gorm:"default:1" json:"quantity"`
+	IsGift      bool      `gorm:"default:false" json:"is_gift"`
+	ReceiverID  uint      `gorm:"default:0" json:"receiver_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // ====================== 游戏数据 ======================
 
 // Item 物品表
 type Item struct {
 	ID          uint      `gorm:"primary_key" json:"id"`
 	Name        string    `gorm:"size:64;not null" json:"name"`
-	ItemType    int       `gorm:"not null;default:0" json:"item_type"` // 0=消耗 1=装备 2=其他
+	ItemType    int       `gorm:"not null;default:0" json:"item_type"` // 0=消耗 1=装备 2=其他 3=现金
 	Description string    `gorm:"type:text" json:"description"`
 	Price       int       `gorm:"default:0" json:"price"`
 	LevelReq    int       `gorm:"default:1" json:"level_req"`
@@ -98,9 +129,21 @@ type Item struct {
 	LUK         int       `gorm:"default:0" json:"luk"`
 	HPRecovery  int       `gorm:"default:0" json:"hp_recovery"`
 	MPRecovery  int       `gorm:"default:0" json:"mp_recovery"`
+	PAD         int       `gorm:"default:0" json:"pad"`       // 物理攻击力 incPAD
+	MAD         int       `gorm:"default:0" json:"mad"`       // 魔法攻击力 incMAD
+	PDD         int       `gorm:"default:0" json:"pdd"`       // 物理防御力 incPDD
+	MDD         int       `gorm:"default:0" json:"mdd"`       // 魔法防御力 incMDD
+	ACC         int       `gorm:"default:0" json:"acc"`       // 命中率 incACC
+	EVA         int       `gorm:"default:0" json:"eva"`       // 回避率 incEVA
+	Speed       int       `gorm:"default:0" json:"speed"`     // 移动速度 incSpeed
+	Jump        int       `gorm:"default:0" json:"jump"`      // 跳跃力 incJump
+	SlotMax     int       `gorm:"default:100" json:"slot_max"` // 最大堆叠数
+	Cash        int       `gorm:"default:0" json:"cash"`       // 是否为现金商品
+	TradeBlock  int       `gorm:"default:0" json:"trade_block"` // 交易限制
 	Stackable   bool      `gorm:"default:true" json:"stackable"`
 	Image       string    `gorm:"size:128" json:"image"`
 	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Skill 技能表
@@ -111,11 +154,13 @@ type Skill struct {
 	LevelReq    int       `gorm:"default:1" json:"level_req"`
 	MaxLevel    int       `gorm:"default:10" json:"max_level"`
 	MPCost      int       `gorm:"default:0" json:"mp_cost"`
+	HPCost      int       `gorm:"default:0" json:"hp_cost"`     // HP消耗
 	DamageRatio float64   `gorm:"default:1.0" json:"damage_ratio"`
 	Description string    `gorm:"type:text" json:"description"`
 	IsPassive   bool      `gorm:"default:false" json:"is_passive"`
 	CoolDownMs  int       `gorm:"default:0" json:"cool_down_ms"`
 	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Quest 任务表
@@ -183,9 +228,12 @@ type Mob struct {
 	MagicAttack     int       `gorm:"default:5" json:"magic_attack"`
 	PhysicalDefense int       `gorm:"default:5" json:"physical_defense"`
 	MagicDefense    int       `gorm:"default:5" json:"magic_defense"`
+	Acc             int       `gorm:"default:20" json:"acc"`
+	Eva             int       `gorm:"default:10" json:"eva"`
 	ExpReward       int       `gorm:"default:0" json:"exp_reward"`
 	MesosReward     int       `gorm:"default:0" json:"mesos_reward"`
 	Speed           int       `gorm:"default:60" json:"speed"`
+	IsBoss          bool      `gorm:"default:false" json:"is_boss"`
 	Image           string    `gorm:"size:128" json:"image"`
 	CreatedAt       time.Time `json:"created_at"`
 }
